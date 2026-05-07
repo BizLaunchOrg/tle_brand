@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 import { CartDrawerProvider } from '../context/CartDrawerContext.tsx'
 import { CartDrawer } from './CartDrawer.tsx'
 import { FavoritesDrawer } from './FavoritesDrawer.tsx'
+import { FloatingActions } from './FloatingActions.tsx'
 import { Navbar } from './Navbar/navbar.tsx'
 import { Footer } from './Footer/footer.tsx'
 
@@ -18,6 +19,7 @@ export function MainLayout() {
         <Footer />
         <CartDrawer />
         <FavoritesDrawer />
+        <FloatingActions />
       </div>
     </CartDrawerProvider>
   )

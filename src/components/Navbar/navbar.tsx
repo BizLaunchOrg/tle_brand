@@ -171,16 +171,6 @@ export function Navbar() {
               Makeup
             </NavLink>
           </li>
-          <li>
-            <NavLink to="/about" className={navLinkClass(showSolidNav)}>
-              About
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/book" className={navLinkClass(showSolidNav)}>
-              Book
-            </NavLink>
-          </li>
         </ul>
         <div className="flex shrink-0 items-center gap-2.5">
           <button
@@ -279,16 +269,6 @@ export function Navbar() {
               <li>
                 <NavLink to="/makeup" className={mobileSheetLink} onClick={() => setMenuOpen(false)}>
                   Makeup
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/about" className={mobileSheetLink} onClick={() => setMenuOpen(false)}>
-                  About
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/book" className={mobileSheetLink} onClick={() => setMenuOpen(false)}>
-                  Book
                 </NavLink>
               </li>
             </ul>

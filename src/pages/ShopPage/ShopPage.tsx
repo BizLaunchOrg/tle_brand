@@ -16,7 +16,8 @@ export function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { addToCart, toggleFavorite, isFavorite, isInCart } = useCartDrawer()
 
-  const q = (searchParams.get('q') || '').trim().toLowerCase()
+  const [searchText, setSearchText] = useState(() => searchParams.get('q') || '')
+  const q = searchText.trim().toLowerCase()
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
 
@@ -61,6 +62,29 @@ export function ShopPage() {
 
         <div className="mb-6 rounded-2xl border border-black/8 bg-white p-4 sm:p-5">
           <div className="mb-4">
+            <p className="mb-2 text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">Search</p>
+            <div className="flex flex-wrap gap-2">
+              <input
+                type="search"
+                placeholder="Search by name or category..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="min-w-[220px] flex-1 rounded-full border-[1.5px] border-black/10 bg-white px-4 py-2.5 text-sm text-tle-ink outline-none transition-colors placeholder:text-tle-faint focus:border-tle-pink"
+              />
+              <button
+                type="button"
+                className="rounded-full border border-tle-pink/30 bg-white px-4 py-2 text-[10px] font-semibold tracking-wide text-tle-pink uppercase transition-colors hover:bg-tle-pink hover:text-white"
+                onClick={() => {
+                  setSearchText('')
+                  setSearchParams({}, { replace: true })
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-4">
             <p className="mb-2 text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">Type</p>
             <div className="flex flex-wrap gap-2">
               {FILTER_TYPES.map((type) => (
@@ -92,20 +116,6 @@ export function ShopPage() {
             </div>
           </div>
 
-          {q ? (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-tle-pink/15 bg-tle-blush/40 px-3 py-2.5 text-[12px] text-tle-ink">
-              <span>
-                Search: <strong className="text-tle-pink">&ldquo;{searchParams.get('q')}&rdquo;</strong>
-              </span>
-              <button
-                type="button"
-                className="rounded-full border border-tle-pink/30 bg-white px-3 py-1 text-[10px] font-semibold tracking-wide text-tle-pink uppercase transition-colors hover:bg-tle-pink hover:text-white"
-                onClick={() => setSearchParams({}, { replace: true })}
-              >
-                Clear search
-              </button>
-            </div>
-          ) : null}
         </div>
 
         {visibleProducts.length === 0 ? (
