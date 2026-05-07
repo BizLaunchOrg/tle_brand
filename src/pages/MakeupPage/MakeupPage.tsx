@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 const SERVICES = [
@@ -27,7 +28,18 @@ const TESTIMONIALS = [
   },
 ] as const
 
+const TIME_SLOTS = ['9:00 AM', '11:00 AM', '1:00 PM', '3:00 PM', '5:00 PM', '7:00 PM'] as const
+
 export function MakeupPage() {
+  const [formStep, setFormStep] = useState(1)
+  const [selectedService, setSelectedService] = useState<(typeof SERVICES)[number] | null>(null)
+  const [selectedTime, setSelectedTime] = useState('')
+
+  const goToStep = (step: number) => {
+    setFormStep(step)
+    document.getElementById('makeup-booking')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <section className="min-h-0 flex-1 bg-tle-cream/60 px-4 pb-16 pt-28 sm:px-6 md:px-10 md:pt-32 lg:px-16">
       <div className="mx-auto w-full max-w-[1240px]">
@@ -80,7 +92,25 @@ export function MakeupPage() {
 
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {SERVICES.map((s) => (
-            <article key={s.name} className="rounded-2xl border border-black/8 bg-white p-5 shadow-sm">
+            <article
+              key={s.name}
+              role="button"
+              tabIndex={0}
+              className={`rounded-2xl border bg-white p-5 shadow-sm transition-colors ${
+                selectedService?.name === s.name ? 'border-tle-pink bg-tle-blush/40' : 'border-black/8 hover:border-tle-pink/50'
+              }`}
+              onClick={() => {
+                setSelectedService(s)
+                goToStep(2)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setSelectedService(s)
+                  goToStep(2)
+                }
+              }}
+            >
               <p className="text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">{s.duration}</p>
               <h2 className="mt-2 font-sans text-xl font-semibold text-tle-ink">{s.name}</h2>
               <p className="mt-1 text-sm leading-relaxed text-tle-muted">{s.desc}</p>
@@ -88,6 +118,172 @@ export function MakeupPage() {
             </article>
           ))}
         </div>
+
+        <section id="makeup-booking" className="mb-10 rounded-[28px] border border-tle-pink/15 bg-white px-5 py-6 sm:px-7 sm:py-7">
+          <h3 className="mb-4 font-sans text-2xl font-semibold text-tle-ink sm:text-[2rem]">
+            Book Your <em className="font-sans font-medium italic text-tle-pink">Session</em>
+          </h3>
+
+          <div className="relative mb-8 flex">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="relative flex flex-1 cursor-pointer flex-col items-center gap-2"
+                onClick={() => {
+                  if (i <= formStep) goToStep(i)
+                }}
+                role="presentation"
+              >
+                {i > 1 && (
+                  <span
+                    className={`absolute top-[16px] right-1/2 h-px w-full -translate-x-1/2 ${formStep >= i ? 'bg-tle-pink' : 'bg-black/10'}`}
+                  />
+                )}
+                <div
+                  className={`relative z-[1] flex size-8 items-center justify-center rounded-full border text-[12px] font-semibold ${
+                    formStep === i
+                      ? 'border-tle-pink bg-tle-pink text-white'
+                      : formStep > i
+                        ? 'border-tle-charcoal bg-tle-charcoal text-white'
+                        : 'border-black/15 bg-white text-tle-muted'
+                  }`}
+                >
+                  {i}
+                </div>
+                <span className={`text-[10px] font-semibold tracking-wide uppercase ${formStep === i ? 'text-tle-pink' : 'text-tle-muted'}`}>
+                  {i === 1 ? 'Service' : i === 2 ? 'Date & Time' : i === 3 ? 'Details' : 'Confirm'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className={formStep === 1 ? 'block' : 'hidden'}>
+            <p className="mb-4 text-sm text-tle-muted">Choose a service card above to move to next step.</p>
+            <button
+              type="button"
+              className="rounded-full bg-tle-charcoal px-6 py-3 text-[11px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink"
+              onClick={() => goToStep(2)}
+              disabled={!selectedService}
+            >
+              Continue
+            </button>
+          </div>
+
+          <div className={formStep === 2 ? 'block' : 'hidden'}>
+            <div className="mb-4 rounded-xl border border-tle-pink/20 bg-tle-blush/40 px-4 py-3">
+              <p className="text-[10px] font-semibold tracking-wide text-tle-muted uppercase">Selected Service</p>
+              <p className="font-sans text-lg font-semibold text-tle-ink">{selectedService?.name || 'Not selected'}</p>
+              <p className="text-sm text-tle-gold">{selectedService?.price || ''}</p>
+            </div>
+            <div className="mb-5 grid gap-3 sm:grid-cols-2">
+              <input
+                type="date"
+                className="w-full rounded-xl border-[1.5px] border-black/10 px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink"
+              />
+              <select
+                className="w-full rounded-xl border-[1.5px] border-black/10 px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink"
+                value={selectedTime}
+                onChange={(e) => setSelectedTime(e.target.value)}
+              >
+                <option value="">Select a time</option>
+                {TIME_SLOTS.map((slot) => (
+                  <option key={slot} value={slot}>
+                    {slot}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                className="rounded-full border border-black/10 px-5 py-2.5 text-[11px] font-semibold tracking-wide text-tle-muted uppercase"
+                onClick={() => goToStep(1)}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                className="rounded-full bg-tle-charcoal px-6 py-2.5 text-[11px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink"
+                onClick={() => goToStep(3)}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+
+          <div className={formStep === 3 ? 'block' : 'hidden'}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input
+                type="text"
+                placeholder="Full name"
+                className="w-full rounded-xl border-[1.5px] border-black/10 px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink"
+              />
+              <input
+                type="tel"
+                placeholder="Phone number"
+                className="w-full rounded-xl border-[1.5px] border-black/10 px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink"
+              />
+              <input
+                type="email"
+                placeholder="Email address"
+                className="w-full rounded-xl border-[1.5px] border-black/10 px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink sm:col-span-2"
+              />
+              <textarea
+                placeholder="Special notes"
+                className="min-h-[100px] w-full rounded-xl border-[1.5px] border-black/10 px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink sm:col-span-2"
+              />
+            </div>
+            <div className="mt-5 flex items-center justify-between">
+              <button
+                type="button"
+                className="rounded-full border border-black/10 px-5 py-2.5 text-[11px] font-semibold tracking-wide text-tle-muted uppercase"
+                onClick={() => goToStep(2)}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                className="rounded-full bg-tle-charcoal px-6 py-2.5 text-[11px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink"
+                onClick={() => goToStep(4)}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+
+          <div className={formStep === 4 ? 'block' : 'hidden'}>
+            <div className="rounded-xl border border-tle-gold/20 bg-tle-cream/70 px-4 py-4">
+              <p className="text-[10px] font-semibold tracking-wide text-tle-muted uppercase">Booking Summary</p>
+              <div className="mt-2 flex items-center justify-between border-b border-black/8 py-2">
+                <span className="text-sm text-tle-muted">Service</span>
+                <span className="text-sm font-semibold text-tle-ink">{selectedService?.name || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-black/8 py-2">
+                <span className="text-sm text-tle-muted">Time</span>
+                <span className="text-sm font-semibold text-tle-ink">{selectedTime || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-sm text-tle-muted">Price</span>
+                <span className="text-sm font-semibold text-tle-gold">{selectedService?.price || '—'}</span>
+              </div>
+            </div>
+            <div className="mt-5 flex items-center justify-between">
+              <button
+                type="button"
+                className="rounded-full border border-black/10 px-5 py-2.5 text-[11px] font-semibold tracking-wide text-tle-muted uppercase"
+                onClick={() => goToStep(3)}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                className="rounded-full bg-tle-pink px-6 py-2.5 text-[11px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-deep"
+              >
+                Confirm Booking
+              </button>
+            </div>
+          </div>
+        </section>
 
         <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="overflow-hidden rounded-2xl">

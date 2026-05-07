@@ -24,14 +24,46 @@ const BOOKING_SERVICES = [
 ] as const
 
 const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
-  { style: { left: '6%', top: '18%', animationDuration: '8s', animationDelay: '0s' }, icon: 'diamond' },
-  { style: { left: '16%', top: '65%', animationDuration: '10s', animationDelay: '1.8s' }, icon: 'water_drop' },
-  { style: { left: '26%', top: '30%', animationDuration: '7s', animationDelay: '3.2s' }, icon: 'pentagon' },
-  { style: { left: '4%', top: '78%', animationDuration: '12s', animationDelay: '0.6s' }, icon: 'brightness_2' },
-  { style: { left: '34%', top: '12%', animationDuration: '6s', animationDelay: '2.4s' }, icon: 'star' },
-  { style: { left: '40%', top: '82%', animationDuration: '14s', animationDelay: '4.5s' }, icon: 'blur_on' },
-  { style: { left: '1%', top: '44%', animationDuration: '11s', animationDelay: '1s' }, icon: 'spa' },
-  { style: { left: '20%', top: '8%', animationDuration: '9s', animationDelay: '5s' }, icon: 'favorite' },
+  {
+    style: { left: '6%', top: '18%', animationDuration: '8s', animationDelay: '0s' },
+    icon: 'diamond',
+  },
+  {
+    style: { left: '17%', top: '66%', animationDuration: '10s', animationDelay: '1.8s' },
+    icon: 'shopping_bag',
+  },
+  {
+    style: { left: '29%', top: '32%', animationDuration: '7s', animationDelay: '3.2s' },
+    icon: 'face_retouching_natural',
+  },
+  {
+    style: { left: '5%', top: '78%', animationDuration: '12s', animationDelay: '0.6s' },
+    icon: 'styler',
+  },
+  {
+    style: { left: '35%', top: '12%', animationDuration: '6s', animationDelay: '2.4s' },
+    icon: 'checkroom',
+  },
+  {
+    style: { left: '40%', top: '82%', animationDuration: '14s', animationDelay: '4.5s' },
+    icon: 'auto_awesome',
+  },
+  {
+    style: { left: '2%', top: '43%', animationDuration: '11s', animationDelay: '1s' },
+    icon: 'workspace_premium',
+  },
+  {
+    style: { left: '22%', top: '8%', animationDuration: '9s', animationDelay: '5s' },
+    icon: 'local_mall',
+  },
+  {
+    style: { left: '30%', top: '56%', animationDuration: '9s', animationDelay: '2.2s' },
+    icon: 'diamond',
+  },
+  {
+    style: { left: '12%', top: '30%', animationDuration: '8.6s', animationDelay: '4.1s' },
+    icon: 'diamond',
+  },
 ]
 
 const TAKEN_DAYS = new Set([6, 10, 14, 18, 22])
@@ -242,8 +274,8 @@ export function LandingPage() {
             {HERO_FLOAT.map((hi, idx) => (
               <span
                 key={idx}
-                className="material-symbols-outlined animate-tle-float absolute text-tle-pink/[0.16]"
-                style={{ ...hi.style, fontSize: 52, lineHeight: 1 }}
+                className="material-symbols-outlined animate-tle-float absolute text-tle-pink/[0.2]"
+                style={{ ...hi.style, fontSize: 40, lineHeight: 1 }}
               >
                 {hi.icon}
               </span>
@@ -334,7 +366,7 @@ export function LandingPage() {
           <div className="relative min-h-[55vh] overflow-hidden bg-tle-cream lg:min-h-0">
             <img
               src="https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=900&h=1200&fit=crop&crop=top"
-              alt="TLE-BRANDS Beauty Model"
+              alt="TLE-BRAND Beauty Model"
               className="absolute inset-0 size-full object-cover object-top"
             />
             <div className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-r from-white/[0.08] to-transparent via-transparent" />
@@ -511,7 +543,7 @@ export function LandingPage() {
           <div className="relative">
             <img
               src="/tlepic1.jpeg"
-              alt="TLE-BRANDS"
+              alt="TLE-BRAND"
               className="aspect-[4/5] w-full rounded-3xl object-cover"
             />
             <img
@@ -535,7 +567,7 @@ export function LandingPage() {
               No Exceptions.
             </h2>
             <p className="mb-10 text-[15px] font-light leading-[1.9] text-tle-muted">
-              TLE-BRANDS was born from one belief — that beauty belongs to everyone. We create and curate premium aesthetic
+              TLE-BRAND was born from one belief — that beauty belongs to everyone. We create and curate premium aesthetic
               products and professional makeup services for every person ready to own their look, unapologetically.
             </p>
             <div className="mb-11 grid gap-5 sm:grid-cols-2">

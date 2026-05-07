@@ -8,7 +8,7 @@ export function Footer() {
           <Link to="/" className="mb-3.5 inline-block leading-none no-underline">
             <img
               src="/tlelogo.PNG"
-              alt="TLE-BRANDS"
+              alt="TLE-BRAND"
               className="h-10 w-auto max-w-[min(220px,55vw)] object-contain object-left"
               width={200}
               height={56}
@@ -84,7 +84,7 @@ export function Footer() {
       </div>
       <div className="flex flex-wrap items-center justify-between gap-5">
         <span className="text-xs text-white/25">
-          © {new Date().getFullYear()} TLE-BRANDS. All rights reserved.
+          © {new Date().getFullYear()} TLE-BRAND. All rights reserved.
         </span>
         <div className="flex gap-2.5">
           <a
