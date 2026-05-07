@@ -1,69 +1,54 @@
-import plugin from 'tailwindcss/plugin'
-
 /** @type {import('tailwindcss').Config} */
-const poppinsWeights = [
-  ['thin', '100'],
-  ['extralight', '200'],
-  ['light', '300'],
-  ['regular', '400'],
-  ['medium', '500'],
-  ['semibold', '600'],
-  ['bold', '700'],
-  ['extrabold', '800'],
-  ['black', '900'],
-]
-
-const latoWeights = [
-  ['thin', '100'],
-  ['light', '300'],
-  ['regular', '400'],
-  ['bold', '700'],
-  ['black', '900'],
-]
-
-function namedWeightUtilities(prefix, fontFamily, weights) {
-  /** @type {Record<string, Record<string, string>>} */
-  const out = {}
-  for (const [label, w] of weights) {
-    out[`.${prefix}-${label}`] = {
-      'font-family': fontFamily,
-      'font-weight': w,
-      'font-style': 'normal',
-    }
-    out[`.${prefix}-${label}-italic`] = {
-      'font-family': fontFamily,
-      'font-weight': w,
-      'font-style': 'italic',
-    }
-  }
-  return out
-}
-
 export default {
+  darkMode: 'media',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Poppins', 'sans-serif'],
-        poppins: ['Poppins', 'sans-serif'],
-        lato: ['Lato', 'sans-serif'],
-        'open-sans': ['"Open Sans"', 'sans-serif'],
+        sans: ['"Open Sans"', 'system-ui', 'sans-serif'],
+      },
+      colors: {
+        tle: {
+          pink: '#c4698d',
+          deep: '#a0496f',
+          light: '#eeb8ce',
+          blush: '#f8edf2',
+          gold: '#bf8f48',
+          charcoal: '#0e0e0e',
+          ink: '#181818',
+          muted: '#8a7e78',
+          faint: '#c4b8b2',
+          cream: '#faf8f5',
+          white: '#ffffff',
+        },
+      },
+      keyframes: {
+        marquee: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+        'tle-float': {
+          '0%': { transform: 'translateY(0) rotate(0deg) scale(1)' },
+          '50%': { transform: 'translateY(-22px) rotate(12deg) scale(1.04)' },
+          '100%': { transform: 'translateY(-8px) rotate(-6deg) scale(0.97)' },
+        },
+        'tle-bar': {
+          '0%': { left: '-100%' },
+          '60%': { left: '100%' },
+          '100%': { left: '100%' },
+        },
+        'tle-slot-card': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-7px)' },
+        },
+      },
+      animation: {
+        marquee: 'marquee 22s linear infinite',
+        'tle-float': 'tle-float 8s ease-in-out infinite alternate',
+        'tle-bar': 'tle-bar 2.4s ease-in-out infinite',
+        'tle-slot-card': 'tle-slot-card 5.5s ease-in-out infinite',
       },
     },
   },
-  plugins: [
-    plugin(function ({ addUtilities, addComponents }) {
-      addUtilities({
-        ...namedWeightUtilities('poppins', 'Poppins, sans-serif', poppinsWeights),
-        ...namedWeightUtilities('lato', 'Lato, sans-serif', latoWeights),
-      })
-      addComponents({
-        '.open-sans-text': {
-          fontFamily: '"Open Sans", sans-serif',
-          fontOpticalSizing: 'auto',
-          fontVariationSettings: '"wdth" 100',
-        },
-      })
-    }),
-  ],
+  plugins: [],
 }
