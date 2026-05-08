@@ -16,7 +16,7 @@ export function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
     if (password !== confirm) {
@@ -25,9 +25,22 @@ export function SignupPage() {
     }
     setBusy(true)
     try {
-      const result = signup(name, email, password)
-      if (result.ok) navigate(safeFrom, { replace: true })
-      else setError(result.message)
+      const result = await signup(name, email, password)
+      if (!result.ok) {
+        setError(result.message)
+        return
+      }
+      if (result.requiresEmailConfirmation) {
+        navigate('/login', {
+          replace: true,
+          state: {
+            from: safeFrom,
+            authNotice: result.message ?? 'Account created. Check your email to confirm your account.',
+          },
+        })
+        return
+      }
+      navigate(safeFrom, { replace: true })
     } catch {
       setError('Unable to create account right now. Please try again.')
     } finally {

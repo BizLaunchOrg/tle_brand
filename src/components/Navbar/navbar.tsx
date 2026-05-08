@@ -195,7 +195,9 @@ export function Navbar() {
               </div>
               <button
                 type="button"
-                onClick={logout}
+                onClick={() => {
+                  void logout()
+                }}
                 className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold tracking-wide uppercase transition-colors ${
                   showSolidNav
                     ? 'border-white/35 text-white hover:bg-white/15'
@@ -365,7 +367,7 @@ export function Navbar() {
                     className="w-full rounded-xl border border-black/10 py-3 text-[13px] font-semibold text-tle-ink transition-colors hover:bg-tle-blush"
                     onClick={() => {
                       setMenuOpen(false)
-                      logout()
+                      void logout()
                     }}
                   >
                     Log out

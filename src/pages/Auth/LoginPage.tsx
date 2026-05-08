@@ -6,7 +6,8 @@ export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? "/shop";
+  const from = (location.state as { from?: string; authNotice?: string } | null)?.from ?? "/shop";
+  const authNotice = (location.state as { from?: string; authNotice?: string } | null)?.authNotice ?? null;
   const safeFrom = from.startsWith("/") ? from : "/shop";
 
   const [email, setEmail] = useState("");
@@ -14,13 +15,13 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      const result = login(email, password);
-      if ("message" in result) {
+      const result = await login(email, password);
+      if (!result.ok) {
         setError(result.message);
         return;
       }
@@ -52,6 +53,14 @@ export function LoginPage() {
           onSubmit={onSubmit}
           className="mt-10 rounded-[28px] border border-black/8 bg-white p-6 shadow-[0_10px_40px_rgba(0,0,0,0.04)] sm:p-8"
         >
+          {authNotice ? (
+            <p
+              className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+              role="status"
+            >
+              {authNotice}
+            </p>
+          ) : null}
           {error ? (
             <p
               className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
