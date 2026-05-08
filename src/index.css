@@ -26,4 +26,13 @@
       'GRAD' 0,
       'opsz' 24;
   }
+
+  /* Prevent iOS Safari auto-zoom when focusing small text inputs. */
+  @media (max-width: 768px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
 }
