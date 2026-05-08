@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext.tsx'
+import { useAuth } from '../../context/AuthContext'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
 
 const navLinkClass = (onPink: boolean) => {

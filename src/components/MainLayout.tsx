@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom'
-import { AuthProvider } from '../context/AuthContext.tsx'
+import { AuthProvider } from '../context/AuthContext'
 import { CartDrawerProvider } from '../context/CartDrawerContext.tsx'
 import { CartDrawer } from './CartDrawer.tsx'
 import { FavoritesDrawer } from './FavoritesDrawer.tsx'
