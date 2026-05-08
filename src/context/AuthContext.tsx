@@ -8,8 +8,8 @@ import {
   type ReactNode,
 } from 'react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabaseClient.ts'
-import { isSupabaseConfigured, mapSupabaseAuthError } from '../lib/mapSupabaseAuthError.ts'
+import { getSupabase } from '../lib/supabaseClient'
+import { isSupabaseConfigured, mapSupabaseAuthError } from '../lib/mapSupabaseAuthError'
 
 export type AuthUser = {
   email: string
@@ -55,7 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
 
   useEffect(() => {
+    if (!isSupabaseConfigured()) return
+
     let mounted = true
+    const supabase = getSupabase()
 
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return
@@ -78,10 +81,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const e = normalizeEmail(email)
     if (!e || !password) return { ok: false, message: 'Enter email and password.' }
     if (!isSupabaseConfigured()) {
-      return { ok: false, message: 'Sign-in is not configured. Check Supabase URL and anon key in your environment.' }
+      return {
+        ok: false,
+        message:
+          'Sign-in is not configured. In Vercel add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then redeploy.',
+      }
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await getSupabase().auth.signInWithPassword({
       email: e,
       password,
     })
@@ -102,12 +109,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (password.length < 6) return { ok: false, message: 'Password must be at least 6 characters.' }
     if (!isSupabaseConfigured()) {
-      return { ok: false, message: 'Sign-up is not configured. Check Supabase URL and anon key in your environment.' }
+      return {
+        ok: false,
+        message:
+          'Sign-up is not configured. In Vercel add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then redeploy.',
+      }
     }
 
     const emailRedirectTo = import.meta.env.VITE_AUTH_REDIRECT_URL || `${window.location.origin}/login`
 
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await getSupabase().auth.signUp({
       email: e,
       password,
       options: {
@@ -132,7 +143,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut()
+    if (isSupabaseConfigured()) {
+      await getSupabase().auth.signOut()
+    }
     setUser(null)
   }, [])
 
