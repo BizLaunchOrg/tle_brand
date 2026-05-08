@@ -3,8 +3,15 @@ import react from '@vitejs/plugin-react'
 
 // https://v3.vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  let base = env.VITE_BASE?.trim() || '/'
+  // loadEnv only reads .env* files. Vercel/CI inject vars into process.env — merge so VITE_BASE (and any future config) matches production.
+  const fromFiles = loadEnv(mode, process.cwd(), '')
+  const env = { ...process.env, ...fromFiles }
+
+  let base = (env.VITE_BASE ?? '').trim() || '/'
+  if (/^https?:\/\//i.test(base)) {
+    console.warn('[vite] VITE_BASE must be a path (e.g. /repo/), not a full URL. Using /.')
+    base = '/'
+  }
   if (base !== '/' && !base.endsWith('/')) base = `${base}/`
 
   return {
