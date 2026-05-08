@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import type { Product } from '../data/products.ts'
+import { Link } from 'react-router-dom'
+import { getDefaultImageUrls, type Product } from '../data/products.ts'
 
 /** Screenshot-matched palette */
 const NAVY = '#1A233A'
 const ORANGE = '#FF7A20'
-
-const THUMB_INDEXES = [0, 1, 2] as const
 
 export type ProductCardProps = {
   product: Product
@@ -24,21 +23,27 @@ export function ProductCard({
   onToggleFavorite,
   className = '',
 }: ProductCardProps) {
-  const { img, alt, name, cat, price, promo } = product
+  const { slug, alt, name, cat, price, promo } = product
   const promoLabel = promo ?? '10% OFF'
-  const [activeThumb, setActiveThumb] = useState(1)
+  const previews = getDefaultImageUrls(product)
+  const [activeThumb, setActiveThumb] = useState(0)
+  const displayImg = previews[activeThumb] ?? product.img
+  const showThumbRow = previews.length > 1
+  const thumbSlots = previews.slice(0, 4)
+  const moreCount = Math.max(0, previews.length - thumbSlots.length)
 
   return (
     <article
       className={`flex h-full flex-col rounded-[16px] border border-zinc-200 bg-white p-3 shadow-sm sm:rounded-[20px] sm:p-5 ${className}`.trim()}
     >
       {/* Navy image well */}
-      <div
+      <Link
+        to={`/product/${slug}`}
         className="relative flex aspect-square items-center justify-center overflow-hidden rounded-xl sm:aspect-[1/1] sm:rounded-2xl"
         style={{ backgroundColor: NAVY }}
       >
         <img
-          src={img}
+          src={displayImg}
           alt={alt}
           className="max-h-[84%] max-w-[84%] object-contain object-center drop-shadow-[0_10px_24px_rgba(0,0,0,0.3)] sm:max-h-[88%] sm:max-w-[88%] sm:drop-shadow-[0_12px_32px_rgba(0,0,0,0.35)]"
           loading="lazy"
@@ -50,41 +55,43 @@ export function ProductCard({
         >
           {promoLabel}
         </span>
-      </div>
+      </Link>
 
-      {/* 3 thumbnails + "+ 2" */}
-      <div className="mt-2.5 flex items-center gap-1.5 sm:mt-3.5 sm:gap-2.5">
-        {THUMB_INDEXES.map((i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => setActiveThumb(i)}
-            className="relative shrink-0 overflow-hidden rounded-lg border-2 bg-zinc-100 transition-colors"
-            style={{
-              borderColor: activeThumb === i ? ORANGE : 'transparent',
-            }}
-            aria-label={`Preview ${i + 1}`}
-          >
-            <img src={img} alt="" className="size-8 object-cover sm:size-10" />
-          </button>
-        ))}
-        <span
-          className="shrink-0 pl-0.5 text-[11px] font-semibold sm:text-[13px]"
-          style={{ color: ORANGE }}
-        >
-          + 2
-        </span>
-      </div>
+      {showThumbRow ? (
+        <div className="mt-2.5 flex items-center gap-1.5 sm:mt-3.5 sm:gap-2.5">
+          {thumbSlots.map((url, i) => (
+            <button
+              key={url}
+              type="button"
+              onClick={() => setActiveThumb(i)}
+              className="relative shrink-0 overflow-hidden rounded-lg border-2 bg-zinc-100 transition-colors"
+              style={{
+                borderColor: activeThumb === i ? ORANGE : 'transparent',
+              }}
+              aria-label={`Preview ${i + 1}`}
+            >
+              <img src={url} alt="" className="size-8 object-cover sm:size-10" />
+            </button>
+          ))}
+          {moreCount > 0 ? (
+            <span className="shrink-0 pl-0.5 text-[11px] font-semibold sm:text-[13px]" style={{ color: ORANGE }}>
+              +{moreCount}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
-      <p className="mt-2.5 text-[9px] font-medium tracking-[0.12em] text-zinc-400 uppercase sm:mt-3.5 sm:text-[11px]">
-        {cat.replace(/\s+/g, ' ').toUpperCase()}
-      </p>
+      <Link to={`/product/${slug}`} className="group mt-2.5 block text-left no-underline sm:mt-3.5">
+        <p className="text-[9px] font-medium tracking-[0.12em] text-zinc-400 uppercase sm:text-[11px]">
+          {cat.replace(/\s+/g, ' ').toUpperCase()}
+        </p>
 
-      <h3 className="mt-1 line-clamp-2 min-h-[2.4em] font-sans text-[13px] font-bold leading-snug text-zinc-900 sm:min-h-0 sm:text-base">
-        {name}
-      </h3>
+        <h3 className="mt-1 line-clamp-2 min-h-[2.4em] font-sans text-[13px] font-bold leading-snug text-zinc-900 group-hover:text-zinc-700 sm:min-h-0 sm:text-base">
+          {name}
+        </h3>
 
-      <p className="mt-1 font-sans text-base font-bold tabular-nums text-zinc-900 sm:text-xl">{price}</p>
+        <p className="mt-1 font-sans text-base font-bold tabular-nums text-zinc-900 sm:text-xl">{price}</p>
+      </Link>
 
       <div className="mt-3.5 flex items-stretch gap-2 sm:mt-5">
         <button

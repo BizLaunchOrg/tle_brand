@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+import { cartLineKey } from '../data/products.ts'
 import { useCartDrawer } from '../context/CartDrawerContext.tsx'
 
 const formatNaira = (value: number) => `₦${value.toLocaleString()}`
@@ -35,42 +37,54 @@ export function CartDrawer() {
               <p className="mt-2 text-sm text-tle-muted">Add products from the shop to see them here.</p>
             </div>
           ) : (
-            cartItems.map((item) => (
-              <div key={item.name} className="flex gap-4 border-b border-black/[0.06] py-4">
-                <img src={item.img} alt={item.alt} className="size-[70px] h-[90px] shrink-0 rounded-xl object-cover" />
-                <div className="min-w-0 flex-1">
-                  <div className="font-sans text-lg font-medium text-tle-ink">{item.name}</div>
-                  <div className="mb-3 text-[10.5px] tracking-wide text-tle-muted uppercase">
-                    {item.cat} · {item.badge}
+            cartItems.map((item) => {
+              const lineKey = cartLineKey(item.slug, item.variantId)
+              return (
+                <div key={lineKey} className="flex gap-4 border-b border-black/[0.06] py-4">
+                  <Link to={`/product/${item.slug}`} onClick={closeCart} className="shrink-0">
+                    <img src={item.img} alt={item.alt} className="size-[70px] h-[90px] rounded-xl object-cover" />
+                  </Link>
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      to={`/product/${item.slug}`}
+                      onClick={closeCart}
+                      className="font-sans text-lg font-medium text-tle-ink no-underline transition-colors hover:text-tle-pink"
+                    >
+                      {item.name}
+                    </Link>
+                    <div className="mb-1 text-[10.5px] tracking-wide text-tle-muted uppercase">
+                      {item.cat} · {item.badge}
+                      {item.variantLabel ? ` · ${item.variantLabel}` : ''}
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        className="flex size-7 items-center justify-center rounded-full border border-black/10 text-sm transition-colors hover:border-tle-pink hover:text-tle-pink"
+                        onClick={() => decrementCartItem(lineKey)}
+                      >
+                        −
+                      </button>
+                      <span className="min-w-4 text-center text-sm font-semibold">{item.quantity}</span>
+                      <button
+                        type="button"
+                        className="flex size-7 items-center justify-center rounded-full border border-black/10 text-sm transition-colors hover:border-tle-pink hover:text-tle-pink"
+                        onClick={() => incrementCartItem(lineKey)}
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        className="ml-1 text-[11px] font-semibold tracking-wide text-tle-muted uppercase transition-colors hover:text-tle-pink"
+                        onClick={() => removeCartItem(lineKey)}
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2.5">
-                    <button
-                      type="button"
-                      className="flex size-7 items-center justify-center rounded-full border border-black/10 text-sm transition-colors hover:border-tle-pink hover:text-tle-pink"
-                      onClick={() => decrementCartItem(item.name)}
-                    >
-                      −
-                    </button>
-                    <span className="min-w-4 text-center text-sm font-semibold">{item.quantity}</span>
-                    <button
-                      type="button"
-                      className="flex size-7 items-center justify-center rounded-full border border-black/10 text-sm transition-colors hover:border-tle-pink hover:text-tle-pink"
-                      onClick={() => incrementCartItem(item.name)}
-                    >
-                      +
-                    </button>
-                    <button
-                      type="button"
-                      className="ml-1 text-[11px] font-semibold tracking-wide text-tle-muted uppercase transition-colors hover:text-tle-pink"
-                      onClick={() => removeCartItem(item.name)}
-                    >
-                      Remove
-                    </button>
-                  </div>
+                  <div className="shrink-0 self-center font-sans text-xl font-semibold text-tle-gold">{item.price}</div>
                 </div>
-                <div className="shrink-0 self-center font-sans text-xl font-semibold text-tle-gold">{item.price}</div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
         <div className="border-t border-black/[0.07] pt-6">

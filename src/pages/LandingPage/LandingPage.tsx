@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ProductCard } from '../../components/ProductCard.tsx'
-import { PRODUCTS } from '../../data/products.ts'
+import { PRODUCTS, defaultVariantSelection } from '../../data/products.ts'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
 
 const MARQUEE_ITEMS = [
@@ -105,7 +105,7 @@ export function LandingPage() {
   const wrapRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { addToCart, toggleFavorite, isFavorite, isInCart } = useCartDrawer()
+  const { addToCart, toggleFavorite, isFavorite, hasProductInCart } = useCartDrawer()
 
   const catalogSearch = (searchParams.get('q') || '').trim().toLowerCase()
 
@@ -463,12 +463,12 @@ export function LandingPage() {
               const delay =
                 idx === 0 ? 'delay-100' : idx === 1 ? 'delay-200' : idx === 2 ? 'delay-300' : 'delay-500'
               return (
-                <div key={p.name} className={`${revealCls} ${delay} ${idx >= 4 ? 'hidden sm:block' : ''}`}>
+                <div key={p.slug} className={`${revealCls} ${delay} ${idx >= 4 ? 'hidden sm:block' : ''}`}>
                   <ProductCard
                     product={p}
-                    onAddToCart={() => addToCart(p)}
-                    inCart={isInCart(p.name)}
-                    isFavorite={isFavorite(p.name)}
+                    onAddToCart={() => addToCart(p, defaultVariantSelection(p))}
+                    inCart={hasProductInCart(p.slug)}
+                    isFavorite={isFavorite(p.slug)}
                     onToggleFavorite={() => toggleFavorite(p)}
                   />
                 </div>

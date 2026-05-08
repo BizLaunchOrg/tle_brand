@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+import { defaultVariantSelection } from '../data/products.ts'
 import { useCartDrawer } from '../context/CartDrawerContext.tsx'
 
 export function FavoritesDrawer() {
@@ -34,10 +36,18 @@ export function FavoritesDrawer() {
             </div>
           ) : (
             favoriteItems.map((item) => (
-              <div key={item.name} className="flex gap-4 border-b border-black/[0.06] py-4">
-                <img src={item.img} alt={item.alt} className="size-[70px] h-[90px] shrink-0 rounded-xl object-cover" />
+              <div key={item.slug} className="flex gap-4 border-b border-black/[0.06] py-4">
+                <Link to={`/product/${item.slug}`} onClick={closeFavorites} className="shrink-0">
+                  <img src={item.img} alt={item.alt} className="size-[70px] h-[90px] rounded-xl object-cover" />
+                </Link>
                 <div className="min-w-0 flex-1">
-                  <div className="font-sans text-lg font-medium text-tle-ink">{item.name}</div>
+                  <Link
+                    to={`/product/${item.slug}`}
+                    onClick={closeFavorites}
+                    className="font-sans text-lg font-medium text-tle-ink no-underline transition-colors hover:text-tle-pink"
+                  >
+                    {item.name}
+                  </Link>
                   <div className="mb-2 text-[10.5px] tracking-wide text-tle-muted uppercase">
                     {item.cat} · {item.badge}
                   </div>
@@ -46,7 +56,7 @@ export function FavoritesDrawer() {
                     <button
                       type="button"
                       className="rounded-full bg-tle-charcoal px-4 py-2 text-[10px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink"
-                      onClick={() => addToCart(item)}
+                      onClick={() => addToCart(item, defaultVariantSelection(item))}
                     >
                       Add to cart
                     </button>

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ProductCard } from '../../components/ProductCard.tsx'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
-import { PRODUCTS, type ProductGender } from '../../data/products.ts'
+import { PRODUCTS, defaultVariantSelection, type ProductGender } from '../../data/products.ts'
 
 type TypeFilter = 'all' | ProductGender
 
@@ -14,7 +14,7 @@ const FILTER_TYPES: { label: string; value: TypeFilter }[] = [
 
 export function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { addToCart, toggleFavorite, isFavorite, isInCart } = useCartDrawer()
+  const { addToCart, toggleFavorite, isFavorite, hasProductInCart } = useCartDrawer()
 
   const [searchText, setSearchText] = useState(() => searchParams.get('q') || '')
   const q = searchText.trim().toLowerCase()
@@ -102,18 +102,23 @@ export function ShopPage() {
 
           <div>
             <p className="mb-2 text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">Category</p>
-            <div className="flex flex-wrap gap-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  className={pillCls(categoryFilter === cat)}
-                  onClick={() => setCategoryFilter(cat)}
-                >
-                  {cat === 'all' ? 'All Categories' : cat}
-                </button>
-              ))}
-            </div>
+            <label className="relative block max-w-sm">
+              <span className="sr-only">Select category</span>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full appearance-none rounded-xl border-[1.5px] border-black/10 bg-white px-4 py-3 pr-10 text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
+              >
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat === 'all' ? 'All Categories' : cat}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-tle-muted">
+                <span className="material-symbols-outlined text-[20px] leading-none">expand_more</span>
+              </span>
+            </label>
           </div>
 
         </div>
@@ -127,11 +132,11 @@ export function ShopPage() {
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 lg:gap-6">
             {visibleProducts.map((product) => (
               <ProductCard
-                key={product.name}
+                key={product.slug}
                 product={product}
-                onAddToCart={() => addToCart(product)}
-                inCart={isInCart(product.name)}
-                isFavorite={isFavorite(product.name)}
+                onAddToCart={() => addToCart(product, defaultVariantSelection(product))}
+                inCart={hasProductInCart(product.slug)}
+                isFavorite={isFavorite(product.slug)}
                 onToggleFavorite={() => toggleFavorite(product)}
               />
             ))}

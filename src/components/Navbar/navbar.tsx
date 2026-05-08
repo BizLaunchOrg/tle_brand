@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext.tsx'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
 
 const navLinkClass = (onPink: boolean) => {
@@ -29,6 +30,7 @@ export function Navbar() {
   const [searchDraft, setSearchDraft] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const { openCart, openFavorites, cartCount, favoriteCount } = useCartDrawer()
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
 
   const isHome = pathname === '/'
@@ -172,6 +174,62 @@ export function Navbar() {
             </NavLink>
           </li>
         </ul>
+        <div
+          className={`hidden items-center gap-3 md:flex md:pr-1 ${showSolidNav ? 'text-white/95' : 'text-tle-muted'}`}
+        >
+          {user ? (
+            <>
+              <div className="max-w-[180px] leading-tight lg:max-w-[220px]">
+                <p
+                  className={`truncate text-[12px] font-semibold ${showSolidNav ? 'text-white' : 'text-tle-ink'}`}
+                  title={user.name}
+                >
+                  {user.name}
+                </p>
+                <p
+                  className={`truncate text-[10px] ${showSolidNav ? 'text-white/80' : 'text-tle-muted'}`}
+                  title={user.email}
+                >
+                  {user.email}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={logout}
+                className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold tracking-wide uppercase transition-colors ${
+                  showSolidNav
+                    ? 'border-white/35 text-white hover:bg-white/15'
+                    : 'border-black/10 text-tle-ink hover:border-tle-pink hover:text-tle-pink'
+                }`}
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                state={{ from: pathname }}
+                className={`text-[12.5px] font-medium tracking-wide no-underline transition-colors ${
+                  showSolidNav ? 'text-white/90 hover:text-white' : 'text-tle-muted hover:text-tle-ink'
+                }`}
+              >
+                Log in
+              </Link>
+              <Link
+                to="/signup"
+                state={{ from: pathname }}
+                className={`rounded-full px-4 py-2 text-[11px] font-semibold tracking-wide uppercase no-underline transition-colors ${
+                  showSolidNav
+                    ? 'bg-white/15 text-white hover:bg-white/25'
+                    : 'bg-tle-charcoal text-white hover:bg-tle-pink'
+                }`}
+              >
+                Sign up
+              </Link>
+            </>
+          )}
+        </div>
         <div className="flex shrink-0 items-center gap-2.5">
           <button
             type="button"
@@ -271,6 +329,49 @@ export function Navbar() {
                   Makeup
                 </NavLink>
               </li>
+              {user ? (
+                <li className="px-3 py-2 text-[12px] text-tle-muted">
+                  Signed in as <span className="font-medium text-tle-ink">{user.email}</span>
+                </li>
+              ) : null}
+              {!user ? (
+                <>
+                  <li>
+                    <NavLink
+                      to="/login"
+                      state={{ from: pathname }}
+                      className={mobileSheetLink}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Log in
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/signup"
+                      state={{ from: pathname }}
+                      className={mobileSheetLink}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Sign up
+                    </NavLink>
+                  </li>
+                </>
+              ) : null}
+              {user ? (
+                <li className="px-2">
+                  <button
+                    type="button"
+                    className="w-full rounded-xl border border-black/10 py-3 text-[13px] font-semibold text-tle-ink transition-colors hover:bg-tle-blush"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      logout()
+                    }}
+                  >
+                    Log out
+                  </button>
+                </li>
+              ) : null}
             </ul>
             <div className="mt-2 border-t border-tle-pink/10 px-2 pt-3">
               <button

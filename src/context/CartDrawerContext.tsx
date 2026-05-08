@@ -2,13 +2,28 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
-import type { Product } from '../data/products.ts'
+import {
+  cartLineKey,
+  getDisplayPrice,
+  getGalleryUrls,
+  getProductBySlug,
+  type Product,
+} from '../data/products.ts'
+import { loadShopState, saveShopState, type PersistedCartLine } from '../lib/shopStorage.ts'
 
-type CartItem = Product & { quantity: number }
+export type CartVariant = { id: string; label: string }
+
+type CartItem = Product & {
+  quantity: number
+  variantId?: string
+  variantLabel?: string
+}
 
 type CartDrawerContextValue = {
   cartOpen: boolean
@@ -22,71 +37,164 @@ type CartDrawerContextValue = {
   closeCart: () => void
   openFavorites: () => void
   closeFavorites: () => void
-  addToCart: (product: Product) => void
-  incrementCartItem: (productName: string) => void
-  decrementCartItem: (productName: string) => void
-  removeCartItem: (productName: string) => void
+  addToCart: (product: Product, variant?: CartVariant) => void
+  incrementCartItem: (lineKey: string) => void
+  decrementCartItem: (lineKey: string) => void
+  removeCartItem: (lineKey: string) => void
   toggleFavorite: (product: Product) => void
-  isFavorite: (productName: string) => boolean
-  isInCart: (productName: string) => boolean
+  isFavorite: (slug: string) => boolean
+  isLineInCart: (lineKey: string) => boolean
+  hasProductInCart: (slug: string) => boolean
 }
 
 const CartDrawerContext = createContext<CartDrawerContextValue | null>(null)
 
 const parsePrice = (price: string) => Number(price.replace(/[^\d]/g, '')) || 0
 
+function buildCartLine(product: Product, variant?: CartVariant): CartItem {
+  const variantId = variant?.id
+  const urls = getGalleryUrls(product, variantId)
+  const hero = urls[0] ?? product.img
+  const price = getDisplayPrice(product, variantId)
+  const alt =
+    variant?.label && variant.label.length > 0 ? `${product.alt} — ${variant.label}` : product.alt
+
+  return {
+    ...product,
+    quantity: 1,
+    price,
+    img: hero,
+    alt,
+    variantId,
+    variantLabel: variant?.label,
+  }
+}
+
+function hydrateCart(lines: PersistedCartLine[]): CartItem[] {
+  const out: CartItem[] = []
+  for (const line of lines) {
+    const p = getProductBySlug(line.slug)
+    if (!p) continue
+    const qty = Math.min(999, Math.max(1, Math.floor(Number(line.quantity)) || 1))
+    let variant: CartVariant | undefined
+    if (line.variantId) {
+      const opt = p.colorOptions?.find((c) => c.id === line.variantId)
+      if (opt) variant = { id: opt.id, label: opt.label }
+    }
+    out.push({ ...buildCartLine(p, variant), quantity: qty })
+  }
+  return out
+}
+
+function hydrateFavoriteSlugs(slugs: string[]): Product[] {
+  const out: Product[] = []
+  const seen = new Set<string>()
+  for (const slug of slugs) {
+    if (seen.has(slug)) continue
+    const p = getProductBySlug(slug)
+    if (p) {
+      seen.add(slug)
+      out.push(p)
+    }
+  }
+  return out
+}
+
+function readInitialShop(): { cart: CartItem[]; favorites: Product[] } {
+  const raw = loadShopState()
+  if (!raw) return { cart: [], favorites: [] }
+  return {
+    cart: hydrateCart(raw.cart),
+    favorites: hydrateFavoriteSlugs(raw.favoriteSlugs),
+  }
+}
+
 export function CartDrawerProvider({ children }: { children: ReactNode }) {
+  const initRef = useRef<{ cart: CartItem[]; favorites: Product[] } | null>(null)
+  const getInit = () => {
+    if (!initRef.current) initRef.current = readInitialShop()
+    return initRef.current
+  }
   const [cartOpen, setCartOpen] = useState(false)
   const [favoritesOpen, setFavoritesOpen] = useState(false)
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
-  const [favoriteItems, setFavoriteItems] = useState<Product[]>([])
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => getInit().cart)
+  const [favoriteItems, setFavoriteItems] = useState<Product[]>(() => getInit().favorites)
+
+  useEffect(() => {
+    saveShopState({
+      cart: cartItems.map((item) => ({
+        slug: item.slug,
+        variantId: item.variantId,
+        quantity: item.quantity,
+      })),
+      favoriteSlugs: favoriteItems.map((p) => p.slug),
+    })
+  }, [cartItems, favoriteItems])
 
   const openCart = useCallback(() => setCartOpen(true), [])
   const closeCart = useCallback(() => setCartOpen(false), [])
   const openFavorites = useCallback(() => setFavoritesOpen(true), [])
   const closeFavorites = useCallback(() => setFavoritesOpen(false), [])
 
-  const addToCart = useCallback((product: Product) => {
+  const addToCart = useCallback((product: Product, variant?: CartVariant) => {
+    const lineKey = cartLineKey(product.slug, variant?.id)
     setCartItems((prev) => {
-      const existing = prev.find((item) => item.name === product.name)
-      if (!existing) return [...prev, { ...product, quantity: 1 }]
-      return prev.map((item) => (item.name === product.name ? { ...item, quantity: item.quantity + 1 } : item))
+      const existing = prev.find((item) => cartLineKey(item.slug, item.variantId) === lineKey)
+      if (!existing) return [...prev, buildCartLine(product, variant)]
+      return prev.map((item) =>
+        cartLineKey(item.slug, item.variantId) === lineKey
+          ? { ...item, quantity: item.quantity + 1 }
+          : item,
+      )
     })
     setCartOpen(true)
   }, [])
 
-  const incrementCartItem = useCallback((productName: string) => {
+  const incrementCartItem = useCallback((lineKey: string) => {
     setCartItems((prev) =>
-      prev.map((item) => (item.name === productName ? { ...item, quantity: item.quantity + 1 } : item)),
+      prev.map((item) =>
+        cartLineKey(item.slug, item.variantId) === lineKey ? { ...item, quantity: item.quantity + 1 } : item,
+      ),
     )
   }, [])
 
-  const decrementCartItem = useCallback((productName: string) => {
+  const decrementCartItem = useCallback((lineKey: string) => {
     setCartItems((prev) =>
       prev
-        .map((item) => (item.name === productName ? { ...item, quantity: item.quantity - 1 } : item))
+        .map((item) =>
+          cartLineKey(item.slug, item.variantId) === lineKey ? { ...item, quantity: item.quantity - 1 } : item,
+        )
         .filter((item) => item.quantity > 0),
     )
   }, [])
 
-  const removeCartItem = useCallback((productName: string) => {
-    setCartItems((prev) => prev.filter((item) => item.name !== productName))
+  const removeCartItem = useCallback((lineKey: string) => {
+    setCartItems((prev) => prev.filter((item) => cartLineKey(item.slug, item.variantId) !== lineKey))
   }, [])
 
   const toggleFavorite = useCallback((product: Product) => {
+    let opened = false
     setFavoriteItems((prev) => {
-      const exists = prev.some((item) => item.name === product.name)
-      if (exists) return prev.filter((item) => item.name !== product.name)
+      const exists = prev.some((item) => item.slug === product.slug)
+      if (exists) return prev.filter((item) => item.slug !== product.slug)
+      opened = true
       return [...prev, product]
     })
+    if (opened) setFavoritesOpen(true)
   }, [])
 
   const isFavorite = useCallback(
-    (productName: string) => favoriteItems.some((item) => item.name === productName),
+    (slug: string) => favoriteItems.some((item) => item.slug === slug),
     [favoriteItems],
   )
-  const isInCart = useCallback(
-    (productName: string) => cartItems.some((item) => item.name === productName),
+
+  const isLineInCart = useCallback(
+    (lineKey: string) => cartItems.some((item) => cartLineKey(item.slug, item.variantId) === lineKey),
+    [cartItems],
+  )
+
+  const hasProductInCart = useCallback(
+    (slug: string) => cartItems.some((item) => item.slug === slug),
     [cartItems],
   )
 
@@ -116,7 +224,8 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
       removeCartItem,
       toggleFavorite,
       isFavorite,
-      isInCart,
+      isLineInCart,
+      hasProductInCart,
     }),
     [
       cartOpen,
@@ -136,15 +245,12 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
       removeCartItem,
       toggleFavorite,
       isFavorite,
-      isInCart,
+      isLineInCart,
+      hasProductInCart,
     ],
   )
 
-  return (
-    <CartDrawerContext.Provider value={value}>
-      {children}
-    </CartDrawerContext.Provider>
-  )
+  return <CartDrawerContext.Provider value={value}>{children}</CartDrawerContext.Provider>
 }
 
 export function useCartDrawer() {
