@@ -1,37 +1,42 @@
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 
 export function LoginPage() {
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const from = (location.state as { from?: string; authNotice?: string } | null)?.from ?? "/shop";
-  const authNotice = (location.state as { from?: string; authNotice?: string } | null)?.authNotice ?? null;
-  const safeFrom = from.startsWith("/") ? from : "/shop";
+  const { login, user } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const from = (location.state as { from?: string; authNotice?: string } | null)?.from ?? '/shop'
+  const authNotice = (location.state as { from?: string; authNotice?: string } | null)?.authNotice ?? null
+  const safeFrom = from.startsWith('/') ? from : '/shop'
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    navigate(safeFrom, { replace: true })
+  }, [navigate, safeFrom, user])
 
   const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setBusy(true);
+    e.preventDefault()
+    setError(null)
+    setBusy(true)
     try {
-      const result = await login(email, password);
+      const result = await login(email, password)
       if (!result.ok) {
-        setError(result.message);
-        return;
+        setError(result.message)
+        return
       }
-      navigate(safeFrom, { replace: true });
+      navigate(safeFrom, { replace: true })
     } catch {
-      setError("Unable to sign in right now. Please try again.");
+      setError('Unable to sign in right now. Please try again.')
     } finally {
-      setBusy(false);
+      setBusy(false)
     }
-  };
+  }
 
   return (
     <section className="min-h-0 flex-1 bg-tle-cream/60 px-4 pb-20 pt-28 sm:px-6 md:px-10 md:pt-32 lg:px-16">
@@ -106,12 +111,12 @@ export function LoginPage() {
             disabled={busy}
             className="mt-8 w-full rounded-full bg-tle-charcoal py-3.5 text-[12px] font-bold tracking-[0.12em] text-white uppercase transition-colors hover:bg-tle-pink disabled:opacity-60"
           >
-            {busy ? "Signing in…" : "Sign in"}
+            {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 
         <p className="mt-8 text-center text-sm text-tle-muted">
-          New here?{" "}
+          New here?{' '}
           <Link
             to="/signup"
             className="font-semibold text-tle-pink no-underline hover:text-tle-deep"
@@ -132,5 +137,5 @@ export function LoginPage() {
         </Link>
       </div>
     </section>
-  );
+  )
 }

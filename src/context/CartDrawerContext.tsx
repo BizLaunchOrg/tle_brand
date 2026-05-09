@@ -16,6 +16,16 @@ import {
   type Product,
 } from '../data/products.ts'
 import { loadShopState, saveShopState, type PersistedCartLine } from '../lib/shopStorage.ts'
+import {
+  fetchUserCartItems,
+  fetchUserFavoriteSlugs,
+  mergeCartLines,
+  mergeFavoriteSlugs,
+  replaceUserCartItems,
+  replaceUserFavorites,
+} from '../lib/userShopSync.ts'
+import { isSupabaseConfigured } from '../lib/mapSupabaseAuthError'
+import { useAuth } from './AuthContext'
 
 export type CartVariant = { id: string; label: string }
 
@@ -41,6 +51,7 @@ type CartDrawerContextValue = {
   incrementCartItem: (lineKey: string) => void
   decrementCartItem: (lineKey: string) => void
   removeCartItem: (lineKey: string) => void
+  clearCart: () => void
   toggleFavorite: (product: Product) => void
   isFavorite: (slug: string) => boolean
   isLineInCart: (lineKey: string) => boolean
@@ -110,6 +121,7 @@ function readInitialShop(): { cart: CartItem[]; favorites: Product[] } {
 }
 
 export function CartDrawerProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
   const initRef = useRef<{ cart: CartItem[]; favorites: Product[] } | null>(null)
   const getInit = () => {
     if (!initRef.current) initRef.current = readInitialShop()
@@ -119,6 +131,71 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
   const [favoritesOpen, setFavoritesOpen] = useState(false)
   const [cartItems, setCartItems] = useState<CartItem[]>(() => getInit().cart)
   const [favoriteItems, setFavoriteItems] = useState<Product[]>(() => getInit().favorites)
+  const [shopRemoteSynced, setShopRemoteSynced] = useState(false)
+
+  useEffect(() => {
+    if (!user?.id) {
+      setShopRemoteSynced(false)
+      return
+    }
+
+    if (!isSupabaseConfigured()) {
+      setShopRemoteSynced(true)
+      return
+    }
+
+    let cancelled = false
+    setShopRemoteSynced(false)
+
+    ;(async () => {
+      const [remoteCart, remoteFav] = await Promise.all([
+        fetchUserCartItems(user.id),
+        fetchUserFavoriteSlugs(user.id),
+      ])
+      if (cancelled) return
+
+      setCartItems((prev) => {
+        const localLines: PersistedCartLine[] = prev.map((i) => ({
+          slug: i.slug,
+          variantId: i.variantId,
+          quantity: i.quantity,
+        }))
+        const merged = mergeCartLines(localLines, remoteCart)
+        return hydrateCart(merged)
+      })
+
+      setFavoriteItems((prev) => {
+        const mergedSlugs = mergeFavoriteSlugs(
+          prev.map((p) => p.slug),
+          remoteFav,
+        )
+        return hydrateFavoriteSlugs(mergedSlugs)
+      })
+
+      setShopRemoteSynced(true)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user?.id || !shopRemoteSynced) return
+
+    const lines: PersistedCartLine[] = cartItems.map((i) => ({
+      slug: i.slug,
+      variantId: i.variantId,
+      quantity: i.quantity,
+    }))
+    const favSlugs = favoriteItems.map((p) => p.slug)
+
+    const t = window.setTimeout(() => {
+      void Promise.all([replaceUserCartItems(user.id, lines), replaceUserFavorites(user.id, favSlugs)])
+    }, 450)
+
+    return () => window.clearTimeout(t)
+  }, [cartItems, favoriteItems, user?.id, shopRemoteSynced])
 
   useEffect(() => {
     saveShopState({
@@ -172,6 +249,10 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
     setCartItems((prev) => prev.filter((item) => cartLineKey(item.slug, item.variantId) !== lineKey))
   }, [])
 
+  const clearCart = useCallback(() => {
+    setCartItems([])
+  }, [])
+
   const toggleFavorite = useCallback((product: Product) => {
     let opened = false
     setFavoriteItems((prev) => {
@@ -222,6 +303,7 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
       incrementCartItem,
       decrementCartItem,
       removeCartItem,
+      clearCart,
       toggleFavorite,
       isFavorite,
       isLineInCart,
@@ -243,6 +325,7 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
       incrementCartItem,
       decrementCartItem,
       removeCartItem,
+      clearCart,
       toggleFavorite,
       isFavorite,
       isLineInCart,

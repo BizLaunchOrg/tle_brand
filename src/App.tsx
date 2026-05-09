@@ -8,6 +8,7 @@ import { LoginPage } from './pages/Auth/LoginPage.tsx'
 import { SignupPage } from './pages/Auth/SignupPage.tsx'
 import { AuthConfirmPage } from './pages/Auth/AuthConfirmPage.tsx'
 import { ShopPage } from './pages/ShopPage/ShopPage.tsx'
+import { CheckoutPage } from './pages/CheckoutPage/CheckoutPage.tsx'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
       <Route path="/" element={<MainLayout />}>
         <Route index element={<LandingPage />} />
         <Route path="shop" element={<ShopPage />} />
+        <Route path="checkout" element={<CheckoutPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="signup" element={<SignupPage />} />
         <Route path="auth/confirm" element={<AuthConfirmPage />} />

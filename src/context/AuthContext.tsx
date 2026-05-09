@@ -12,6 +12,7 @@ import { getSupabase } from '../lib/supabaseClient'
 import { isSupabaseConfigured, mapSupabaseAuthError } from '../lib/mapSupabaseAuthError'
 
 export type AuthUser = {
+  id: string
   email: string
   name: string
 }
@@ -44,8 +45,9 @@ function getDisplayName(user: SupabaseUser): string {
 }
 
 function mapSupabaseUser(user: SupabaseUser | null): AuthUser | null {
-  if (!user?.email) return null
+  if (!user?.id || !user.email) return null
   return {
+    id: user.id,
     email: user.email,
     name: getDisplayName(user),
   }

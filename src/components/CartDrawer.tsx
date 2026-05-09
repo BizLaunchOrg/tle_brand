@@ -92,12 +92,13 @@ export function CartDrawer() {
             <span className="text-[13px] text-tle-muted">Subtotal</span>
             <span className="font-sans text-[26px] font-semibold text-tle-ink">{formatNaira(cartSubtotal)}</span>
           </div>
-          <button
-            type="button"
-            className="mb-3 w-full rounded-full bg-tle-charcoal py-[18px] font-sans text-xs font-bold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink"
+          <Link
+            to="/checkout"
+            onClick={closeCart}
+            className="mb-3 flex w-full items-center justify-center rounded-full bg-tle-charcoal py-[18px] font-sans text-xs font-bold tracking-wide text-white uppercase no-underline transition-colors hover:bg-tle-pink"
           >
             Proceed to Checkout
-          </button>
+          </Link>
           <button
             type="button"
             className="w-full rounded-full border-[1.5px] border-black/10 py-[15px] font-sans text-xs font-semibold tracking-wide text-tle-muted uppercase transition-colors hover:border-tle-ink hover:text-tle-ink"
