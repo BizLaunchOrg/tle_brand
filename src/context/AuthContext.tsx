@@ -51,6 +51,22 @@ function mapSupabaseUser(user: SupabaseUser | null): AuthUser | null {
   }
 }
 
+function getSignupRedirectUrl() {
+  const fallback = `${window.location.origin}/login`
+  const configured = import.meta.env.VITE_AUTH_REDIRECT_URL?.trim()
+  if (!configured) return fallback
+
+  // Guard against accidentally pasting a comma-separated URL list in env.
+  const firstCandidate = configured.split(',')[0]?.trim()
+  if (!firstCandidate) return fallback
+
+  try {
+    return new URL(firstCandidate).toString()
+  } catch {
+    return fallback
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
 
@@ -116,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const emailRedirectTo = import.meta.env.VITE_AUTH_REDIRECT_URL || `${window.location.origin}/login`
+    const emailRedirectTo = getSignupRedirectUrl()
 
     const { data, error } = await getSupabase().auth.signUp({
       email: e,
