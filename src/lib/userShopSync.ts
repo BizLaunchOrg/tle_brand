@@ -117,6 +117,9 @@ export async function createOrder(params: {
   shipping: ShippingPayload
   lineItems: OrderLinePayload[]
   subtotalNgn: number
+  deliveryNgn: number
+  processingNgn: number
+  totalNgn: number
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) {
     return { ok: false, message: 'Checkout is not configured.' }
@@ -130,6 +133,9 @@ export async function createOrder(params: {
       shipping: params.shipping,
       line_items: params.lineItems,
       subtotal_ngn: params.subtotalNgn,
+      delivery_ngn: params.deliveryNgn,
+      processing_ngn: params.processingNgn,
+      total_ngn: params.totalNgn,
     })
     .select('id')
     .maybeSingle()

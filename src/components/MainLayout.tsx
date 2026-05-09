@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import { AuthProvider } from '../context/AuthContext'
 import { CartDrawerProvider } from '../context/CartDrawerContext.tsx'
+import { ScrollToTop } from './ScrollToTop.tsx'
 import { CartDrawer } from './CartDrawer.tsx'
 import { FavoritesDrawer } from './FavoritesDrawer.tsx'
 import { FloatingActions } from './FloatingActions.tsx'
@@ -11,6 +12,7 @@ export function MainLayout() {
   return (
     <AuthProvider>
       <CartDrawerProvider>
+        <ScrollToTop />
         <div className="flex min-h-svh flex-col bg-white font-sans text-tle-ink antialiased">
           <Navbar />
           <main className="flex w-full flex-1 flex-col">
