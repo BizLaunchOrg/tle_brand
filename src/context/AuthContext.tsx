@@ -4,10 +4,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
+import { resolveAdminAccess } from '../lib/adminAccess'
 import { getSupabase } from '../lib/supabaseClient'
 import { isSupabaseConfigured, mapSupabaseAuthError } from '../lib/mapSupabaseAuthError'
 
@@ -23,6 +25,12 @@ export type AuthResult =
 
 type AuthContextValue = {
   user: AuthUser | null
+  /** Same session as storefront; true if allowlisted in Supabase or JWT claims. */
+  isAdmin: boolean
+  /** Initial session load finished. */
+  authReady: boolean
+  /** Admin allowlist / JWT check finished (for current user). */
+  adminResolved: boolean
   login: (email: string, password: string) => Promise<AuthResult>
   signup: (name: string, email: string, password: string) => Promise<AuthResult>
   logout: () => Promise<void>
@@ -58,7 +66,6 @@ function getSignupRedirectUrl() {
   const configured = import.meta.env.VITE_AUTH_REDIRECT_URL?.trim()
   if (!configured) return fallback
 
-  // Guard against accidentally pasting a comma-separated URL list in env.
   const firstCandidate = configured.split(',')[0]?.trim()
   if (!firstCandidate) return fallback
 
@@ -71,26 +78,56 @@ function getSignupRedirectUrl() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
+  const [authReady, setAuthReady] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [adminResolved, setAdminResolved] = useState(false)
+  const adminSeqRef = useRef(0)
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) return
+    if (!isSupabaseConfigured()) {
+      setAuthReady(true)
+      setAdminResolved(true)
+      setIsAdmin(false)
+      return
+    }
 
-    let mounted = true
+    let cancelled = false
     const supabase = getSupabase()
 
+    const runAdminCheck = async (su: SupabaseUser | null) => {
+      const seq = ++adminSeqRef.current
+      if (!su) {
+        if (adminSeqRef.current !== seq) return
+        setIsAdmin(false)
+        setAdminResolved(true)
+        return
+      }
+      setAdminResolved(false)
+      const ok = await resolveAdminAccess(su)
+      if (adminSeqRef.current !== seq) return
+      setIsAdmin(ok)
+      setAdminResolved(true)
+    }
+
     supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return
-      setUser(mapSupabaseUser(data.session?.user ?? null))
+      if (cancelled) return
+      const su = data.session?.user ?? null
+      setUser(mapSupabaseUser(su))
+      setAuthReady(true)
+      void runAdminCheck(su)
     })
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(mapSupabaseUser(session?.user ?? null))
+      if (cancelled) return
+      const su = session?.user ?? null
+      setUser(mapSupabaseUser(su))
+      void runAdminCheck(su)
     })
 
     return () => {
-      mounted = false
+      cancelled = true
       subscription.unsubscribe()
     }
   }, [])
@@ -165,16 +202,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await getSupabase().auth.signOut()
     }
     setUser(null)
+    setIsAdmin(false)
+    setAdminResolved(true)
   }, [])
 
   const value = useMemo(
     () => ({
       user,
+      isAdmin,
+      authReady,
+      adminResolved,
       login,
       signup,
       logout,
     }),
-    [user, login, signup, logout],
+    [user, isAdmin, authReady, adminResolved, login, signup, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

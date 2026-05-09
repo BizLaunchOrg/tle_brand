@@ -30,7 +30,7 @@ export function Navbar() {
   const [searchDraft, setSearchDraft] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const { openCart, openFavorites, cartCount, favoriteCount } = useCartDrawer()
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin, adminResolved } = useAuth()
   const navigate = useNavigate()
 
   const isHome = pathname === '/'
@@ -193,6 +193,18 @@ export function Navbar() {
                   {user.email}
                 </p>
               </div>
+              {isAdmin && adminResolved ? (
+                <Link
+                  to="/admin"
+                  className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold tracking-wide uppercase no-underline transition-colors ${
+                    showSolidNav
+                      ? 'border-white/35 text-white hover:bg-white/15'
+                      : 'border-black/10 text-tle-ink hover:border-tle-pink hover:text-tle-pink'
+                  }`}
+                >
+                  Admin
+                </Link>
+              ) : null}
               <button
                 type="button"
                 onClick={() => {
@@ -334,6 +346,15 @@ export function Navbar() {
               {user ? (
                 <li className="px-3 py-2 text-[12px] text-tle-muted">
                   Signed in as <span className="font-medium text-tle-ink">{user.email}</span>
+                  {isAdmin && adminResolved ? (
+                    <Link
+                      to="/admin"
+                      className="mt-2 block rounded-xl bg-tle-blush py-2 text-center text-[13px] font-semibold text-tle-pink no-underline"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Admin dashboard
+                    </Link>
+                  ) : null}
                 </li>
               ) : null}
               {!user ? (
