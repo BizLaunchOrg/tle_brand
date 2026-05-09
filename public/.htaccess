@@ -1,0 +1,10 @@
+# SPA fallback for Apache (e.g. Hostinger). Copy the contents of `dist/` to your web root
+# so this file sits next to index.html. Without it, /login and other routes return 404.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
