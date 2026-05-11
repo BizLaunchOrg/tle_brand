@@ -27,6 +27,13 @@ export async function fetchOrdersForAdmin(limit = 500): Promise<AdminOrderRow[]>
   return data as AdminOrderRow[]
 }
 
+export async function fetchOrderById(orderId: string): Promise<AdminOrderRow | null> {
+  if (!isSupabaseConfigured() || !orderId.trim()) return null
+  const { data, error } = await getSupabase().from('orders').select('*').eq('id', orderId.trim()).maybeSingle()
+  if (error || !data) return null
+  return data as AdminOrderRow
+}
+
 export async function updateOrderStatus(
   orderId: string,
   status: string,

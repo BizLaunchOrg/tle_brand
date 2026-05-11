@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { defaultVariantSelection } from '../data/products.ts'
+import { defaultVariantSelection, displayableImageUrl } from '../data/products.ts'
 import { useCartDrawer } from '../context/CartDrawerContext.tsx'
 
 export function FavoritesDrawer() {
@@ -38,7 +38,7 @@ export function FavoritesDrawer() {
             favoriteItems.map((item) => (
               <div key={item.slug} className="flex gap-4 border-b border-black/[0.06] py-4">
                 <Link to={`/product/${item.slug}`} onClick={closeFavorites} className="shrink-0">
-                  <img src={item.img} alt={item.alt} className="size-[70px] h-[90px] rounded-xl object-cover" />
+                  <img src={displayableImageUrl(item.img)} alt={item.alt} className="size-[70px] h-[90px] rounded-xl object-cover" />
                 </Link>
                 <div className="min-w-0 flex-1">
                   <Link

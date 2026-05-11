@@ -1,8 +1,15 @@
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ScrollToTop } from '../../components/ScrollToTop.tsx'
 import { useAuth } from '../../context/AuthContext'
 import { AdminThemeProvider, useAdminTheme } from './AdminThemeContext.tsx'
 import { ad, adminFont } from './adminUi.ts'
+import {
+  countNewOrdersSince,
+  ensureAdminOrdersSeenBaseline,
+  getAdminOrdersLastSeenAt,
+  markAdminOrdersSeenNow,
+} from '../../lib/adminOrderAlerts.ts'
 
 function NavItem({
   to,
@@ -10,12 +17,14 @@ function NavItem({
   label,
   theme,
   icon,
+  badge,
 }: {
   to: string
   end?: boolean
   label: string
   theme: 'light' | 'dark'
   icon: string
+  badge?: number
 }) {
   return (
     <NavLink to={to} end={end} className="block no-underline">
@@ -38,7 +47,7 @@ function NavItem({
         >
           <span
             className={[
-              'material-symbols-outlined text-[20px] font-light leading-none',
+              'material-symbols-outlined shrink-0 text-[20px] font-light leading-none',
               isActive
                 ? ad(theme, 'text-emerald-600', 'text-emerald-400')
                 : ad(theme, 'text-stone-400', 'text-neutral-500'),
@@ -47,7 +56,17 @@ function NavItem({
           >
             {icon}
           </span>
-          {label}
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {typeof badge === 'number' && badge > 0 ? (
+            <span
+              className={
+                'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ' +
+                ad(theme, 'bg-rose-600 text-white', 'bg-rose-500 text-white')
+              }
+            >
+              {badge > 99 ? '99+' : badge}
+            </span>
+          ) : null}
         </span>
       )}
     </NavLink>
@@ -60,26 +79,39 @@ function MobileNavItem({
   label,
   icon,
   theme,
+  dot,
 }: {
   to: string
   end?: boolean
   label: string
   icon: string
   theme: 'light' | 'dark'
+  dot?: boolean
 }) {
   return (
     <NavLink to={to} end={end} className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-2 no-underline">
       {({ isActive }) => (
         <>
-          <span
-            className={[
-              'material-symbols-outlined text-[22px] font-light leading-none',
-              isActive
-                ? ad(theme, 'text-emerald-600', 'text-emerald-400')
-                : ad(theme, 'text-stone-400', 'text-neutral-500'),
-            ].join(' ')}
-          >
-            {icon}
+          <span className="relative inline-flex">
+            <span
+              className={[
+                'material-symbols-outlined text-[22px] font-light leading-none',
+                isActive
+                  ? ad(theme, 'text-emerald-600', 'text-emerald-400')
+                  : ad(theme, 'text-stone-400', 'text-neutral-500'),
+              ].join(' ')}
+            >
+              {icon}
+            </span>
+            {dot ? (
+              <span
+                className={
+                  'absolute -top-0.5 -right-1 size-2 rounded-full bg-rose-500 ring-2 ' +
+                  ad(theme, 'ring-stone-100', 'ring-[#101412]')
+                }
+                aria-hidden
+              />
+            ) : null}
           </span>
           <span
             className={[
@@ -100,6 +132,8 @@ function MobileNavItem({
 function AdminLayoutInner() {
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useAdminTheme()
+  const location = useLocation()
+  const [orderAlertCount, setOrderAlertCount] = useState(0)
   const storeOrigin = typeof window !== 'undefined' ? window.location.origin : ''
 
   const shell = [
@@ -113,7 +147,8 @@ function AdminLayoutInner() {
 
   const sidebar = ad(theme, 'border-stone-200/90 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)]', 'border-neutral-800 bg-[#101412]')
 
-  const mainPad = 'flex-1 px-4 py-5 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-6 lg:px-8 lg:py-8 lg:pb-10'
+  const mainPad =
+    'min-w-0 flex-1 px-4 py-5 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-6 lg:px-8 lg:py-8 lg:pb-10'
 
   const initials = (user?.name || user?.email || '?')
     .split(/\s+/)
@@ -129,6 +164,33 @@ function AdminLayoutInner() {
       /* ignore */
     }
   }
+
+  useEffect(() => {
+    ensureAdminOrdersSeenBaseline()
+  }, [])
+
+  useEffect(() => {
+    const p = location.pathname
+    if (p === '/admin/orders' || p.startsWith('/admin/orders/') || p === '/admin/transactions') {
+      markAdminOrdersSeenNow()
+      setOrderAlertCount(0)
+    }
+  }, [location.pathname])
+
+  useEffect(() => {
+    const refresh = () => {
+      const since = getAdminOrdersLastSeenAt()
+      if (!since) return
+      void countNewOrdersSince(since).then(setOrderAlertCount)
+    }
+    refresh()
+    const id = window.setInterval(refresh, 45_000)
+    window.addEventListener('focus', refresh)
+    return () => {
+      window.clearInterval(id)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [])
 
   return (
     <div className={shell}>
@@ -149,20 +211,42 @@ function AdminLayoutInner() {
             </Link>
           </div>
 
-          <p
-            className={ad(
-              theme,
-              'px-4 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400',
-              'px-4 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500',
-            )}
-          >
-            Quick access
-          </p>
+          <div className="flex items-center justify-between gap-2 px-4 pb-2">
+            <p
+              className={ad(
+                theme,
+                'text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400',
+                'text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500',
+              )}
+            >
+              Quick access
+            </p>
+            <Link
+              to="/admin/orders"
+              className={
+                'relative flex size-9 shrink-0 items-center justify-center rounded-xl no-underline transition ' +
+                ad(theme, 'text-stone-600 hover:bg-stone-100', 'text-neutral-300 hover:bg-neutral-800/80')
+              }
+              aria-label={orderAlertCount > 0 ? `${orderAlertCount} new orders or checkouts` : 'Orders (no new alerts)'}
+            >
+              <span className="material-symbols-outlined text-[22px] font-light">notifications</span>
+              {orderAlertCount > 0 ? (
+                <span
+                  className={
+                    'absolute -right-0.5 -top-0.5 flex min-w-[1.1rem] items-center justify-center rounded-full px-1 py-0.5 text-[9px] font-bold leading-none text-white ' +
+                    ad(theme, 'bg-rose-600', 'bg-rose-500')
+                  }
+                >
+                  {orderAlertCount > 99 ? '99+' : orderAlertCount}
+                </span>
+              ) : null}
+            </Link>
+          </div>
           <nav className="flex flex-1 flex-col gap-0.5 px-3">
             <NavItem to="/admin" end label="Dashboard" theme={theme} icon="dashboard" />
-            <NavItem to="/admin/orders" label="Orders" theme={theme} icon="receipt_long" />
+            <NavItem to="/admin/orders" label="Orders" theme={theme} icon="receipt_long" badge={orderAlertCount} />
             <NavItem to="/admin/products" label="Products" theme={theme} icon="inventory_2" />
-            <NavItem to="/admin/transactions" label="Transactions" theme={theme} icon="account_balance_wallet" />
+            <NavItem to="/admin/transactions" label="Transactions" theme={theme} icon="account_balance_wallet" badge={orderAlertCount} />
             <div className={ad(theme, 'my-2 mx-1 h-px bg-stone-100', 'my-2 mx-1 h-px bg-neutral-800')} />
             <NavItem to="/admin/account" label="Account" theme={theme} icon="person" />
           </nav>
@@ -354,9 +438,9 @@ function AdminLayoutInner() {
             aria-label="Admin navigation"
           >
             <MobileNavItem to="/admin" end label="Home" icon="home" theme={theme} />
-            <MobileNavItem to="/admin/orders" label="Orders" icon="receipt_long" theme={theme} />
+            <MobileNavItem to="/admin/orders" label="Orders" icon="receipt_long" theme={theme} dot={orderAlertCount > 0} />
             <MobileNavItem to="/admin/products" label="Stock" icon="inventory_2" theme={theme} />
-            <MobileNavItem to="/admin/transactions" label="Wallet" icon="account_balance_wallet" theme={theme} />
+            <MobileNavItem to="/admin/transactions" label="Wallet" icon="account_balance_wallet" theme={theme} dot={orderAlertCount > 0} />
             <MobileNavItem to="/admin/account" label="More" icon="menu" theme={theme} />
           </nav>
         </div>

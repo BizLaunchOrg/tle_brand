@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getDefaultImageUrls, type Product } from '../data/products.ts'
+import { displayableImageUrl, getDefaultImageUrls, type Product } from '../data/products.ts'
 
 /** Screenshot-matched palette */
 const NAVY = '#1A233A'
@@ -25,9 +25,9 @@ export function ProductCard({
 }: ProductCardProps) {
   const { slug, alt, name, cat, price, promo } = product
   const promoLabel = typeof promo === 'string' && promo.trim() ? promo.trim() : null
-  const previews = getDefaultImageUrls(product)
+  const previews = getDefaultImageUrls(product).map(displayableImageUrl)
   const [activeThumb, setActiveThumb] = useState(0)
-  const displayImg = previews[activeThumb] ?? product.img
+  const displayImg = previews[activeThumb] ?? displayableImageUrl(product.img)
   const showThumbRow = previews.length > 1
   const thumbSlots = previews.slice(0, 4)
   const moreCount = Math.max(0, previews.length - thumbSlots.length)
@@ -42,13 +42,17 @@ export function ProductCard({
         className="relative flex aspect-square items-center justify-center overflow-hidden rounded-xl sm:aspect-[1/1] sm:rounded-2xl"
         style={{ backgroundColor: NAVY }}
       >
-        <img
-          src={displayImg}
-          alt={alt}
-          className="max-h-[84%] max-w-[84%] object-contain object-center drop-shadow-[0_10px_24px_rgba(0,0,0,0.3)] sm:max-h-[88%] sm:max-w-[88%] sm:drop-shadow-[0_12px_32px_rgba(0,0,0,0.35)]"
-          loading="lazy"
-          decoding="async"
-        />
+        {displayImg ? (
+          <img
+            src={displayImg}
+            alt={alt}
+            className="max-h-[84%] max-w-[84%] object-contain object-center drop-shadow-[0_10px_24px_rgba(0,0,0,0.3)] sm:max-h-[88%] sm:max-w-[88%] sm:drop-shadow-[0_12px_32px_rgba(0,0,0,0.35)]"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <span className="px-3 text-center text-[11px] font-semibold text-white/70">No photo</span>
+        )}
         {promoLabel ? (
           <span
             className="absolute top-2.5 left-2.5 rounded-md px-2 py-0.5 text-[8px] font-bold tracking-wide text-white uppercase sm:top-3.5 sm:left-3.5 sm:px-2.5 sm:py-1 sm:text-[10px]"

@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { cartLineKey } from '../../data/products.ts'
+import { cartLineKey, displayableImageUrl, getDefaultImageUrls } from '../../data/products.ts'
 import { NIGERIAN_STATES } from '../../data/nigerianStates.ts'
 import { useAuth } from '../../context/AuthContext'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
-import {
-  CHECKOUT_DELIVERY_FEE_NGN,
-  CHECKOUT_PROCESSING_PERCENT,
-  computeCheckoutTotalNgn,
-} from '../../lib/checkoutPricing.ts'
+import { computeCheckoutTotalWithFlatFees } from '../../lib/checkoutPricing.ts'
+import { fetchShopFees } from '../../lib/shopSettings.ts'
 import { createOrder } from '../../lib/userShopSync.ts'
 
 const formatNaira = (value: number) => `₦${value.toLocaleString()}`
@@ -39,11 +36,24 @@ export function CheckoutPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [orderReceipt, setOrderReceipt] = useState<OrderReceipt | null>(null)
+  const [shopFees, setShopFees] = useState<{ deliveryFeeNgn: number; processingFeeNgn: number } | null>(null)
 
-  const { deliveryNgn, processingNgn, totalNgn } = useMemo(
-    () => computeCheckoutTotalNgn(cartSubtotal),
-    [cartSubtotal],
-  )
+  useEffect(() => {
+    let on = true
+    void (async () => {
+      const fees = await fetchShopFees()
+      if (on) setShopFees(fees)
+    })()
+    return () => {
+      on = false
+    }
+  }, [])
+
+  const { deliveryNgn, processingNgn, totalNgn } = useMemo(() => {
+    const d = shopFees?.deliveryFeeNgn ?? 4_000
+    const p = shopFees?.processingFeeNgn ?? 1_200
+    return computeCheckoutTotalWithFlatFees(cartSubtotal, d, p)
+  }, [cartSubtotal, shopFees])
 
   useEffect(() => {
     if (!user) return
@@ -98,7 +108,7 @@ export function CheckoutPage() {
               <span className="font-medium text-tle-ink">{formatNaira(orderReceipt.deliveryNgn)}</span>
             </div>
             <div className="flex justify-between py-1 text-tle-muted">
-              <span>Processing ({CHECKOUT_PROCESSING_PERCENT}%)</span>
+              <span>Processing (flat)</span>
               <span className="font-medium text-tle-ink">{formatNaira(orderReceipt.processingNgn)}</span>
             </div>
             <div className="mt-2 flex justify-between border-t border-black/[0.08] pt-3 font-sans text-base font-semibold text-tle-ink">
@@ -154,13 +164,20 @@ export function CheckoutPage() {
         name: item.name,
         price: item.price,
         quantity: item.quantity,
-        image: item.img,
+        image:
+          displayableImageUrl(
+            (typeof item.img === 'string' && item.img.trim() ? item.img.trim() : getDefaultImageUrls(item)[0]) || undefined,
+          ) || undefined,
         category: item.cat,
         badge: item.badge,
       }))
 
       const subtotal = cartSubtotal
-      const fees = computeCheckoutTotalNgn(subtotal)
+      const fees = computeCheckoutTotalWithFlatFees(
+        subtotal,
+        shopFees?.deliveryFeeNgn ?? 4_000,
+        shopFees?.processingFeeNgn ?? 1_200,
+      )
 
       const result = await createOrder({
         userId: user.id,
@@ -211,7 +228,7 @@ export function CheckoutPage() {
         </div>
         <h1 className="font-sans text-[clamp(1.75rem,4vw,2.25rem)] font-semibold text-tle-ink">Delivery in Nigeria</h1>
         <p className="mt-2 max-w-xl text-sm text-tle-muted">
-          Flat delivery ₦{CHECKOUT_DELIVERY_FEE_NGN.toLocaleString()} nationwide plus {CHECKOUT_PROCESSING_PERCENT}% processing on your items. Total is calculated below.
+          Flat delivery {formatNaira(deliveryNgn)} nationwide plus {formatNaira(processingNgn)} processing per order. Totals update below.
         </p>
 
         <form
@@ -347,7 +364,7 @@ export function CheckoutPage() {
                 const lineTotal = parsePrice(item.price) * item.quantity
                 return (
                   <li key={lineKey} className="flex gap-3">
-                    <img src={item.img} alt="" className="size-14 shrink-0 rounded-xl object-cover" />
+                    <img src={displayableImageUrl(item.img)} alt="" className="size-14 shrink-0 rounded-xl object-cover" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-tle-ink">{item.name}</p>
                       <p className="text-[10px] tracking-wide text-tle-muted uppercase">
@@ -370,7 +387,7 @@ export function CheckoutPage() {
                 <span className="font-medium text-tle-ink">{formatNaira(deliveryNgn)}</span>
               </div>
               <div className="flex justify-between text-tle-muted">
-                <span>Processing ({CHECKOUT_PROCESSING_PERCENT}%)</span>
+                <span>Processing (flat)</span>
                 <span className="font-medium text-tle-ink">{formatNaira(processingNgn)}</span>
               </div>
               <div className="flex justify-between border-t border-black/[0.08] pt-3 font-sans text-lg font-semibold text-tle-ink">

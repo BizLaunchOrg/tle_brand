@@ -9,3 +9,10 @@ export function ad(theme: AdminTheme, light: string, dark: string) {
 export function adminFont() {
   return "font-[system-ui,-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,'Helvetica_Neue',Arial,sans-serif]"
 }
+
+/** Use before any destructive delete in admin (native OK/Cancel dialog). */
+export function adminConfirmDelete(itemLabel?: string): boolean {
+  const label = itemLabel?.trim()
+  const suffix = label ? ` “${label}”` : ' this item'
+  return window.confirm(`Are you sure you want to delete${suffix}? This cannot be undone.`)
+}

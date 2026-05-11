@@ -4,6 +4,14 @@ import { isSupabaseConfigured } from '../../lib/mapSupabaseAuthError'
 import { useAuth } from '../../context/AuthContext'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { ad, adminFont } from './adminUi.ts'
+import {
+  DEFAULT_DELIVERY_FEE_NGN,
+  DEFAULT_PROCESSING_FEE_NGN,
+  fetchShopFees,
+  updateShopFees,
+} from '../../lib/shopSettings.ts'
+
+const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
 export function AdminAccountPage() {
   const { user } = useAuth()
@@ -16,31 +24,51 @@ export function AdminAccountPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const [deliveryFee, setDeliveryFee] = useState(String(DEFAULT_DELIVERY_FEE_NGN))
+  const [processingFee, setProcessingFee] = useState(String(DEFAULT_PROCESSING_FEE_NGN))
+  const [busyFees, setBusyFees] = useState(false)
+  const [feesLoaded, setFeesLoaded] = useState(false)
+
   useEffect(() => {
     if (user?.email) setEmail(user.email)
   }, [user?.email])
 
+  useEffect(() => {
+    let on = true
+    void (async () => {
+      const fees = await fetchShopFees()
+      if (!on) return
+      setDeliveryFee(String(fees.deliveryFeeNgn))
+      setProcessingFee(String(fees.processingFeeNgn))
+      setFeesLoaded(true)
+    })()
+    return () => {
+      on = false
+    }
+  }, [])
+
   const surface = ad(
     theme,
-    'rounded-sm border border-stone-200 bg-white p-5 sm:p-6',
-    'rounded-sm border border-neutral-800 bg-[#141414] p-5 sm:p-6',
+    'rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6',
+    'rounded-2xl border border-neutral-700/90 bg-neutral-900/40 p-5 shadow-sm sm:p-6',
   )
   const input = ad(
     theme,
-    'w-full rounded-sm border border-stone-300 bg-white px-3 py-2 text-[13px] outline-none focus:border-stone-500',
-    'w-full rounded-sm border border-neutral-600 bg-neutral-900 px-3 py-2 text-[13px] text-neutral-100 outline-none focus:border-neutral-500',
+    'w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-[13px] outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20',
+    'w-full rounded-xl border border-neutral-600 bg-neutral-950 px-3 py-2.5 text-[13px] text-neutral-100 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25',
   )
   const label = ad(
     theme,
-    'mb-1 block text-[10px] font-semibold uppercase tracking-wider text-stone-500',
-    'mb-1 block text-[10px] font-semibold uppercase tracking-wider text-neutral-500',
+    'mb-1.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-stone-500',
+    'mb-1.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500',
   )
   const btn = ad(
     theme,
-    'rounded-sm bg-stone-900 px-4 py-2.5 text-[13px] font-medium text-white hover:bg-stone-800 disabled:opacity-50',
-    'rounded-sm bg-neutral-100 px-4 py-2.5 text-[13px] font-medium text-neutral-900 hover:bg-white disabled:opacity-50',
+    'rounded-xl bg-emerald-600 px-4 py-2.5 text-[13px] font-bold text-white shadow-md shadow-emerald-900/15 transition hover:bg-emerald-700 disabled:opacity-50',
+    'rounded-xl bg-emerald-600 px-4 py-2.5 text-[13px] font-bold text-white shadow-md shadow-emerald-900/25 transition hover:bg-emerald-500 disabled:opacity-50',
   )
   const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
+  const heading = ad(theme, 'text-2xl font-bold tracking-tight text-stone-900', 'text-2xl font-bold tracking-tight text-white')
 
   const onEmail = async (e: FormEvent) => {
     e.preventDefault()
@@ -93,34 +121,96 @@ export function AdminAccountPage() {
     setNotice('Password updated.')
   }
 
+  const onSaveFees = async (e: FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setNotice(null)
+    const d = Math.round(Number(deliveryFee.replace(/[^\d]/g, '')) || 0)
+    const p = Math.round(Number(processingFee.replace(/[^\d]/g, '')) || 0)
+    if (d < 0 || p < 0 || d > 50_000_000 || p > 50_000_000) {
+      setError('Enter sensible whole-naira amounts (0–50,000,000).')
+      return
+    }
+    setBusyFees(true)
+    const res = await updateShopFees(d, p)
+    setBusyFees(false)
+    if (!res.ok) {
+      setError(res.message)
+      return
+    }
+    setNotice('Checkout fees saved. New checkouts use these amounts.')
+  }
+
   return (
-    <div className={adminFont() + ' mx-auto max-w-md'}>
-      <h1
-        className={ad(
-          theme,
-          'text-xl font-semibold tracking-tight text-stone-900',
-          'text-xl font-semibold tracking-tight text-neutral-100',
-        )}
-      >
-        Account
-      </h1>
-      <p className={muted + ' mt-1 text-[13px]'}>Supabase auth · same session as the store.</p>
+    <div className={adminFont() + ' mx-auto w-full max-w-lg pb-10'}>
+      <h1 className={heading}>Account</h1>
+      <p className={muted + ' mt-1 text-[14px] leading-relaxed'}>Sign-in, passwords, and store checkout fees.</p>
 
       {error ? (
-        <p className="mt-6 rounded-sm border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-900" role="alert">
+        <p
+          className={
+            'mt-6 rounded-2xl border px-4 py-3 text-[13px] font-medium ' +
+            ad(theme, 'border-rose-200 bg-rose-50 text-rose-900', 'border-rose-900/40 bg-rose-950/30 text-rose-200')
+          }
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p className="mt-6 rounded-sm border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-900" role="status">
+        <p
+          className={
+            'mt-6 rounded-2xl border px-4 py-3 text-[13px] font-medium ' +
+            ad(theme, 'border-emerald-200 bg-emerald-50 text-emerald-900', 'border-emerald-800/50 bg-emerald-950/40 text-emerald-200')
+          }
+          role="status"
+        >
           {notice}
         </p>
       ) : null}
 
-      <form onSubmit={onEmail} className={surface + ' mt-8 space-y-4'}>
-        <h2 className={ad(theme, 'text-[15px] font-semibold text-stone-900', 'text-[15px] font-semibold text-neutral-100')}>
-          Email
-        </h2>
+      <form onSubmit={onSaveFees} className={surface + ' mt-8 space-y-5'}>
+        <div>
+          <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>Checkout fees</h2>
+          <p className={muted + ' mt-1 text-[13px] leading-relaxed'}>
+            Flat amounts added to every website order (delivery + processing). Stored in the database; checkout and receipts use these values.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label>
+            <span className={label}>Delivery (₦)</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              className={input}
+              value={deliveryFee}
+              disabled={!feesLoaded}
+              onChange={(e) => setDeliveryFee(e.target.value)}
+              autoComplete="off"
+            />
+            <p className={muted + ' mt-1 text-[11px]'}>Example: {formatNaira(DEFAULT_DELIVERY_FEE_NGN)}</p>
+          </label>
+          <label>
+            <span className={label}>Processing (₦)</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              className={input}
+              value={processingFee}
+              disabled={!feesLoaded}
+              onChange={(e) => setProcessingFee(e.target.value)}
+              autoComplete="off"
+            />
+            <p className={muted + ' mt-1 text-[11px]'}>Example: {formatNaira(DEFAULT_PROCESSING_FEE_NGN)}</p>
+          </label>
+        </div>
+        <button type="submit" disabled={busyFees || !feesLoaded} className={btn + ' w-full sm:w-auto'}>
+          {busyFees ? 'Saving…' : 'Save checkout fees'}
+        </button>
+      </form>
+
+      <form onSubmit={onEmail} className={surface + ' mt-6 space-y-4'}>
+        <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>Email</h2>
         <label>
           <span className={label}>Address</span>
           <input type="email" className={input} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
@@ -131,9 +221,7 @@ export function AdminAccountPage() {
       </form>
 
       <form onSubmit={onPassword} className={surface + ' mt-6 space-y-4'}>
-        <h2 className={ad(theme, 'text-[15px] font-semibold text-stone-900', 'text-[15px] font-semibold text-neutral-100')}>
-          Password
-        </h2>
+        <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>Password</h2>
         <label>
           <span className={label}>New</span>
           <input

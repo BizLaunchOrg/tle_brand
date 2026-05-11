@@ -32,6 +32,47 @@ export type Product = {
   description: string
   /** Optional collection / SEO-style tags (e.g. EARRINGS, SET JEWELRY) */
   tags?: string[]
+  /** Admin: hide from shop when false; omitted = visible */
+  published?: boolean
+  /** Admin: stock on hand (optional; used on inventory table) */
+  stock?: number
+}
+
+/** Normalize stored image URLs for `<img src>` (relative paths, protocol-relative, blob previews). */
+export function displayableImageUrl(raw: string | undefined): string {
+  const u = typeof raw === 'string' ? raw.trim() : ''
+  if (!u) return ''
+  if (u.startsWith('blob:') || u.startsWith('data:')) return u
+  if (/^https?:\/\//i.test(u)) return u
+  if (u.startsWith('//')) return `https:${u}`
+  if (u.startsWith('/') && typeof window !== 'undefined') return `${window.location.origin}${u}`
+  // Bare storage path (some imports store without host)
+  if (/^(storage\/v1\/|object\/public\/)/i.test(u)) {
+    const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '')
+    if (base) return `${base}/${u.replace(/^\//, '')}`
+  }
+
+  const supabaseBase = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') ?? ''
+  // Supabase Storage: catalog / orders often store only the object key under bucket `product-media`
+  // (e.g. `uuid/1730000000000-abc12345.jpg` from admin uploads).
+  if (
+    supabaseBase &&
+    !/^https?:\/\//i.test(u) &&
+    !u.startsWith('//') &&
+    !u.startsWith('data:') &&
+    !u.startsWith('blob:')
+  ) {
+    const trimmed = u.replace(/^\//, '')
+    const uuidDir =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\//i.test(trimmed) ||
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\//i.test(trimmed)
+    if (uuidDir || trimmed.toLowerCase().startsWith('product-media/')) {
+      const objectPath = trimmed.toLowerCase().startsWith('product-media/') ? trimmed.slice('product-media/'.length) : trimmed
+      return `${supabaseBase}/storage/v1/object/public/product-media/${objectPath.replace(/^\//, '')}`
+    }
+  }
+
+  return u
 }
 
 /** Unique cart line: same slug + different color = separate rows */
@@ -41,8 +82,20 @@ export function cartLineKey(slug: string, variantId?: string): string {
 
 /** Image URLs for PDP / card previews when no color is selected */
 export function getDefaultImageUrls(product: Product): string[] {
-  const urls = [product.img, ...(product.gallery ?? [])]
-  return urls.filter((u, i) => u && urls.indexOf(u) === i)
+  const urls: string[] = []
+  const push = (u: string | undefined) => {
+    const t = typeof u === 'string' ? u.trim() : ''
+    if (!t || urls.includes(t)) return
+    urls.push(t)
+  }
+  push(product.img)
+  for (const u of product.gallery ?? []) push(u)
+  if (!urls.length) {
+    for (const c of product.colorOptions ?? []) {
+      for (const u of c.images ?? []) push(u)
+    }
+  }
+  return urls
 }
 
 export function getActiveColorOption(product: Product, colorId: string | undefined): ProductColorOption | undefined {

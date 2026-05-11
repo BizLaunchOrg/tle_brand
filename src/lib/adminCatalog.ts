@@ -71,7 +71,11 @@ export async function fetchCatalogPayloadsBySlugs(slugs: string[]): Promise<Map<
 
   if (error || !data) return map
   for (const row of data as { slug: string; payload: Product }[]) {
-    if (row?.slug && row.payload && typeof row.payload === 'object') map.set(row.slug, row.payload as Product)
+    if (!row?.slug || !row.payload || typeof row.payload !== 'object') continue
+    const p = row.payload as Product
+    map.set(row.slug.trim(), p)
+    const payloadSlug = typeof p.slug === 'string' ? p.slug.trim() : ''
+    if (payloadSlug && payloadSlug !== row.slug.trim()) map.set(payloadSlug, p)
   }
   return map
 }

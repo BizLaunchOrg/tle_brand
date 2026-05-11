@@ -15,6 +15,7 @@ import { AdminGate } from './pages/admin/AdminGate.tsx'
 import { AdminLayout } from './pages/admin/AdminLayout.tsx'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.tsx'
 import { AdminOrdersPage } from './pages/admin/AdminOrdersPage.tsx'
+import { AdminOrderDetailPage } from './pages/admin/AdminOrderDetailPage.tsx'
 import { AdminTransactionsPage } from './pages/admin/AdminTransactionsPage.tsx'
 import { AdminProductsPage } from './pages/admin/AdminProductsPage.tsx'
 import { AdminAccountPage } from './pages/admin/AdminAccountPage.tsx'
@@ -41,6 +42,7 @@ function App() {
           <Route element={<AdminLayout />}>
             <Route index element={<AdminDashboardPage />} />
             <Route path="orders" element={<AdminOrdersPage />} />
+            <Route path="orders/:orderId" element={<AdminOrderDetailPage />} />
             <Route path="products" element={<AdminProductsPage />} />
             <Route path="transactions" element={<AdminTransactionsPage />} />
             <Route path="account" element={<AdminAccountPage />} />

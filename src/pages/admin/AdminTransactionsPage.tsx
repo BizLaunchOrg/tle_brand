@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fetchOrdersForAdmin } from '../../lib/adminOrders.ts'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import {
@@ -9,7 +10,6 @@ import {
   type DateRangeFilter,
 } from '../../lib/adminOrderAnalytics.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { AdminOrderDetailModal } from './AdminOrderDetailModal.tsx'
 import { AdminRangeTabs, AdminStatusBucketTabs, adminStatusPillClass, type AdminOrderBucket } from './adminRangeTabs.tsx'
 import { ad, adminFont } from './adminUi.ts'
 import { printOrdersStatement } from './statementPrint.ts'
@@ -48,14 +48,13 @@ function detailBtn(theme: 'light' | 'dark') {
 }
 
 export function AdminTransactionsPage() {
+  const navigate = useNavigate()
   const { theme } = useAdminTheme()
   const [orders, setOrders] = useState<AdminOrderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState<DateRangeFilter>('30d')
   const [bucket, setBucket] = useState<AdminOrderBucket>('all')
   const [actionMsg, setActionMsg] = useState<string | null>(null)
-  const [detailOrder, setDetailOrder] = useState<AdminOrderRow | null>(null)
-
   useEffect(() => {
     let on = true
     ;(async () => {
@@ -127,10 +126,6 @@ export function AdminTransactionsPage() {
 
   return (
     <div className={adminFont() + ' mx-auto max-w-6xl pb-8'}>
-      {detailOrder ? (
-        <AdminOrderDetailModal order={detailOrder} onClose={() => setDetailOrder(null)} headline="Transaction details" />
-      ) : null}
-
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -140,7 +135,7 @@ export function AdminTransactionsPage() {
             <h1 className={heading}>Transactions</h1>
           </div>
           <p className={muted + ' mt-2 max-w-2xl text-[14px] leading-relaxed'}>
-            One row per checkout. Tap <strong className={ad(theme, 'text-stone-700', 'text-neutral-300')}>Details</strong> for the full breakdown — contact, address, line items, and amounts.
+            One row per checkout. Use <strong className={ad(theme, 'text-stone-700', 'text-neutral-300')}>View</strong> to open the full order page (same as Orders) — contact, address, line items, fees, and status updates.
           </p>
         </div>
         <div className="flex w-full shrink-0 flex-col items-stretch gap-2 lg:w-auto lg:items-end">
@@ -249,7 +244,11 @@ export function AdminTransactionsPage() {
                   </span>
                 </div>
               </div>
-              <button type="button" onClick={() => setDetailOrder(o)} className={'mt-4 w-full justify-center ' + detailBtn(theme)}>
+              <button
+                type="button"
+                onClick={() => navigate(`/admin/orders/${encodeURIComponent(o.id)}`, { state: { from: 'transactions' } })}
+                className={'mt-4 w-full justify-center ' + detailBtn(theme)}
+              >
                 <span className="material-symbols-outlined text-[18px] font-light">visibility</span>
                 View full details
               </button>
@@ -300,7 +299,11 @@ export function AdminTransactionsPage() {
                       </span>
                     </td>
                     <td className={td}>
-                      <button type="button" onClick={() => setDetailOrder(o)} className={detailBtn(theme)}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/admin/orders/${encodeURIComponent(o.id)}`, { state: { from: 'transactions' } })}
+                        className={detailBtn(theme)}
+                      >
                         <span className="material-symbols-outlined text-[18px] font-light">visibility</span>
                         View
                       </button>
