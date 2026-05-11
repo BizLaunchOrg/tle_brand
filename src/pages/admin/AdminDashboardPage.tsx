@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import {
   countAndRevenue,
   filterOrdersByRange,
@@ -11,146 +12,91 @@ import {
 import { fetchOrdersForAdmin } from '../../lib/adminOrders.ts'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { ad } from './adminUi.ts'
+import { AdminRangeTabs, adminStatusPillClass } from './adminRangeTabs.tsx'
+import { ad, adminFont } from './adminUi.ts'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
-function RangeTabs({
-  value,
-  onChange,
-  theme,
-}: {
-  value: DateRangeFilter
-  onChange: (v: DateRangeFilter) => void
-  theme: 'light' | 'dark'
-}) {
-  const tabs: { id: DateRangeFilter; label: string }[] = [
-    { id: 'today', label: 'Today' },
-    { id: '7d', label: '7 days' },
-    { id: '30d', label: '30 days' },
-    { id: 'all', label: 'All time' },
-  ]
-  return (
-    <div
-      className={ad(
-        theme,
-        'inline-flex rounded-lg border border-zinc-200/90 bg-white p-0.5 shadow-sm',
-        'inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-0.5',
-      )}
-      role="tablist"
-    >
-      {tabs.map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          role="tab"
-          aria-selected={value === t.id}
-          onClick={() => onChange(t.id)}
-          className={[
-            'rounded-md px-3 py-1.5 text-[12px] font-semibold tracking-tight transition-colors',
-            value === t.id
-              ? ad(theme, 'bg-zinc-900 text-white shadow-sm', 'bg-zinc-100 text-zinc-900')
-              : ad(theme, 'text-zinc-500 hover:text-zinc-800', 'text-zinc-500 hover:text-zinc-200'),
-          ].join(' ')}
-        >
-          {t.label}
-        </button>
-      ))}
-    </div>
-  )
+function filterOrdersByYear(orders: AdminOrderRow[], year: number) {
+  return orders.filter((o) => new Date(o.created_at).getFullYear() === year)
 }
 
-function Kpi({
+function uniqueBuyerCount(orders: AdminOrderRow[]): number {
+  const s = new Set<string>()
+  for (const o of orders) {
+    const e = (o.email || '').trim().toLowerCase()
+    if (e) s.add(e)
+  }
+  return s.size
+}
+
+function revenueCompleted(orders: AdminOrderRow[]) {
+  return orders.filter((o) => isCompletedStatus(o.status)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0)
+}
+
+function revenuePending(orders: AdminOrderRow[]) {
+  return orders.filter((o) => isPendingStatus(o.status)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0)
+}
+
+function completedCount(orders: AdminOrderRow[]) {
+  return orders.filter((o) => isCompletedStatus(o.status)).length
+}
+
+type OverviewTint = 'emerald' | 'sky' | 'amber' | 'rose'
+
+function overviewShell(tint: OverviewTint, theme: 'light' | 'dark') {
+  const map: Record<OverviewTint, [string, string]> = {
+    emerald: ['border-emerald-100/80 bg-emerald-50/90', 'border-emerald-900/30 bg-emerald-950/25'],
+    sky: ['border-sky-100/80 bg-sky-50/90', 'border-sky-900/30 bg-sky-950/25'],
+    amber: ['border-amber-100/80 bg-amber-50/90', 'border-amber-900/25 bg-amber-950/20'],
+    rose: ['border-rose-100/80 bg-rose-50/90', 'border-rose-900/25 bg-rose-950/20'],
+  }
+  const [L, D] = map[tint]
+  return ad(theme, L, D)
+}
+
+function OverviewCard({
   label,
   value,
-  sub,
-  icon,
+  hint,
   theme,
+  icon,
+  iconColor,
+  tint,
 }: {
   label: string
   value: string
-  sub?: string
-  icon: string
+  hint: string
   theme: 'light' | 'dark'
+  icon: string
+  iconColor: string
+  tint: OverviewTint
 }) {
   return (
-    <div
-      className={ad(
-        theme,
-        'rounded-xl border border-zinc-200/90 bg-white p-5 shadow-sm',
-        'rounded-xl border border-zinc-800/90 bg-[#0c0c0e] p-5',
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p
-            className={ad(
-              theme,
-              'text-[11px] font-semibold uppercase tracking-wider text-zinc-500',
-              'text-[11px] font-semibold uppercase tracking-wider text-zinc-500',
-            )}
-          >
-            {label}
-          </p>
-          <p className="mt-2 font-sans text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-          {sub ? (
-            <p className={ad(theme, 'mt-1 text-[12px] text-zinc-500', 'mt-1 text-[12px] text-zinc-500')}>{sub}</p>
-          ) : null}
-        </div>
-        <span
-          className={ad(
-            theme,
-            'flex size-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600',
-            'flex size-10 items-center justify-center rounded-lg bg-zinc-800/80 text-zinc-300',
-          )}
-          style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24" }}
-        >
-          <span className="material-symbols-outlined text-[22px] leading-none">{icon}</span>
+    <div className={['min-w-[152px] shrink-0 snap-start rounded-2xl border p-4 shadow-sm', overviewShell(tint, theme)].join(' ')}>
+      <div className="flex items-start justify-between gap-2">
+        <p className={ad(theme, 'text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-600', 'text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400')}>
+          {label}
+        </p>
+        <span className={`flex size-9 items-center justify-center rounded-xl ${iconColor}`}>
+          <span className="material-symbols-outlined text-[18px] font-light leading-none text-white">{icon}</span>
         </span>
       </div>
-    </div>
-  )
-}
-
-function Panel({
-  title,
-  action,
-  children,
-  theme,
-}: {
-  title: string
-  action?: ReactNode
-  children: ReactNode
-  theme: 'light' | 'dark'
-}) {
-  return (
-    <div
-      className={ad(
-        theme,
-        'overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-sm',
-        'overflow-hidden rounded-xl border border-zinc-800/90 bg-[#0c0c0e]',
-      )}
-    >
-      <div
-        className={ad(
-          theme,
-          'flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4',
-          'flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 px-5 py-4',
-        )}
-      >
-        <h2 className="font-sans text-[15px] font-semibold tracking-tight">{title}</h2>
-        {action}
-      </div>
-      {children}
+      <p className={ad(theme, 'mt-2.5 text-xl font-bold tabular-nums tracking-tight text-stone-900', 'mt-2.5 text-xl font-bold tabular-nums tracking-tight text-neutral-50')}>
+        {value}
+      </p>
+      <p className={ad(theme, 'mt-1 text-[11px] text-stone-600/90', 'mt-1 text-[11px] text-neutral-500')}>{hint}</p>
     </div>
   )
 }
 
 export function AdminDashboardPage() {
+  const { user } = useAuth()
   const { theme } = useAdminTheme()
   const [orders, setOrders] = useState<AdminOrderRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [range, setRange] = useState<DateRangeFilter>('today')
+  const [range, setRange] = useState<DateRangeFilter>('7d')
+  const [yearSel, setYearSel] = useState(() => new Date().getFullYear())
 
   useEffect(() => {
     let on = true
@@ -168,257 +114,467 @@ export function AdminDashboardPage() {
 
   const inRange = useMemo(() => filterOrdersByRange(orders, range), [orders, range])
   const rangeStats = useMemo(() => countAndRevenue(inRange), [inRange])
-
+  const buyersInRange = useMemo(() => uniqueBuyerCount(inRange), [inRange])
+  const completedInRange = useMemo(() => completedCount(inRange), [inRange])
   const pendingAll = useMemo(() => orders.filter((o) => isPendingStatus(o.status)), [orders])
   const completedAll = useMemo(() => orders.filter((o) => isCompletedStatus(o.status)), [orders])
+  const topStates = useMemo(() => topStatesByRevenue(orders, 10), [orders])
+  const recent = orders.slice(0, 12)
+  const allTime = useMemo(() => countAndRevenue(orders), [orders])
 
-  const topStates = useMemo(() => topStatesByRevenue(orders, 8), [orders])
-  const maxStateRev = topStates[0]?.revenue ?? 1
+  const yearOptions = useMemo(() => {
+    const ys = new Set<number>()
+    const y0 = new Date().getFullYear()
+    for (let i = 0; i < 6; i++) ys.add(y0 - i)
+    for (const o of orders) ys.add(new Date(o.created_at).getFullYear())
+    return Array.from(ys).sort((a, b) => b - a)
+  }, [orders])
 
-  const recentOrders = orders.slice(0, 7)
-  const recentTx = orders.slice(0, 10)
+  const inYear = useMemo(() => filterOrdersByYear(orders, yearSel), [orders, yearSel])
+  const yearTotal = useMemo(() => countAndRevenue(inYear), [inYear])
+  const yearSettled = useMemo(() => revenueCompleted(inYear), [inYear])
+  const yearOwed = useMemo(() => revenuePending(inYear), [inYear])
 
-  const rowBorder = ad(theme, 'border-zinc-100', 'border-zinc-800/80')
-  const muted = ad(theme, 'text-zinc-500', 'text-zinc-500')
-  const strong = ad(theme, 'text-zinc-900', 'text-zinc-100')
+  const rangeLabel =
+    range === 'today' ? 'Today' : range === 'all' ? 'All time' : range === '7d' ? 'Last 7 days' : 'Last 30 days'
+
+  const surface = ad(theme, 'rounded-2xl border border-stone-100/90 bg-white shadow-sm', 'rounded-2xl border border-neutral-800 bg-[#141816] shadow-sm')
+  const th = ad(
+    theme,
+    'border-b border-stone-100 bg-stone-50/90 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-stone-500',
+    'border-b border-neutral-800 bg-neutral-900/50 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-500',
+  )
+  const td = ad(
+    theme,
+    'border-b border-stone-50 px-3 py-2.5 text-[13px] text-stone-800',
+    'border-b border-neutral-800/80 px-3 py-2.5 text-[13px] text-neutral-200',
+  )
+  const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
+  const link = ad(
+    theme,
+    'text-[12px] font-semibold text-emerald-700 underline decoration-emerald-200 underline-offset-2 hover:text-emerald-900',
+    'text-[12px] font-semibold text-emerald-400 underline decoration-emerald-800 underline-offset-2 hover:text-emerald-200',
+  )
 
   if (loading) {
     return (
-      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
-        <div
-          className={ad(
-            theme,
-            'size-8 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-800',
-            'size-8 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-200',
-          )}
-        />
-        <p className={muted + ' text-sm'}>Syncing ledger…</p>
+      <div className={'flex min-h-[32vh] items-center justify-center ' + muted}>
+        <p className="text-[13px]">Loading dashboard…</p>
       </div>
     )
   }
 
+  const overviewMobile = [
+    {
+      label: 'Orders',
+      value: String(rangeStats.count),
+      hint: rangeLabel,
+      icon: 'shopping_bag' as const,
+      iconColor: 'bg-emerald-600',
+      tint: 'emerald' as const,
+    },
+    {
+      label: 'Sales',
+      value: formatNaira(rangeStats.revenue),
+      hint: 'In selected period',
+      icon: 'payments' as const,
+      iconColor: 'bg-sky-600',
+      tint: 'sky' as const,
+    },
+    {
+      label: 'Customers',
+      value: String(buyersInRange),
+      hint: 'Unique buyers',
+      icon: 'group' as const,
+      iconColor: 'bg-amber-500',
+      tint: 'amber' as const,
+    },
+    {
+      label: 'Completed',
+      value: String(completedInRange),
+      hint: 'Orders in period',
+      icon: 'check_circle' as const,
+      iconColor: 'bg-rose-500',
+      tint: 'rose' as const,
+    },
+  ]
+
   return (
-    <div className="mx-auto max-w-6xl">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="font-sans text-2xl font-semibold tracking-tight sm:text-[26px]">Overview</h1>
-          <p className={muted + ' mt-1 max-w-xl text-sm leading-relaxed'}>
-            Performance for the selected window. Figures derive from checkout orders in Supabase.
-          </p>
-        </div>
-        <RangeTabs value={range} onChange={setRange} theme={theme} />
-      </div>
-
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi
-          theme={theme}
-          icon="receipt_long"
-          label={`Orders · ${range === 'today' ? 'today' : range === 'all' ? 'all time' : range}`}
-          value={String(rangeStats.count)}
-          sub="In selected range"
-        />
-        <Kpi
-          theme={theme}
-          icon="account_balance_wallet"
-          label="Revenue · range"
-          value={formatNaira(rangeStats.revenue)}
-          sub="Sum of order totals"
-        />
-        <Kpi
-          theme={theme}
-          icon="hourglass_top"
-          label="Pending"
-          value={String(pendingAll.length)}
-          sub="All statuses awaiting fulfilment"
-        />
-        <Kpi
-          theme={theme}
-          icon="check_circle"
-          label="Completed"
-          value={String(completedAll.length)}
-          sub="Delivered / fulfilled"
-        />
-      </div>
-
-      <div className="mt-8 grid gap-6 lg:grid-cols-5 lg:items-start">
-        <div className="lg:col-span-3 space-y-6">
-          <Panel
-            theme={theme}
-            title="Recent orders"
-            action={
-              <Link
-                to="/admin/orders"
-                className={ad(
-                  theme,
-                  'text-[12px] font-semibold text-tle-deep no-underline hover:underline',
-                  'text-[12px] font-semibold text-tle-light no-underline hover:underline',
-                )}
-              >
-                Open queue →
-              </Link>
-            }
-          >
-            {recentOrders.length === 0 ? (
-              <p className={'px-5 py-12 text-center text-sm ' + muted}>No orders yet.</p>
-            ) : (
-              <ul className="divide-y">
-                {recentOrders.map((o) => (
-                  <li key={o.id} className={'flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 ' + rowBorder}>
-                    <div className="min-w-0">
-                      <p className={'truncate text-sm font-medium ' + strong}>{o.email}</p>
-                      <p className={'text-[11px] ' + muted}>
-                        {new Date(o.created_at).toLocaleString(undefined, {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        })}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p
-                        className={
-                          'text-sm font-semibold tabular-nums ' +
-                          ad(theme, 'text-tle-deep', 'text-tle-light')
-                        }
-                      >
-                        {formatNaira(Number(o.total_ngn) || 0)}
-                      </p>
-                      <span
-                        className={[
-                          'mt-0.5 inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                          isCompletedStatus(o.status)
-                            ? ad(
-                                theme,
-                                'bg-emerald-500/15 text-emerald-800',
-                                'bg-emerald-500/10 text-emerald-400',
-                              )
-                            : isPendingStatus(o.status)
-                              ? ad(
-                                  theme,
-                                  'bg-amber-500/15 text-amber-900',
-                                  'bg-amber-500/10 text-amber-400',
-                                )
-                              : ad(theme, 'bg-zinc-100 text-zinc-600', 'bg-zinc-800 text-zinc-400'),
-                        ].join(' ')}
-                      >
-                        {o.status}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-
-          <Panel
-            theme={theme}
-            title="Recent transactions"
-            action={
-              <Link
-                to="/admin/transactions"
-                className={ad(
-                  theme,
-                  'text-[12px] font-semibold text-tle-deep no-underline hover:underline',
-                  'text-[12px] font-semibold text-tle-light no-underline hover:underline',
-                )}
-              >
-                Full ledger →
-              </Link>
-            }
-          >
-            {recentTx.length === 0 ? (
-              <p className={'px-5 py-12 text-center text-sm ' + muted}>No transactions.</p>
-            ) : (
-              <ul className="divide-y">
-                {recentTx.map((o) => (
-                  <li key={o.id} className={'flex items-center justify-between gap-3 px-5 py-3 ' + rowBorder}>
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span
-                        className={ad(
-                          theme,
-                          'flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600',
-                          'flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-zinc-400',
-                        )}
-                      >
-                        <span className="material-symbols-outlined text-[18px] leading-none">swap_horiz</span>
-                      </span>
-                      <div className="min-w-0">
-                        <p className={'truncate text-[13px] font-medium ' + strong}>Order · {o.id.slice(0, 8)}…</p>
-                        <p className={'text-[11px] ' + muted}>{o.email}</p>
-                      </div>
-                    </div>
-                    <p
-                      className={
-                        'shrink-0 text-sm font-semibold tabular-nums ' +
-                        ad(theme, 'text-tle-deep', 'text-tle-light')
-                      }
-                    >
-                      {formatNaira(Number(o.total_ngn) || 0)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
+    <div className={['mx-auto max-w-6xl', adminFont()].join(' ')}>
+      {/* Mobile */}
+      <div className="space-y-5 lg:hidden">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className={ad(theme, 'text-xl font-bold tracking-tight text-stone-900', 'text-xl font-bold tracking-tight text-neutral-50')}>
+              Hi {user?.name?.split(' ')[0] || 'there'}
+            </h1>
+            <p className={muted + ' mt-0.5 text-[13px]'}>Here is how your store is performing.</p>
+          </div>
+          <AdminRangeTabs value={range} onChange={setRange} theme={theme} compact />
         </div>
 
-        <div className="lg:col-span-2">
-          <Panel theme={theme} title="Top states · revenue">
-            {topStates.length === 0 ? (
-              <p className={'px-5 py-10 text-center text-sm ' + muted}>No geographic data yet.</p>
-            ) : (
-              <div className="space-y-4 px-5 py-5">
-                {topStates.map((s) => (
-                  <div key={s.state}>
-                    <div className="mb-1 flex justify-between text-[12px]">
-                      <span className={'font-medium ' + strong}>{s.state}</span>
-                      <span className={muted + ' tabular-nums'}>
-                        {formatNaira(s.revenue)} · {s.orders} orders
-                      </span>
-                    </div>
-                    <div
-                      className={ad(
-                        theme,
-                        'h-2 overflow-hidden rounded-full bg-zinc-100',
-                        'h-2 overflow-hidden rounded-full bg-zinc-800/80',
-                      )}
-                    >
-                      <div
-                        className={'h-full rounded-full ' + ad(theme, 'bg-tle-deep', 'bg-tle-pink')}
-                        style={{ width: `${Math.max(8, (s.revenue / maxStateRev) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Panel>
-
-          <div
-            className={ad(
-              theme,
-              'mt-6 rounded-xl border border-zinc-200/90 bg-white p-5 shadow-sm',
-              'mt-6 rounded-xl border border-zinc-800/90 bg-[#0c0c0e] p-5',
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] leading-none text-zinc-500">inventory_2</span>
-              <h3 className="text-[13px] font-semibold tracking-tight">Catalog</h3>
-            </div>
-            <p className={muted + ' mt-2 text-[12px] leading-relaxed'}>
-              Stage new SKUs in the catalog workspace. Live storefront still reads the static catalog until you wire
-              Supabase.
+        <div className={surface + ' p-5'}>
+          <div className="flex items-center justify-between gap-2">
+            <p className={ad(theme, 'text-[11px] font-semibold uppercase tracking-wide text-stone-500', 'text-[11px] font-semibold uppercase tracking-wide text-neutral-500')}>
+              Total sales
             </p>
-            <Link
-              to="/admin/products"
-              className={ad(
-                theme,
-                'mt-4 inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-[12px] font-semibold text-white no-underline hover:bg-zinc-800',
-                'mt-4 inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-2.5 text-[12px] font-semibold text-zinc-900 no-underline hover:bg-white',
-              )}
-            >
-              <span className="material-symbols-outlined text-[18px] leading-none">add</span>
-              Manage products
+            <span className={muted + ' text-[11px]'}>{rangeLabel}</span>
+          </div>
+          <p className={ad(theme, 'mt-2 text-3xl font-bold tabular-nums tracking-tight text-stone-900', 'mt-2 text-3xl font-bold tabular-nums tracking-tight text-white')}>
+            {formatNaira(rangeStats.revenue)}
+          </p>
+          <p className={muted + ' mt-1 text-[12px]'}>{rangeStats.count} orders in this period</p>
+        </div>
+
+        <div>
+          <p className={ad(theme, 'mb-2 text-[11px] font-semibold uppercase tracking-wide text-stone-500', 'mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500')}>
+            Business overview
+          </p>
+          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] snap-x snap-mandatory [&::-webkit-scrollbar]:hidden">
+            {overviewMobile.map((s) => (
+              <OverviewCard key={s.label} {...s} theme={theme} />
+            ))}
+          </div>
+        </div>
+
+        <div className={surface + ' p-5'}>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className={ad(theme, 'text-[14px] font-bold text-stone-900', 'text-[14px] font-bold text-neutral-100')}>Yearly overview</h2>
+            <label className={ad(theme, 'flex items-center gap-2 text-[12px] font-medium text-stone-600', 'flex items-center gap-2 text-[12px] font-medium text-neutral-400')}>
+              <span className="sr-only">Year</span>
+              <select
+                value={yearSel}
+                onChange={(e) => setYearSel(Number(e.target.value))}
+                className={ad(
+                  theme,
+                  'cursor-pointer rounded-xl border border-stone-200 bg-white px-3 py-2 text-[13px] font-semibold text-stone-900 outline-none focus:border-emerald-500',
+                  'cursor-pointer rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-[13px] font-semibold text-neutral-100 outline-none focus:border-emerald-500',
+                )}
+              >
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className={'rounded-xl border p-3 sm:p-4 ' + ad(theme, 'border-stone-100 bg-stone-50/50', 'border-neutral-700 bg-neutral-900/40')}>
+              <p className={muted + ' text-[10px] font-semibold uppercase tracking-wide'}>Total sales</p>
+              <p className={ad(theme, 'mt-1 text-lg font-bold tabular-nums text-stone-900', 'mt-1 text-lg font-bold tabular-nums text-white')}>{formatNaira(yearTotal.revenue)}</p>
+            </div>
+            <div className={'rounded-xl border p-3 sm:p-4 ' + ad(theme, 'border-emerald-100 bg-emerald-50/60', 'border-emerald-900/40 bg-emerald-950/20')}>
+              <p className={muted + ' text-[10px] font-semibold uppercase tracking-wide'}>Total settled</p>
+              <p className={ad(theme, 'mt-1 text-lg font-bold tabular-nums text-emerald-800', 'mt-1 text-lg font-bold tabular-nums text-emerald-300')}>{formatNaira(yearSettled)}</p>
+            </div>
+            <div className={'rounded-xl border p-3 sm:p-4 ' + ad(theme, 'border-amber-100 bg-amber-50/60', 'border-amber-900/35 bg-amber-950/20')}>
+              <p className={muted + ' text-[10px] font-semibold uppercase tracking-wide'}>Pipeline (pending)</p>
+              <p className={ad(theme, 'mt-1 text-lg font-bold tabular-nums text-amber-800', 'mt-1 text-lg font-bold tabular-nums text-amber-200')}>{formatNaira(yearOwed)}</p>
+            </div>
+            <div className={'rounded-xl border p-3 sm:p-4 ' + ad(theme, 'border-stone-100 bg-stone-50/50', 'border-neutral-700 bg-neutral-900/40')}>
+              <p className={muted + ' text-[10px] font-semibold uppercase tracking-wide'}>Orders</p>
+              <p className={ad(theme, 'mt-1 text-lg font-bold tabular-nums text-stone-900', 'mt-1 text-lg font-bold tabular-nums text-white')}>{yearTotal.count}</p>
+            </div>
+          </div>
+        </div>
+
+        <Link
+          to="/admin/transactions"
+          className={ad(
+            theme,
+            'flex items-center justify-between gap-3 rounded-2xl bg-emerald-600 px-4 py-3.5 text-white shadow-md shadow-emerald-900/20 no-underline transition active:scale-[0.99]',
+            'flex items-center justify-between gap-3 rounded-2xl bg-emerald-600 px-4 py-3.5 text-white shadow-md shadow-black/30 no-underline transition active:scale-[0.99]',
+          )}
+        >
+          <span className="material-symbols-outlined text-[26px] font-light">account_balance_wallet</span>
+          <span className="flex-1 text-left text-[13px] font-semibold leading-snug">Review settlements and payouts in Transactions.</span>
+          <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+        </Link>
+
+        <div className={surface + ' p-4'}>
+          <p className={ad(theme, 'text-[13px] font-bold text-stone-900', 'text-[13px] font-bold text-neutral-100')}>To-do</p>
+          <ul className="mt-3 space-y-2">
+            <li className="flex items-start gap-2">
+              <span className="material-symbols-outlined mt-0.5 text-[18px] text-amber-500">warning</span>
+              <span className={muted + ' text-[13px] leading-snug'}>
+                {pendingAll.length > 0 ? (
+                  <>
+                    <strong className={ad(theme, 'text-stone-800', 'text-neutral-200')}>{pendingAll.length} orders</strong> need attention — review status and fulfilment.
+                  </>
+                ) : (
+                  'No pending pipeline items. You are all caught up.'
+                )}
+              </span>
+            </li>
+          </ul>
+          {pendingAll.length > 0 ? (
+            <Link to="/admin/orders" className={'mt-3 inline-block ' + link}>
+              Review orders →
             </Link>
+          ) : null}
+        </div>
+
+        <div>
+          <p className={ad(theme, 'mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500', 'mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-500')}>
+            Quick actions
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { to: '/admin/orders', icon: 'add_shopping_cart', label: 'Orders' },
+              { to: '/admin/transactions', icon: 'payments', label: 'Wallet' },
+              { to: '/', icon: 'storefront', label: 'Store' },
+              { to: '/admin/account', icon: 'tune', label: 'Settings' },
+            ].map((q) => (
+              <Link
+                key={q.label}
+                to={q.to}
+                className={ad(
+                  theme,
+                  'flex flex-col items-center gap-1.5 rounded-2xl border border-stone-100 bg-white py-3 no-underline shadow-sm transition active:scale-[0.98]',
+                  'flex flex-col items-center gap-1.5 rounded-2xl border border-neutral-800 bg-[#141816] py-3 no-underline shadow-sm transition active:scale-[0.98]',
+                )}
+              >
+                <span
+                  className={ad(
+                    theme,
+                    'flex size-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700',
+                    'flex size-11 items-center justify-center rounded-full bg-emerald-950/50 text-emerald-300',
+                  )}
+                >
+                  <span className="material-symbols-outlined text-[22px] font-light">{q.icon}</span>
+                </span>
+                <span className={ad(theme, 'text-[10px] font-semibold text-stone-600', 'text-[10px] font-semibold text-neutral-400')}>{q.label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className={ad(theme, 'text-[14px] font-bold text-stone-900', 'text-[14px] font-bold text-neutral-100')}>Recent orders</h2>
+            <Link to="/admin/orders" className={link}>
+              View all
+            </Link>
+          </div>
+          <div className={surface + ' overflow-x-auto'}>
+            <table className="w-full min-w-[520px] border-collapse text-left">
+              <thead>
+                <tr>
+                  <th className={th}>When</th>
+                  <th className={th}>Customer</th>
+                  <th className={th + ' text-right'}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recent.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className={td + ' py-8 text-center ' + muted}>
+                      No orders yet.
+                    </td>
+                  </tr>
+                ) : (
+                  recent.slice(0, 6).map((o) => (
+                    <tr key={o.id}>
+                      <td className={td + ' whitespace-nowrap tabular-nums ' + muted}>
+                        {new Date(o.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric' })}
+                      </td>
+                      <td className={td + ' max-w-[140px] truncate'}>{o.email}</td>
+                      <td className={td + ' text-right font-semibold tabular-nums ' + ad(theme, 'text-emerald-800', 'text-emerald-300')}>
+                        {formatNaira(Number(o.total_ngn) || 0)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop */}
+      <div className="hidden lg:block">
+        <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+          <div>
+            <h1 className={ad(theme, 'text-3xl font-bold tracking-tight text-stone-900', 'text-3xl font-bold tracking-tight text-neutral-50')}>
+              Hi {user?.name?.split(' ')[0] || 'there'}
+            </h1>
+            <p className={muted + ' mt-2 max-w-xl text-[15px] leading-relaxed'}>
+              Business overview from checkout. Use the period filter for a quick pulse; yearly figures use the year selector below.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+            <p className={ad(theme, 'text-right text-[10px] font-semibold uppercase tracking-wide text-stone-500', 'text-right text-[10px] font-semibold uppercase tracking-wide text-neutral-500')}>
+              Period
+            </p>
+            <AdminRangeTabs value={range} onChange={setRange} theme={theme} />
+          </div>
+        </div>
+
+        <p className={ad(theme, 'mt-8 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500', 'mt-8 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500')}>
+          Business overview
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-4 xl:grid-cols-4">
+          {overviewMobile.map((s) => (
+            <OverviewCard key={s.label + '-d'} {...s} theme={theme} />
+          ))}
+        </div>
+
+        <div className={surface + ' mt-10 p-6'}>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>Yearly overview</h2>
+              <p className={muted + ' mt-1 text-[13px]'}>Totals for the selected calendar year (all channels).</p>
+            </div>
+            <label className={ad(theme, 'flex items-center gap-2 text-[13px] font-medium text-stone-600', 'flex items-center gap-2 text-[13px] font-medium text-neutral-400')}>
+              Year
+              <select
+                value={yearSel}
+                onChange={(e) => setYearSel(Number(e.target.value))}
+                className={ad(
+                  theme,
+                  'cursor-pointer rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-[14px] font-semibold text-stone-900 outline-none focus:border-emerald-500',
+                  'cursor-pointer rounded-xl border border-neutral-700 bg-neutral-900 px-4 py-2.5 text-[14px] font-semibold text-neutral-100 outline-none focus:border-emerald-500',
+                )}
+              >
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className={'mt-6 grid gap-4 border-t pt-6 sm:grid-cols-2 lg:grid-cols-4 ' + ad(theme, 'border-stone-100', 'border-neutral-800')}>
+            <div className="rounded-2xl border border-stone-100 bg-stone-50/60 p-4">
+              <p className={muted + ' text-[11px] font-semibold uppercase tracking-wide'}>Total sales</p>
+              <p className={ad(theme, 'mt-2 text-xl font-bold tabular-nums text-stone-900', 'mt-2 text-xl font-bold tabular-nums text-white')}>{formatNaira(yearTotal.revenue)}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-100/80 bg-emerald-50/50 p-4">
+              <p className={muted + ' text-[11px] font-semibold uppercase tracking-wide'}>Total settled</p>
+              <p className={ad(theme, 'mt-2 text-xl font-bold tabular-nums text-emerald-900', 'mt-2 text-xl font-bold tabular-nums text-emerald-300')}>{formatNaira(yearSettled)}</p>
+              <p className={muted + ' mt-1 text-[11px]'}>Completed / delivered orders</p>
+            </div>
+            <div className="rounded-2xl border border-amber-100/80 bg-amber-50/50 p-4">
+              <p className={muted + ' text-[11px] font-semibold uppercase tracking-wide'}>Pipeline (pending)</p>
+              <p className={ad(theme, 'mt-2 text-xl font-bold tabular-nums text-amber-900', 'mt-2 text-xl font-bold tabular-nums text-amber-200')}>{formatNaira(yearOwed)}</p>
+              <p className={muted + ' mt-1 text-[11px]'}>Awaiting payment / processing</p>
+            </div>
+            <div className="rounded-2xl border border-stone-100 bg-stone-50/60 p-4">
+              <p className={muted + ' text-[11px] font-semibold uppercase tracking-wide'}>Orders</p>
+              <p className={ad(theme, 'mt-2 text-xl font-bold tabular-nums text-stone-900', 'mt-2 text-xl font-bold tabular-nums text-white')}>{yearTotal.count}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-10 grid gap-8 lg:grid-cols-3 lg:items-start">
+          <div className="lg:col-span-2">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>Recent orders</h2>
+              <Link to="/admin/orders" className={link}>
+                View all
+              </Link>
+            </div>
+            <div className={surface + ' overflow-x-auto'}>
+              <table className="w-full min-w-[560px] border-collapse text-left">
+                <thead>
+                  <tr>
+                    <th className={th}>Created</th>
+                    <th className={th}>Reference</th>
+                    <th className={th}>Customer</th>
+                    <th className={th + ' text-right'}>Total</th>
+                    <th className={th}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recent.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className={td + ' py-10 text-center ' + muted}>
+                        No orders yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    recent.map((o) => (
+                      <tr key={o.id} className={ad(theme, 'transition-colors hover:bg-stone-50/80', 'transition-colors hover:bg-neutral-900/40')}>
+                        <td className={td + ' whitespace-nowrap tabular-nums ' + muted}>
+                          {new Date(o.created_at).toLocaleString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </td>
+                        <td className={td + ' font-mono text-[12px]'}>{o.id.slice(0, 10)}…</td>
+                        <td className={td + ' max-w-[180px] truncate'}>{o.email}</td>
+                        <td className={td + ' text-right font-semibold tabular-nums ' + ad(theme, 'text-emerald-800', 'text-emerald-300')}>
+                          {formatNaira(Number(o.total_ngn) || 0)}
+                        </td>
+                        <td className={td}>
+                          <span className={'inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ' + adminStatusPillClass(o.status, theme)}>
+                            {o.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className={muted + ' mt-4 text-[12px]'}>
+              Need payout detail?{' '}
+              <Link to="/admin/transactions" className={link}>
+                Open transactions
+              </Link>
+              .
+            </p>
+          </div>
+
+          <div>
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>Top states</h2>
+              <span className={muted + ' text-[11px]'}>By revenue</span>
+            </div>
+            <div className={surface + ' overflow-x-auto'}>
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr>
+                    <th className={th}>#</th>
+                    <th className={th}>State</th>
+                    <th className={th + ' text-right'}>Orders</th>
+                    <th className={th + ' text-right'}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topStates.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className={td + ' py-8 text-center ' + muted}>
+                        No shipping data.
+                      </td>
+                    </tr>
+                  ) : (
+                    topStates.map((row, i) => (
+                      <tr key={row.state}>
+                        <td className={td + ' tabular-nums ' + muted}>{i + 1}</td>
+                        <td className={td + ' font-medium'}>{row.state}</td>
+                        <td className={td + ' text-right tabular-nums ' + muted}>{row.orders}</td>
+                        <td className={td + ' text-right font-medium tabular-nums ' + ad(theme, 'text-emerald-800', 'text-emerald-300')}>
+                          {formatNaira(row.revenue)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className={surface + ' mt-6 px-4 py-4'}>
+              <p className={ad(theme, 'text-[13px] font-bold text-stone-900', 'text-[13px] font-bold text-neutral-100')}>
+                Lifetime snapshot
+              </p>
+              <p className={muted + ' mt-1 text-[12px] leading-relaxed'}>
+                {allTime.count} orders · {formatNaira(allTime.revenue)} total revenue · {completedAll.length} completed · {pendingAll.length} pending
+              </p>
+            </div>
           </div>
         </div>
       </div>

@@ -106,9 +106,18 @@ export type ShippingPayload = {
 export type OrderLinePayload = {
   slug: string
   variantId?: string
+  /** Finish / shade label at checkout (snapshot) */
+  variantLabel?: string
   name: string
   price: string
   quantity: number
+  /** Primary image URL at checkout */
+  image?: string
+  /** Product category at checkout */
+  category?: string
+  badge?: string
+  /** Optional size or other variant text if added later */
+  size?: string
 }
 
 export async function createOrder(params: {

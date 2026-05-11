@@ -150,9 +150,13 @@ export function CheckoutPage() {
       const lineItems = cartItems.map((item) => ({
         slug: item.slug,
         variantId: item.variantId,
+        variantLabel: item.variantLabel,
         name: item.name,
         price: item.price,
         quantity: item.quantity,
+        image: item.img,
+        category: item.cat,
+        badge: item.badge,
       }))
 
       const subtotal = cartSubtotal

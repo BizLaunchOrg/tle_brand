@@ -3,7 +3,7 @@ import { getSupabase } from '../../lib/supabaseClient'
 import { isSupabaseConfigured } from '../../lib/mapSupabaseAuthError'
 import { useAuth } from '../../context/AuthContext'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { ad } from './adminUi.ts'
+import { ad, adminFont } from './adminUi.ts'
 
 export function AdminAccountPage() {
   const { user } = useAuth()
@@ -20,21 +20,27 @@ export function AdminAccountPage() {
     if (user?.email) setEmail(user.email)
   }, [user?.email])
 
-  const card = ad(
+  const surface = ad(
     theme,
-    'rounded-xl border border-zinc-200/90 bg-white p-6 shadow-sm',
-    'rounded-xl border border-zinc-800/90 bg-[#0c0c0e] p-6',
+    'rounded-sm border border-stone-200 bg-white p-5 sm:p-6',
+    'rounded-sm border border-neutral-800 bg-[#141414] p-5 sm:p-6',
   )
   const input = ad(
     theme,
-    'w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400',
-    'w-full rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-zinc-500',
+    'w-full rounded-sm border border-stone-300 bg-white px-3 py-2 text-[13px] outline-none focus:border-stone-500',
+    'w-full rounded-sm border border-neutral-600 bg-neutral-900 px-3 py-2 text-[13px] text-neutral-100 outline-none focus:border-neutral-500',
   )
-  const btnPrimary = ad(
+  const label = ad(
     theme,
-    'rounded-lg bg-zinc-900 px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-zinc-800 disabled:opacity-50',
-    'rounded-lg bg-zinc-100 px-4 py-2.5 text-[13px] font-semibold text-zinc-900 transition-colors hover:bg-white disabled:opacity-50',
+    'mb-1 block text-[10px] font-semibold uppercase tracking-wider text-stone-500',
+    'mb-1 block text-[10px] font-semibold uppercase tracking-wider text-neutral-500',
   )
+  const btn = ad(
+    theme,
+    'rounded-sm bg-stone-900 px-4 py-2.5 text-[13px] font-medium text-white hover:bg-stone-800 disabled:opacity-50',
+    'rounded-sm bg-neutral-100 px-4 py-2.5 text-[13px] font-medium text-neutral-900 hover:bg-white disabled:opacity-50',
+  )
+  const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
 
   const onEmail = async (e: FormEvent) => {
     e.preventDefault()
@@ -46,7 +52,7 @@ export function AdminAccountPage() {
     }
     const next = email.trim().toLowerCase()
     if (!next || next === user?.email) {
-      setNotice('Email unchanged.')
+      setNotice('No change.')
       return
     }
     setBusyEmail(true)
@@ -56,7 +62,7 @@ export function AdminAccountPage() {
       setError(err.message || 'Could not update email.')
       return
     }
-    setNotice('Check your inbox to confirm the new email address.')
+    setNotice('Confirm the new address from your inbox.')
   }
 
   const onPassword = async (e: FormEvent) => {
@@ -88,44 +94,48 @@ export function AdminAccountPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg">
-      <h1 className="font-sans text-2xl font-semibold tracking-tight">Account</h1>
-      <p className={ad(theme, 'mt-1 text-sm text-zinc-500', 'mt-1 text-sm text-zinc-500')}>
-        Same session as the storefront. Changes apply to your Supabase auth user.
-      </p>
+    <div className={adminFont() + ' mx-auto max-w-md'}>
+      <h1
+        className={ad(
+          theme,
+          'text-xl font-semibold tracking-tight text-stone-900',
+          'text-xl font-semibold tracking-tight text-neutral-100',
+        )}
+      >
+        Account
+      </h1>
+      <p className={muted + ' mt-1 text-[13px]'}>Supabase auth · same session as the store.</p>
 
       {error ? (
-        <p className="mt-6 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p className="mt-6 rounded-sm border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-900" role="alert">
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900" role="status">
+        <p className="mt-6 rounded-sm border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-900" role="status">
           {notice}
         </p>
       ) : null}
 
-      <form onSubmit={onEmail} className={card + ' mt-8 space-y-4'}>
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-zinc-500">mail</span>
-          <h2 className="text-[15px] font-semibold tracking-tight">Email</h2>
-        </div>
+      <form onSubmit={onEmail} className={surface + ' mt-8 space-y-4'}>
+        <h2 className={ad(theme, 'text-[15px] font-semibold text-stone-900', 'text-[15px] font-semibold text-neutral-100')}>
+          Email
+        </h2>
         <label>
-          <span className={ad(theme, 'mb-1.5 block text-[10px] font-bold text-zinc-500 uppercase', '')}>Address</span>
+          <span className={label}>Address</span>
           <input type="email" className={input} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
         </label>
-        <button type="submit" disabled={busyEmail} className={btnPrimary}>
+        <button type="submit" disabled={busyEmail} className={btn}>
           {busyEmail ? 'Updating…' : 'Update email'}
         </button>
       </form>
 
-      <form onSubmit={onPassword} className={card + ' mt-6 space-y-4'}>
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-zinc-500">key</span>
-          <h2 className="text-[15px] font-semibold tracking-tight">Password</h2>
-        </div>
+      <form onSubmit={onPassword} className={surface + ' mt-6 space-y-4'}>
+        <h2 className={ad(theme, 'text-[15px] font-semibold text-stone-900', 'text-[15px] font-semibold text-neutral-100')}>
+          Password
+        </h2>
         <label>
-          <span className={ad(theme, 'mb-1.5 block text-[10px] font-bold text-zinc-500 uppercase', '')}>New password</span>
+          <span className={label}>New</span>
           <input
             type="password"
             className={input}
@@ -135,7 +145,7 @@ export function AdminAccountPage() {
           />
         </label>
         <label>
-          <span className={ad(theme, 'mb-1.5 block text-[10px] font-bold text-zinc-500 uppercase', '')}>Confirm</span>
+          <span className={label}>Confirm</span>
           <input
             type="password"
             className={input}
@@ -144,7 +154,7 @@ export function AdminAccountPage() {
             autoComplete="new-password"
           />
         </label>
-        <button type="submit" disabled={busyPw} className={btnPrimary}>
+        <button type="submit" disabled={busyPw} className={btn}>
           {busyPw ? 'Saving…' : 'Update password'}
         </button>
       </form>

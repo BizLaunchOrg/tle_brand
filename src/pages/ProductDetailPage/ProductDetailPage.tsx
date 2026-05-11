@@ -2,19 +2,20 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
 import {
-  PRODUCTS,
   cartLineKey,
   getDisplayPrice,
   getGalleryUrls,
-  getProductBySlug,
+  productDescriptionPlainText,
 } from '../../data/products.ts'
+import { useShopProducts } from '../../context/ShopProductsContext.tsx'
 
 const NAVY = '#1A233A'
 const ORANGE = '#FF7A20'
 
 export function ProductDetailPage() {
+  const products = useShopProducts()
   const { slug } = useParams<{ slug: string }>()
-  const product = useMemo(() => getProductBySlug(slug), [slug])
+  const product = useMemo(() => products.find((p) => p.slug === slug), [products, slug])
   const { addToCart, toggleFavorite, isFavorite, isLineInCart } = useCartDrawer()
 
   const [pickedColorId, setPickedColorId] = useState<string | null>(null)
@@ -48,8 +49,13 @@ export function ProductDetailPage() {
 
   const related = useMemo(() => {
     if (!product) return []
-    return PRODUCTS.filter((p) => p.slug !== product.slug && p.cat === product.cat).slice(0, 4)
-  }, [product])
+    return products.filter((p) => p.slug !== product.slug && p.cat === product.cat).slice(0, 4)
+  }, [product, products])
+
+  const descriptionPlain = useMemo(
+    () => (product ? productDescriptionPlainText(product.description) : ''),
+    [product],
+  )
 
   const selectedVariant =
     product && colorId ? product.colorOptions?.find((c) => c.id === colorId) : undefined
@@ -84,8 +90,6 @@ export function ProductDetailPage() {
       </section>
     )
   }
-
-  const promoLabel = product.promo ?? 'Offer'
 
   const addVariant =
     product.colorOptions?.length && colorId && selectedVariant
@@ -156,12 +160,14 @@ export function ProductDetailPage() {
                   </div>
                 </>
               ) : null}
-              <span
-                className="pointer-events-none absolute top-4 left-4 rounded-lg px-3 py-1 text-[10px] font-bold tracking-wide text-white uppercase sm:top-5 sm:left-5 sm:text-[11px]"
-                style={{ backgroundColor: ORANGE }}
-              >
-                {promoLabel}
-              </span>
+              {product.promo ? (
+                <span
+                  className="pointer-events-none absolute top-4 left-4 rounded-lg px-3 py-1 text-[10px] font-bold tracking-wide text-white uppercase sm:top-5 sm:left-5 sm:text-[11px]"
+                  style={{ backgroundColor: ORANGE }}
+                >
+                  {product.promo}
+                </span>
+              ) : null}
               <span className="pointer-events-none absolute top-4 right-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold tracking-wide text-white uppercase backdrop-blur-sm sm:text-[11px]">
                 {product.badge}
               </span>
@@ -204,15 +210,26 @@ export function ProductDetailPage() {
               {product.name}
             </h1>
 
-            <p className="mt-4 font-sans text-[clamp(1.5rem,3vw,2rem)] font-bold tabular-nums text-tle-charcoal">
+            <p className="mt-4 font-sans text-[clamp(1.5rem,3vw,2rem)] font-bold tabular-nums text-emerald-700">
               {displayPrice}
             </p>
 
+            {product.tags && product.tags.length > 0 ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {product.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-full border border-black/10 bg-white px-3 py-1 text-[10px] font-semibold tracking-wide text-tle-muted uppercase"
+                  >
+                    {t.replace(/_/g, ' ')}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
             {product.colorOptions && product.colorOptions.length > 0 ? (
               <div className="mt-8">
-                <p className="mb-3 text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">
-                  Color / finish
-                </p>
+                <p className="mb-3 text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">Options</p>
                 <div className="flex flex-wrap gap-3">
                   {product.colorOptions.map((opt) => {
                     const selected = colorId === opt.id
@@ -233,7 +250,10 @@ export function ProductDetailPage() {
                           style={{ backgroundColor: opt.swatch }}
                           aria-hidden
                         />
-                        <span>{opt.label}</span>
+                        <span className="min-w-0 flex-1">{opt.label}</span>
+                        {opt.price ? (
+                          <span className="shrink-0 font-bold tabular-nums text-emerald-700">{opt.price}</span>
+                        ) : null}
                       </button>
                     )
                   })}
@@ -241,7 +261,14 @@ export function ProductDetailPage() {
               </div>
             ) : null}
 
-            <p className="mt-8 max-w-xl text-[15px] leading-[1.75] text-tle-muted">{product.description}</p>
+            {descriptionPlain ? (
+              <div className="mt-8 max-w-xl space-y-3">
+                <p className="text-[10px] font-semibold tracking-[0.18em] text-neutral-900 uppercase">
+                  Product description
+                </p>
+                <p className="whitespace-pre-line text-[15px] leading-[1.75] text-neutral-900">{descriptionPlain}</p>
+              </div>
+            ) : null}
 
             <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-stretch">
               <button
@@ -308,7 +335,7 @@ export function ProductDetailPage() {
                     <p className="line-clamp-2 font-sans text-sm font-semibold text-tle-ink group-hover:text-tle-pink">
                       {p.name}
                     </p>
-                    <p className="mt-1 font-sans text-sm font-bold text-tle-charcoal">{p.price}</p>
+                    <p className="mt-1 font-sans text-sm font-bold tabular-nums text-emerald-700">{p.price}</p>
                   </div>
                 </Link>
               ))}

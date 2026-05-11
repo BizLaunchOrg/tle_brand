@@ -12,6 +12,14 @@ export function getSupabase(): SupabaseClient {
       'Supabase env missing: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY on your host (Vercel → Settings → Environment Variables), then redeploy.',
     )
   }
-  client = createClient(url, anonKey)
+  client = createClient(url, anonKey, {
+    auth: {
+      /** Keep users signed in across visits until they sign out (refresh token rotates in the background). */
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    },
+  })
   return client
 }
