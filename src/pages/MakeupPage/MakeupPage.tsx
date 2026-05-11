@@ -1,14 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-
-const SERVICES = [
-  { name: 'Bridal Glam', price: 'From ₦65,000', duration: '3-4 hrs', desc: 'Full bridal face beat, lashes, and long-wear finish.' },
-  { name: 'Editorial Look', price: 'From ₦45,000', duration: '2-3 hrs', desc: 'High-impact camera-ready look for shoots and campaigns.' },
-  { name: 'Natural Flawless', price: 'From ₦25,000', duration: '1-2 hrs', desc: 'Soft, skin-like finish for events and everyday glam.' },
-  { name: 'Bold Evening', price: 'From ₦38,000', duration: '2 hrs', desc: 'Statement makeup with rich tones and dramatic eyes.' },
-  { name: "Men's Grooming", price: 'From ₦20,000', duration: '1 hr', desc: 'Clean complexion grooming and shine control for men.' },
-  { name: 'Trial Session', price: 'From ₦15,000', duration: '1 hr', desc: 'Preview your look before your event day.' },
-] as const
+import { MakeupBookingDateTimePick } from '../../components/MakeupBookingDateTimePick.tsx'
+import {
+  BOOKABLE_SERVICES,
+  PHOTOSHOOT_PACKAGES,
+  bookableServiceFromPhotoshootLine,
+  isPhotoshootService,
+} from '../../data/bookingServices.ts'
+import type { BookableServiceItem } from '../../data/bookingServices.ts'
+import { formatBookingDateLabel } from '../../lib/makeupBookingDates.ts'
+import { insertMakeupBooking } from '../../lib/makeupBookings.ts'
+import {
+  fetchPublicMakeupAvailability,
+  type MakeupAvailabilityRuleRow,
+  type MakeupCalendarDay,
+} from '../../lib/makeupAvailability.ts'
 
 const TESTIMONIALS = [
   {
@@ -28,7 +34,6 @@ const TESTIMONIALS = [
   },
 ] as const
 
-const TIME_SLOTS = ['9:00 AM', '11:00 AM', '1:00 PM', '3:00 PM', '5:00 PM', '7:00 PM'] as const
 const HIGHLIGHTS = [
   { label: 'Looks Completed', value: '1,200+' },
   { label: 'Bridal Bookings', value: '380+' },
@@ -48,12 +53,94 @@ const REVIEW_IMAGES = [
 
 export function MakeupPage() {
   const [formStep, setFormStep] = useState(1)
-  const [selectedService, setSelectedService] = useState<(typeof SERVICES)[number] | null>(null)
+  const [selectedService, setSelectedService] = useState<BookableServiceItem | null>(null)
   const [selectedTime, setSelectedTime] = useState('')
+  const [preferredDateIso, setPreferredDateIso] = useState('')
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [customerEmail, setCustomerEmail] = useState('')
+  const [bookingNotes, setBookingNotes] = useState('')
+  const [bookingError, setBookingError] = useState<string | null>(null)
+  const [bookingSubmitting, setBookingSubmitting] = useState(false)
+  const [bookingSuccessRef, setBookingSuccessRef] = useState<string | null>(null)
+  const [availabilityRules, setAvailabilityRules] = useState<MakeupAvailabilityRuleRow[]>([])
+  const [availabilityCalendar, setAvailabilityCalendar] = useState<MakeupCalendarDay[]>([])
+
+  useEffect(() => {
+    void fetchPublicMakeupAvailability().then(({ rules, calendarDays }) => {
+      setAvailabilityRules(rules)
+      setAvailabilityCalendar(calendarDays)
+    })
+  }, [])
+
+  const preferredDateLabel = useMemo(() => formatBookingDateLabel(preferredDateIso), [preferredDateIso])
 
   const goToStep = (step: number) => {
+    setBookingError(null)
     setFormStep(step)
     document.getElementById('makeup-booking')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const pickPhotoshootPackage = (line: string) => {
+    const s = bookableServiceFromPhotoshootLine(line)
+    if (!s) return
+    setBookingSuccessRef(null)
+    setSelectedService(s)
+    setBookingError(null)
+    setFormStep(2)
+    document.getElementById('makeup-booking')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const confirmMakeupBooking = async () => {
+    setBookingError(null)
+    if (!selectedService) {
+      setBookingError('Please select a service.')
+      return
+    }
+    if (!preferredDateIso.trim() || !selectedTime) {
+      setBookingError('Pick a day on the calendar, then pick a time.')
+      goToStep(2)
+      return
+    }
+    const name = customerName.trim()
+    const phone = customerPhone.trim()
+    const email = customerEmail.trim()
+    if (!name || !phone || !email) {
+      setBookingError('Please add your name, phone, and email.')
+      goToStep(3)
+      return
+    }
+
+    setBookingSubmitting(true)
+    const res = await insertMakeupBooking({
+      source: 'makeup',
+      service_name: selectedService.name,
+      service_price: selectedService.price,
+      preferred_date: preferredDateLabel || preferredDateIso,
+      preferred_time: selectedTime,
+      customer_name: name,
+      customer_phone: phone,
+      customer_email: email,
+      location_venue: '',
+      skin_type: '',
+      allergies: '',
+      notes: bookingNotes.trim(),
+    })
+    setBookingSubmitting(false)
+
+    if (res.ok === false) {
+      setBookingError(res.message)
+      return
+    }
+    setBookingSuccessRef(res.id.slice(0, 8).toUpperCase())
+    setFormStep(1)
+    setSelectedService(null)
+    setSelectedTime('')
+    setPreferredDateIso('')
+    setCustomerName('')
+    setCustomerPhone('')
+    setCustomerEmail('')
+    setBookingNotes('')
   }
 
   return (
@@ -77,8 +164,10 @@ export function MakeupPage() {
               Your Signature <em className="font-sans font-medium italic text-tle-pink">Glow-Up</em>
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-tle-muted sm:text-[15px]">
-              Professional makeup services for weddings, events, shoots, and personal glam. We match your skin, tone, and
-              style so your look feels confident and timeless.
+              Studio session at <span className="font-medium text-tle-ink">₦35,000</span>. Home service from{' '}
+              <span className="font-medium text-tle-ink">₦50,000</span> and bridal from{' '}
+              <span className="font-medium text-tle-ink">₦100,000</span> (home and bridal depend on location). Photoshoot
+              bundles with edited pictures are listed below — book any option on this page or from the home booking form.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
@@ -132,9 +221,9 @@ export function MakeupPage() {
 
         <div className="mb-5 flex items-end justify-between gap-3">
           <div>
-            <p className="text-[10px] font-semibold tracking-[0.2em] text-tle-gold uppercase">Service Menu</p>
+            <p className="text-[10px] font-semibold tracking-[0.2em] text-tle-gold uppercase">Services &amp; packages</p>
             <h2 className="mt-1 font-sans text-2xl font-semibold text-tle-ink sm:text-[2.05rem]">
-              Pick Your <em className="font-sans font-medium italic text-tle-pink">Perfect Look</em>
+              Makeup &amp; <em className="font-sans font-medium italic text-tle-pink">photoshoot</em> menu
             </h2>
           </div>
           {selectedService ? (
@@ -145,7 +234,7 @@ export function MakeupPage() {
         </div>
 
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {SERVICES.map((s) => (
+          {BOOKABLE_SERVICES.map((s) => (
             <article
               key={s.name}
               role="button"
@@ -156,19 +245,21 @@ export function MakeupPage() {
                   : 'border-black/8 hover:-translate-y-1 hover:border-tle-pink/50 hover:shadow-[0_12px_26px_rgba(0,0,0,0.08)]'
               }`}
               onClick={() => {
+                setBookingSuccessRef(null)
                 setSelectedService(s)
                 goToStep(2)
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
+                  setBookingSuccessRef(null)
                   setSelectedService(s)
                   goToStep(2)
                 }
               }}
             >
               <p className="text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">{s.duration}</p>
-              <h2 className="mt-2 font-sans text-xl font-semibold text-tle-ink">{s.name}</h2>
+              <h2 className="mt-2 font-sans text-lg font-semibold leading-snug text-tle-ink sm:text-xl">{s.name}</h2>
               <p className="mt-1 text-sm leading-relaxed text-tle-muted">{s.desc}</p>
               <p className="mt-4 font-sans text-xl font-semibold text-tle-gold transition-transform duration-300 group-hover:translate-x-0.5">
                 {s.price}
@@ -181,13 +272,90 @@ export function MakeupPage() {
           id="makeup-booking"
           className="relative mb-12 overflow-hidden rounded-[30px] border border-tle-pink/15 bg-white/95 px-5 py-6 shadow-[0_20px_60px_rgba(150,70,105,0.1)] sm:px-7 sm:py-8"
         >
+          <div
+            id="photoshoot-packages"
+            className="relative z-[2] mb-8 overflow-hidden rounded-[26px] border-2 border-tle-gold/35 bg-tle-charcoal px-5 py-7 text-white shadow-[0_16px_40px_rgba(14,14,14,0.14)] sm:px-7 sm:py-8"
+          >
+            <div className="pointer-events-none absolute -right-12 top-0 h-44 w-44 rounded-full bg-tle-pink/12 blur-3xl" aria-hidden />
+            <div className="pointer-events-none absolute -left-8 bottom-0 h-32 w-32 rounded-full bg-tle-gold/10 blur-3xl" aria-hidden />
+            <div className="relative z-[1] flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
+              <div className="min-w-0 flex-1">
+                <p className="inline-flex rounded-full border border-tle-gold/30 bg-tle-gold/10 px-3 py-1 font-sans text-[9px] font-bold tracking-[0.2em] text-tle-gold uppercase">
+                  Featured add-on
+                </p>
+                <h3 className="mt-3 font-sans text-[clamp(1.2rem,3vw,1.65rem)] font-semibold leading-snug">
+                  Photoshoot packages — outfits &amp; edited pictures
+                </h3>
+                <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-white/55">
+                  Tap a package to continue — you&apos;ll pick your day on the calendar, then your time. Book now jumps ahead
+                  when a photoshoot package is already selected from the menu above.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedService && isPhotoshootService(selectedService.name)) goToStep(2)
+                  else goToStep(1)
+                }}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-tle-gold px-7 py-3.5 font-sans text-[11px] font-bold tracking-[0.14em] text-tle-charcoal uppercase shadow-lg shadow-black/15 transition-all hover:-translate-y-0.5 hover:bg-white"
+              >
+                Book now
+                <span className="material-symbols-outlined text-lg">calendar_month</span>
+              </button>
+            </div>
+            <div className="relative z-[1] mt-6 grid gap-3 sm:grid-cols-3">
+              {PHOTOSHOOT_PACKAGES.map((p) => {
+                const sel = selectedService?.name === bookableServiceFromPhotoshootLine(p.line)?.name
+                return (
+                  <div
+                    key={p.line}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => pickPhotoshootPackage(p.line)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        pickPhotoshootPackage(p.line)
+                      }
+                    }}
+                    className={
+                      'cursor-pointer rounded-2xl border px-4 py-3.5 outline-none transition-all ' +
+                      (sel
+                        ? 'border-tle-gold bg-tle-gold/20 ring-2 ring-tle-gold/50'
+                        : 'border-white/12 bg-white/[0.07] hover:border-tle-gold/40')
+                    }
+                  >
+                    <p className="text-[12px] font-semibold leading-snug text-white/95 sm:text-[12.5px]">{p.line}</p>
+                    <p className="mt-1.5 font-sans text-base font-semibold text-tle-gold sm:text-lg">{p.price}</p>
+                    <p className="mt-2 text-[10px] font-semibold tracking-wide text-tle-gold/90 uppercase">Select &amp; continue</p>
+                  </div>
+                )
+              })}
+            </div>
+            <p className="relative z-[1] mt-4 text-center text-[10.5px] font-medium tracking-wide text-white/45 sm:text-left">
+              Terms and conditions apply.
+            </p>
+          </div>
+
           <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-tle-pink/10 blur-3xl" aria-hidden />
-          <h3 className="mb-4 font-sans text-2xl font-semibold text-tle-ink sm:text-[2rem]">
+          <h3 className="relative z-[1] mb-4 font-sans text-2xl font-semibold text-tle-ink sm:text-[2rem]">
             Book Your <em className="font-sans font-medium italic text-tle-pink">Session</em>
           </h3>
           <p className="mb-6 max-w-2xl text-sm leading-relaxed text-tle-muted">
-            Quick 4-step booking. Select your service, reserve a time, drop your details, and confirm in seconds.
+            Four simple steps: choose your service, pick your day and time on the calendar, add your details, and confirm.
           </p>
+
+          {bookingSuccessRef ? (
+            <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] font-medium text-emerald-900">
+              Booking received! Reference <span className="font-mono font-bold">#{bookingSuccessRef}</span>. We&apos;ll be in touch
+              soon.
+            </div>
+          ) : null}
+          {bookingError ? (
+            <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] font-medium text-rose-900" role="alert">
+              {bookingError}
+            </div>
+          ) : null}
 
           <div className="relative mb-8 flex">
             {[1, 2, 3, 4].map((i) => (
@@ -216,7 +384,7 @@ export function MakeupPage() {
                   {i}
                 </div>
                 <span className={`text-[10px] font-semibold tracking-wide uppercase ${formStep === i ? 'text-tle-pink' : 'text-tle-muted'}`}>
-                  {i === 1 ? 'Service' : i === 2 ? 'Date & Time' : i === 3 ? 'Details' : 'Confirm'}
+                  {i === 1 ? 'Service' : i === 2 ? 'Day & time' : i === 3 ? 'Details' : 'Confirm'}
                 </span>
               </div>
             ))}
@@ -240,24 +408,15 @@ export function MakeupPage() {
               <p className="font-sans text-lg font-semibold text-tle-ink">{selectedService?.name || 'Not selected'}</p>
               <p className="text-sm text-tle-gold">{selectedService?.price || ''}</p>
             </div>
-            <div className="mb-5 grid gap-3 sm:grid-cols-2">
-              <input
-                type="date"
-                className="w-full rounded-xl border-[1.5px] border-black/10 bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink"
-              />
-              <select
-                className="w-full rounded-xl border-[1.5px] border-black/10 bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink"
-                value={selectedTime}
-                onChange={(e) => setSelectedTime(e.target.value)}
-              >
-                <option value="">Select a time</option>
-                {TIME_SLOTS.map((slot) => (
-                  <option key={slot} value={slot}>
-                    {slot}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <MakeupBookingDateTimePick
+              availabilityRules={availabilityRules}
+              calendarDays={availabilityCalendar}
+              dateIso={preferredDateIso}
+              onDateIsoChange={setPreferredDateIso}
+              selectedTime={selectedTime}
+              onTimeChange={setSelectedTime}
+              calendarPanelClassName="mb-6 rounded-[22px] border border-tle-pink/12 bg-gradient-to-b from-tle-cream/80 to-white p-5 sm:p-6"
+            />
             <div className="flex items-center justify-between">
               <button
                 type="button"
@@ -269,7 +428,13 @@ export function MakeupPage() {
               <button
                 type="button"
                 className="rounded-full bg-tle-charcoal px-6 py-2.5 text-[11px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink"
-                onClick={() => goToStep(3)}
+                onClick={() => {
+                  if (!preferredDateIso.trim() || !selectedTime) {
+                    setBookingError('Pick a day on the calendar, then pick a time.')
+                    return
+                  }
+                  goToStep(3)
+                }}
               >
                 Continue
               </button>
@@ -280,20 +445,28 @@ export function MakeupPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <input
                 type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="Full name"
                 className="w-full rounded-xl border-[1.5px] border-black/10 px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink"
               />
               <input
                 type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
                 placeholder="Phone number"
                 className="w-full rounded-xl border-[1.5px] border-black/10 px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink"
               />
               <input
                 type="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
                 placeholder="Email address"
                 className="w-full rounded-xl border-[1.5px] border-black/10 px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink sm:col-span-2"
               />
               <textarea
+                value={bookingNotes}
+                onChange={(e) => setBookingNotes(e.target.value)}
                 placeholder="Special notes"
                 className="min-h-[100px] w-full rounded-xl border-[1.5px] border-black/10 px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink sm:col-span-2"
               />
@@ -324,6 +497,10 @@ export function MakeupPage() {
                 <span className="text-sm font-semibold text-tle-ink">{selectedService?.name || '—'}</span>
               </div>
               <div className="flex items-center justify-between border-b border-black/8 py-2">
+                <span className="text-sm text-tle-muted">Date</span>
+                <span className="text-sm font-semibold text-tle-ink">{preferredDateLabel || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-black/8 py-2">
                 <span className="text-sm text-tle-muted">Time</span>
                 <span className="text-sm font-semibold text-tle-ink">{selectedTime || '—'}</span>
               </div>
@@ -342,9 +519,11 @@ export function MakeupPage() {
               </button>
               <button
                 type="button"
-                className="rounded-full bg-tle-pink px-6 py-2.5 text-[11px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-deep"
+                disabled={bookingSubmitting}
+                className="rounded-full bg-tle-pink px-6 py-2.5 text-[11px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-deep disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => void confirmMakeupBooking()}
               >
-                Confirm Booking
+                {bookingSubmitting ? 'Sending…' : 'Confirm Booking'}
               </button>
             </div>
           </div>

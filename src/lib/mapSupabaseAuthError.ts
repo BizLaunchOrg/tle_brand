@@ -5,7 +5,10 @@ type AuthErrorLike = {
   status?: number
 }
 
-export function mapSupabaseAuthError(error: AuthErrorLike, context: 'login' | 'signup'): string {
+export function mapSupabaseAuthError(
+  error: AuthErrorLike,
+  context: 'login' | 'signup' | 'account_email' | 'account_password',
+): string {
   const raw = (error.message || '').trim()
   const msg = raw.toLowerCase()
   const status = error.status
@@ -22,6 +25,44 @@ export function mapSupabaseAuthError(error: AuthErrorLike, context: 'login' | 's
 
   if (msg.includes('too many requests') || msg.includes('rate limit') || msg.includes('email rate limit')) {
     return 'Too many attempts. Please wait a few minutes and try again.'
+  }
+
+  if (context === 'account_email') {
+    if (
+      msg.includes('same') &&
+      (msg.includes('email') || msg.includes('old') || msg.includes('new'))
+    ) {
+      return 'Enter a different email address than your current one.'
+    }
+    if (
+      msg.includes('already registered') ||
+      msg.includes('already been registered') ||
+      msg.includes('user already exists') ||
+      msg.includes('email address is already registered') ||
+      msg.includes('already been taken')
+    ) {
+      return 'That email is already in use. Try another address.'
+    }
+    if (msg.includes('invalid email') || msg.includes('invalid format') || msg.includes('validate email')) {
+      return 'Enter a valid email address.'
+    }
+    if (status !== undefined && status >= 500) {
+      return 'The service is temporarily unavailable. Please try again later.'
+    }
+    return 'Could not update email. Please try again.'
+  }
+
+  if (context === 'account_password') {
+    if (msg.includes('same') && msg.includes('password')) {
+      return 'Choose a new password that is different from your current one.'
+    }
+    if (msg.includes('password') && (msg.includes('least') || msg.includes('short') || msg.includes('weak'))) {
+      return 'Password does not meet requirements. Use a stronger password.'
+    }
+    if (status !== undefined && status >= 500) {
+      return 'The service is temporarily unavailable. Please try again later.'
+    }
+    return 'Could not update password. Please try again.'
   }
 
   if (context === 'login') {

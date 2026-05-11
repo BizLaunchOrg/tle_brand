@@ -19,6 +19,9 @@ import { AdminOrderDetailPage } from './pages/admin/AdminOrderDetailPage.tsx'
 import { AdminTransactionsPage } from './pages/admin/AdminTransactionsPage.tsx'
 import { AdminProductsPage } from './pages/admin/AdminProductsPage.tsx'
 import { AdminAccountPage } from './pages/admin/AdminAccountPage.tsx'
+import { AdminCustomersPage } from './pages/admin/AdminCustomersPage.tsx'
+import { AdminMakeupBookingsPage } from './pages/admin/AdminMakeupBookingsPage.tsx'
+import { AdminMakeupHoursPage } from './pages/admin/AdminMakeupHoursPage.tsx'
 
 function App() {
   return (
@@ -44,6 +47,9 @@ function App() {
             <Route path="orders" element={<AdminOrdersPage />} />
             <Route path="orders/:orderId" element={<AdminOrderDetailPage />} />
             <Route path="products" element={<AdminProductsPage />} />
+            <Route path="customers" element={<AdminCustomersPage />} />
+            <Route path="makeup-bookings" element={<AdminMakeupBookingsPage />} />
+            <Route path="makeup-hours" element={<AdminMakeupHoursPage />} />
             <Route path="transactions" element={<AdminTransactionsPage />} />
             <Route path="account" element={<AdminAccountPage />} />
           </Route>

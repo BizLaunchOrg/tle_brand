@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { getSupabase } from '../../lib/supabaseClient'
-import { isSupabaseConfigured } from '../../lib/mapSupabaseAuthError'
+import { isSupabaseConfigured, mapSupabaseAuthError } from '../../lib/mapSupabaseAuthError'
 import { useAuth } from '../../context/AuthContext'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { ad, adminFont } from './adminUi.ts'
@@ -87,7 +87,7 @@ export function AdminAccountPage() {
     const { error: err } = await getSupabase().auth.updateUser({ email: next })
     setBusyEmail(false)
     if (err) {
-      setError(err.message || 'Could not update email.')
+      setError(mapSupabaseAuthError(err, 'account_email'))
       return
     }
     setNotice('Confirm the new address from your inbox.')
@@ -113,7 +113,7 @@ export function AdminAccountPage() {
     const { error: err } = await getSupabase().auth.updateUser({ password: newPassword })
     setBusyPw(false)
     if (err) {
-      setError(err.message || 'Could not update password.')
+      setError(mapSupabaseAuthError(err, 'account_password'))
       return
     }
     setNewPassword('')

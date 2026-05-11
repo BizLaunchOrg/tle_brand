@@ -72,9 +72,7 @@ export async function replaceUserCartItems(userId: string, lines: PersistedCartL
   }))
 
   const { error: insErr } = await sb.from('user_cart_items').insert(rows)
-  if (insErr) {
-    console.error(insErr)
-  }
+  void insErr
 }
 
 export async function replaceUserFavorites(userId: string, slugs: string[]): Promise<void> {
@@ -86,9 +84,7 @@ export async function replaceUserFavorites(userId: string, slugs: string[]): Pro
 
   const rows = slugs.map((product_slug) => ({ user_id: userId, product_slug }))
   const { error: insErr } = await sb.from('user_favorites').insert(rows)
-  if (insErr) {
-    console.error(insErr)
-  }
+  void insErr
 }
 
 export type ShippingPayload = {

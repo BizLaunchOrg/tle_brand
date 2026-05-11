@@ -1,7 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { MakeupBookingDateTimePick } from '../../components/MakeupBookingDateTimePick.tsx'
 import { ProductCard } from '../../components/ProductCard.tsx'
 import { defaultVariantSelection } from '../../data/products.ts'
+import {
+  BOOKABLE_SERVICES,
+  MAKEUP_HIGHLIGHT_TAGS,
+  PHOTOSHOOT_PACKAGES,
+  bookableServiceFromPhotoshootLine,
+  isPhotoshootService,
+} from '../../data/bookingServices.ts'
+import { formatBookingDateLabel } from '../../lib/makeupBookingDates.ts'
+import { insertMakeupBooking } from '../../lib/makeupBookings.ts'
+import {
+  fetchPublicMakeupAvailability,
+  type MakeupAvailabilityRuleRow,
+  type MakeupCalendarDay,
+} from '../../lib/makeupAvailability.ts'
 import { useShopProducts } from '../../context/ShopProductsContext.tsx'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
 
@@ -13,15 +28,6 @@ const MARQUEE_ITEMS = [
   'Aesthetic Products',
   'Professional Artists',
   'Free Delivery Over 100K',
-] as const
-
-const BOOKING_SERVICES = [
-  { name: 'Bridal Glam', price: 'From ₦65,000', icon: 'favorite' },
-  { name: 'Editorial Look', price: 'From ₦45,000', icon: 'auto_awesome' },
-  { name: 'Natural Flawless', price: 'From ₦25,000', icon: 'schedule' },
-  { name: 'Bold Evening', price: 'From ₦38,000', icon: 'diamond' },
-  { name: "Men's Grooming", price: 'From ₦20,000', icon: 'shield' },
-  { name: 'Trial Session', price: 'From ₦15,000', icon: 'water_drop' },
 ] as const
 
 const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
@@ -67,40 +73,8 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   },
 ]
 
-const TAKEN_DAYS = new Set([6, 10, 14, 18, 22])
-
-const TIME_SLOTS = [
-  { label: '9:00 AM', taken: true },
-  { label: '10:00 AM', taken: false },
-  { label: '11:00 AM', taken: false },
-  { label: '12:00 PM', taken: true },
-  { label: '1:00 PM', taken: false },
-  { label: '2:00 PM', taken: false },
-  { label: '3:00 PM', taken: false },
-  { label: '4:00 PM', taken: true },
-  { label: '5:00 PM', taken: false },
-  { label: '6:00 PM', taken: false },
-  { label: '7:00 PM', taken: true },
-  { label: '8:00 PM', taken: false },
-] as const
-
 const revealCls =
   'reveal opacity-0 translate-y-8 transition-all duration-[750ms] ease-out [&.in]:translate-y-0 [&.in]:opacity-100'
-
-function addMonths(d: Date, n: number) {
-  const x = new Date(d)
-  x.setMonth(x.getMonth() + n)
-  return x
-}
-
-function dayCellCls(unavailable: boolean, isToday: boolean, selected: boolean) {
-  const base =
-    'flex h-[38px] items-center justify-center rounded-full text-[13px] font-medium transition-all duration-200'
-  if (unavailable) return `${base} cursor-not-allowed text-tle-faint`
-  if (selected) return `${base} cursor-pointer bg-tle-pink text-white`
-  if (isToday) return `${base} cursor-pointer font-bold text-tle-pink hover:bg-tle-blush`
-  return `${base} cursor-pointer text-tle-ink hover:bg-tle-blush hover:text-tle-pink`
-}
 
 export function LandingPage() {
   const products = useShopProducts()
@@ -115,20 +89,32 @@ export function LandingPage() {
   const [formStep, setFormStep] = useState(1)
   const [selectedService, setSelectedService] = useState({ name: '', price: '' })
   const [selectedTime, setSelectedTime] = useState('')
-  const [calDate, setCalDate] = useState(() => new Date())
-  const [selectedDay, setSelectedDay] = useState<number | null>(null)
-  const [selectedDateLabel, setSelectedDateLabel] = useState('')
+  const [preferredDateIso, setPreferredDateIso] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
   const [successDetails, setSuccessDetails] = useState({
-    service: 'Bridal Glam',
+    service: 'Studio Session',
     date: 'May 12, 2025',
     time: '2:00 PM',
+    bookingRef: '',
   })
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [customerEmail, setCustomerEmail] = useState('')
+  const [customerLocation, setCustomerLocation] = useState('')
+  const [skinType, setSkinType] = useState('')
+  const [allergies, setAllergies] = useState('')
+  const [bookingNotes, setBookingNotes] = useState('')
+  const [bookingSubmitting, setBookingSubmitting] = useState(false)
+  const [bookingError, setBookingError] = useState<string | null>(null)
+  const [availabilityRules, setAvailabilityRules] = useState<MakeupAvailabilityRuleRow[]>([])
+  const [availabilityCalendar, setAvailabilityCalendar] = useState<MakeupCalendarDay[]>([])
 
   useEffect(() => {
-    setSelectedDay(null)
-    setSelectedDateLabel('')
-  }, [calDate])
+    void fetchPublicMakeupAvailability().then(({ rules, calendarDays }) => {
+      setAvailabilityRules(rules)
+      setAvailabilityCalendar(calendarDays)
+    })
+  }, [])
 
   useEffect(() => {
     const id = location.hash.replace(/^#/, '')
@@ -163,7 +149,20 @@ export function LandingPage() {
 
   const goToStep = useCallback(
     (n: number) => {
+      setBookingError(null)
       setFormStep(n)
+      scrollToBooking()
+    },
+    [scrollToBooking],
+  )
+
+  const pickPhotoshootPackage = useCallback(
+    (line: string) => {
+      const s = bookableServiceFromPhotoshootLine(line)
+      if (!s) return
+      setSelectedService({ name: s.name, price: s.price })
+      setBookingError(null)
+      setFormStep(2)
       scrollToBooking()
     },
     [scrollToBooking],
@@ -182,61 +181,54 @@ export function LandingPage() {
   const HOME_SHOP_PREVIEW = 8
   const homeShopProducts = useMemo(() => visibleProducts.slice(0, HOME_SHOP_PREVIEW), [visibleProducts])
 
-  const calendarCells = useMemo(() => {
-    const y = calDate.getFullYear()
-    const m = calDate.getMonth()
-    const firstDay = new Date(y, m, 1).getDay()
-    const daysInMonth = new Date(y, m + 1, 0).getDate()
-    const today = new Date()
-    const todayY = today.getFullYear()
-    const todayM = today.getMonth()
-    const todayD = today.getDate()
-    const cells: ReactNode[] = []
-    for (let i = 0; i < firstDay; i++) {
-      cells.push(<div key={`e-${i}`} className="h-[38px]" />)
-    }
-    for (let d = 1; d <= daysInMonth; d++) {
-      const isToday = todayY === y && todayM === m && todayD === d
-      const dayDate = new Date(y, m, d)
-      const startOfToday = new Date(todayY, todayM, todayD)
-      const isPast = dayDate < startOfToday
-      const isTaken = TAKEN_DAYS.has(d)
-      const unavailable = isPast || isTaken
-      const label = `${calDate.toLocaleString('default', { month: 'short' })} ${d}, ${y}`
-      const selected = selectedDay === d && !unavailable
-      cells.push(
-        <div
-          key={d}
-          role="button"
-          tabIndex={0}
-          className={dayCellCls(unavailable, isToday, selected)}
-          onClick={() => {
-            if (unavailable) return
-            setSelectedDay(d)
-            setSelectedDateLabel(label)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              if (!unavailable) {
-                setSelectedDay(d)
-                setSelectedDateLabel(label)
-              }
-            }
-          }}
-        >
-          {d}
-        </div>,
-      )
-    }
-    return cells
-  }, [calDate, selectedDay])
+  const preferredDateLabel = useMemo(() => formatBookingDateLabel(preferredDateIso), [preferredDateIso])
 
-  const confirmBooking = () => {
+  const confirmBooking = async () => {
+    setBookingError(null)
+    if (!selectedService.name.trim()) {
+      setBookingError('Please choose a service.')
+      return
+    }
+    if (!preferredDateIso.trim() || !selectedTime) {
+      setBookingError('Pick a day on the calendar, then pick a time.')
+      return
+    }
+    const name = customerName.trim()
+    const phone = customerPhone.trim()
+    const email = customerEmail.trim()
+    if (!name || !phone || !email) {
+      setBookingError('Please complete your details (name, phone, and email) on the previous step.')
+      goToStep(3)
+      return
+    }
+
+    setBookingSubmitting(true)
+    const res = await insertMakeupBooking({
+      source: 'landing',
+      service_name: selectedService.name,
+      service_price: selectedService.price,
+      preferred_date: preferredDateLabel,
+      preferred_time: selectedTime,
+      customer_name: name,
+      customer_phone: phone,
+      customer_email: email,
+      location_venue: customerLocation.trim(),
+      skin_type: skinType.trim(),
+      allergies: allergies.trim(),
+      notes: bookingNotes.trim(),
+    })
+    setBookingSubmitting(false)
+
+    if (res.ok === false) {
+      setBookingError(res.message)
+      return
+    }
+
     setSuccessDetails({
-      service: selectedService.name || 'Bridal Glam',
-      date: selectedDateLabel || 'May 12, 2025',
-      time: selectedTime || '2:00 PM',
+      service: selectedService.name || 'Studio Session',
+      date: preferredDateLabel,
+      time: selectedTime,
+      bookingRef: res.id.slice(0, 8).toUpperCase(),
     })
     setShowSuccess(true)
     setTimeout(() => {
@@ -246,6 +238,7 @@ export function LandingPage() {
 
   const resetSuccess = () => {
     setShowSuccess(false)
+    setBookingError(null)
     scrollToBooking()
   }
 
@@ -510,50 +503,51 @@ export function LandingPage() {
         </section>
 
         <div className={`${revealCls} px-4 pb-24 md:px-10 lg:px-16`} id="makeup">
-          <div className="relative grid gap-12 overflow-hidden rounded-[36px] bg-tle-charcoal px-6 py-12 md:grid-cols-2 md:gap-20 md:px-14 md:py-[90px] lg:px-20">
+          <div className="relative overflow-hidden rounded-[36px] bg-tle-charcoal px-6 py-12 md:px-14 md:py-[90px] lg:px-20">
             <div className="pointer-events-none absolute -top-20 -right-20 size-80 rounded-full border border-tle-gold/15" />
             <div className="pointer-events-none absolute right-24 -bottom-12 size-[200px] rounded-full border border-tle-gold/10" />
-            <div className="relative z-[2]">
-              <div className="mb-5 text-[10px] font-semibold tracking-[0.22em] text-tle-gold uppercase">Makeup &amp; Aesthetics</div>
-              <h2 className="mb-5 font-sans text-[clamp(2.5rem,4.5vw,4rem)] leading-[1.05] font-semibold text-white">
-                Book Your
-                <br />
-                <em className="font-sans font-medium italic text-tle-pink">Glow-Up</em>
-                <br />
-                Session.
-              </h2>
-              <p className="mb-9 max-w-[380px] text-[14.5px] font-light leading-[1.85] text-white/50">
-                Professional makeup for every occasion — bridal, editorial, natural, or bold. We come to you, or you come
-                to us. Starting from ₦25,000.
-              </p>
-              <div className="mb-10 grid grid-cols-2 gap-2.5">
-                {['Bridal Glam', 'Editorial Look', 'Natural Flawless', 'Bold Evening', "Men's Grooming", 'Trial Session'].map(
-                  (name) => (
+            <div className="relative z-[2] grid gap-12 md:grid-cols-2 md:gap-20">
+              <div>
+                <div className="mb-5 text-[10px] font-semibold tracking-[0.22em] text-tle-gold uppercase">Makeup &amp; Aesthetics</div>
+                <h2 className="mb-5 font-sans text-[clamp(2.5rem,4.5vw,4rem)] leading-[1.05] font-semibold text-white">
+                  Book Your
+                  <br />
+                  <em className="font-sans font-medium italic text-tle-pink">Glow-Up</em>
+                  <br />
+                  Session.
+                </h2>
+                <p className="mb-9 max-w-[400px] text-[14.5px] font-light leading-[1.85] text-white/50">
+                  Studio session at <span className="text-white/75">₦35,000</span>. Home service from{' '}
+                  <span className="text-white/75">₦50,000</span> and bridal from <span className="text-white/75">₦100,000</span> — both
+                  depend on location. Scroll down to book, including our photoshoot bundles.
+                </p>
+                <div className="mb-10 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                  {MAKEUP_HIGHLIGHT_TAGS.map((name) => (
                     <div
                       key={name}
-                      className="flex cursor-pointer items-center gap-2.5 rounded-[13px] border border-white/10 bg-white/5 px-4 py-3.5 transition-colors hover:border-tle-pink/30 hover:bg-tle-pink/10"
+                      className="flex items-center gap-2.5 rounded-[13px] border border-white/10 bg-white/5 px-4 py-3.5 transition-colors hover:border-tle-pink/30 hover:bg-tle-pink/10"
                     >
                       <span className="size-1.5 shrink-0 rounded-full bg-tle-pink" />
                       <span className="text-[12.5px] font-medium text-white/80">{name}</span>
                     </div>
-                  ),
-                )}
+                  ))}
+                </div>
+                <Link
+                  to="/#booking-form"
+                  className="relative z-[2] inline-flex items-center gap-2.5 rounded-full bg-white px-10 py-[18px] font-sans text-xs font-bold tracking-wide text-tle-charcoal uppercase no-underline transition-all hover:-translate-y-0.5 hover:bg-tle-pink hover:text-white hover:shadow-[0_12px_32px_rgba(196,105,141,0.25)]"
+                >
+                  Book a Session
+                  <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                </Link>
               </div>
-              <Link
-                to="/#booking-form"
-                className="relative z-[2] inline-flex items-center gap-2.5 rounded-full bg-white px-10 py-[18px] font-sans text-xs font-bold tracking-wide text-tle-charcoal uppercase no-underline transition-all hover:-translate-y-0.5 hover:bg-tle-pink hover:text-white hover:shadow-[0_12px_32px_rgba(196,105,141,0.25)]"
-              >
-                Book a Session
-                <span className="material-symbols-outlined text-lg">arrow_forward</span>
-              </Link>
-            </div>
-            <div className="relative z-[2] overflow-hidden rounded-2xl">
-              <div className="h-full min-h-[320px] overflow-hidden md:min-h-[520px]">
-                <img
-                  src="/tlepic2.jpeg"
-                  alt="Book your glow-up session"
-                  className="size-full object-cover object-top brightness-[0.92] transition-transform duration-500 hover:scale-105"
-                />
+              <div className="overflow-hidden rounded-2xl">
+                <div className="h-full min-h-[320px] overflow-hidden md:min-h-[520px]">
+                  <img
+                    src="/tlepic2.jpeg"
+                    alt="Book your glow-up session"
+                    className="size-full object-cover object-top brightness-[0.92] transition-transform duration-500 hover:scale-105"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -567,8 +561,8 @@ export function LandingPage() {
               className="aspect-[4/5] w-full rounded-3xl object-cover"
             />
             <img
-              src="https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300&h=300&fit=crop"
-              alt="Products"
+              src="/Imagereviews1.jpeg"
+              alt="TLE makeup and aesthetics"
               className="absolute -right-8 -bottom-11 w-[44%] rounded-full border-[6px] border-tle-cream object-cover shadow-xl max-md:hidden"
             />
             <div className="absolute top-8 -left-8 rounded-[18px] bg-tle-pink px-6 py-5 text-white shadow-[0_20px_44px_rgba(196,105,141,0.32)] max-md:hidden">
@@ -620,12 +614,88 @@ export function LandingPage() {
         {!showSuccess && (
           <section className={`${revealCls} px-4 py-20 md:px-16`} id="booking-form">
             <div className="mx-auto max-w-[800px]">
+              <div
+                id="photoshoot-promo"
+                className="relative mb-12 overflow-hidden rounded-[28px] border-2 border-tle-gold/35 bg-tle-charcoal px-5 py-7 shadow-[0_20px_56px_rgba(14,14,14,0.18)] sm:px-8 sm:py-8"
+              >
+                <div className="pointer-events-none absolute -right-16 top-0 h-48 w-48 rounded-full bg-tle-pink/15 blur-3xl" aria-hidden />
+                <div className="pointer-events-none absolute -left-10 bottom-0 h-36 w-36 rounded-full bg-tle-gold/10 blur-3xl" aria-hidden />
+                <div className="relative z-[1] flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
+                  <div className="min-w-0 flex-1">
+                    <p className="inline-flex rounded-full border border-tle-gold/30 bg-tle-gold/10 px-3 py-1 font-sans text-[9px] font-bold tracking-[0.2em] text-tle-gold uppercase">
+                      Featured add-on
+                    </p>
+                    <h3 className="mt-3 font-sans text-[clamp(1.35rem,3.5vw,1.85rem)] font-semibold leading-tight text-white">
+                      Photoshoot packages — outfits &amp; edited pictures
+                    </h3>
+                    <p className="mt-2 max-w-md text-[13px] leading-relaxed text-white/55">
+                      Tap a package to go to booking — you&apos;ll pick your day on the calendar, then your time.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedService.name && isPhotoshootService(selectedService.name)) goToStep(2)
+                      else goToStep(1)
+                    }}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-tle-gold px-7 py-3.5 font-sans text-[11px] font-bold tracking-[0.14em] text-tle-charcoal uppercase shadow-lg shadow-black/20 transition-all hover:-translate-y-0.5 hover:bg-white"
+                  >
+                    Book now
+                    <span className="material-symbols-outlined text-lg">calendar_month</span>
+                  </button>
+                </div>
+                <div className="relative z-[1] mt-7 grid gap-3 sm:grid-cols-3">
+                  {PHOTOSHOOT_PACKAGES.map((p) => {
+                    const sel = selectedService.name === bookableServiceFromPhotoshootLine(p.line)?.name
+                    return (
+                      <div
+                        key={p.line}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => pickPhotoshootPackage(p.line)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            pickPhotoshootPackage(p.line)
+                          }
+                        }}
+                        className={
+                          'cursor-pointer rounded-2xl border px-4 py-3.5 text-center outline-none transition-all sm:text-left ' +
+                          (sel
+                            ? 'border-tle-gold bg-tle-gold/20 ring-2 ring-tle-gold/50'
+                            : 'border-white/12 bg-white/[0.07] hover:border-tle-gold/40 hover:bg-white/[0.1]')
+                        }
+                      >
+                        <p className="text-[12px] font-semibold leading-snug text-white/95 sm:text-[12.5px]">{p.line}</p>
+                        <p className="mt-1.5 font-sans text-base font-semibold text-tle-gold sm:text-lg">{p.price}</p>
+                        <p className="mt-2 text-[10px] font-semibold tracking-wide text-tle-gold/90 uppercase">Select &amp; continue</p>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="relative z-[1] mt-4 text-center text-[10.5px] font-medium tracking-wide text-white/45 sm:text-left">
+                  Terms and conditions apply.
+                </p>
+              </div>
+
               <h2 className="mb-3 text-center font-sans text-[clamp(2.25rem,4vw,3.25rem)] font-semibold text-tle-ink">
                 Schedule Your <em className="font-sans font-medium italic text-tle-pink">Session</em>
               </h2>
               <p className="mb-14 text-center text-[14.5px] font-light text-tle-muted">
-                Pick your service, choose a date, tell us about you — and you&apos;re set.
+                Pick your service, pick the day and time you want, tell us about you — and you&apos;re set.
               </p>
+
+              {bookingError ? (
+                <div
+                  className={
+                    'mb-8 rounded-2xl border px-4 py-3 text-center text-[13px] font-medium ' +
+                    'border-rose-200 bg-rose-50 text-rose-900'
+                  }
+                  role="alert"
+                >
+                  {bookingError}
+                </div>
+              ) : null}
 
               <div className="relative mb-12 flex">
                 {[1, 2, 3, 4].map((i) => (
@@ -650,7 +720,7 @@ export function LandingPage() {
                       {i}
                     </div>
                     <span className={`text-[10.5px] font-semibold tracking-wide uppercase ${stepLabel(i)}`}>
-                      {i === 1 ? 'Service' : i === 2 ? 'Date & Time' : i === 3 ? 'Your Details' : 'Confirm'}
+                      {i === 1 ? 'Service' : i === 2 ? 'Day & time' : i === 3 ? 'Your Details' : 'Confirm'}
                     </span>
                   </div>
                 ))}
@@ -658,7 +728,7 @@ export function LandingPage() {
 
               <div className={formStep === 1 ? 'block' : 'hidden'}>
                 <div className="mb-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {BOOKING_SERVICES.map((s) => {
+                  {BOOKABLE_SERVICES.map((s) => {
                     const sel = selectedService.name === s.name
                     return (
                       <div
@@ -686,8 +756,9 @@ export function LandingPage() {
                         >
                           <span className="material-symbols-outlined text-2xl">{s.icon}</span>
                         </div>
-                        <div className="mb-1 text-[13.5px] font-semibold text-tle-ink">{s.name}</div>
+                        <div className="mb-1 text-[13.5px] font-semibold leading-snug text-tle-ink">{s.name}</div>
                         <div className="font-sans text-[17px] font-semibold text-tle-gold">{s.price}</div>
+                        <p className="mt-2 text-[11.5px] leading-snug text-tle-muted">{s.desc}</p>
                       </div>
                     )
                   })}
@@ -695,8 +766,14 @@ export function LandingPage() {
                 <div className="mt-10 flex justify-end">
                   <button
                     type="button"
-                    className="inline-flex items-center gap-2.5 rounded-full bg-tle-charcoal px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-pink"
-                    onClick={() => goToStep(2)}
+                    className="inline-flex items-center gap-2.5 rounded-full bg-tle-charcoal px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-pink disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => {
+                      if (!selectedService.name) {
+                        setBookingError('Please select a service to continue.')
+                        return
+                      }
+                      goToStep(2)
+                    }}
                   >
                     Continue
                     <span className="material-symbols-outlined text-lg">arrow_forward</span>
@@ -705,69 +782,16 @@ export function LandingPage() {
               </div>
 
               <div className={formStep === 2 ? 'block' : 'hidden'}>
-                <div className="mb-6 rounded-[20px] bg-tle-cream p-7">
-                  <div className="mb-5 flex items-center justify-between">
-                    <span className="font-sans text-[22px] font-semibold text-tle-ink">
-                      {calDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="flex size-[34px] items-center justify-center rounded-full border border-black/10 bg-white text-tle-muted transition-colors hover:border-tle-pink hover:text-tle-pink"
-                        onClick={() => setCalDate((d) => addMonths(d, -1))}
-                        aria-label="Previous month"
-                      >
-                        <span className="material-symbols-outlined text-lg">chevron_left</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="flex size-[34px] items-center justify-center rounded-full border border-black/10 bg-white text-tle-muted transition-colors hover:border-tle-pink hover:text-tle-pink"
-                        onClick={() => setCalDate((d) => addMonths(d, 1))}
-                        aria-label="Next month"
-                      >
-                        <span className="material-symbols-outlined text-lg">chevron_right</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mb-2 grid grid-cols-7 text-center">
-                    {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
-                      <div key={d} className="py-1.5 text-[10px] font-bold tracking-wide text-tle-faint uppercase">
-                        {d}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-7 gap-1">{calendarCells}</div>
-                </div>
-
-                <p className="mb-3.5 text-[11px] font-semibold tracking-wide text-tle-muted uppercase">Select a Time</p>
-                <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                  {TIME_SLOTS.map((slot) => (
-                    <div
-                      key={slot.label}
-                      role="button"
-                      tabIndex={slot.taken ? -1 : 0}
-                      className={`rounded-xl border-[1.5px] py-3 text-center text-[12.5px] font-semibold transition-all ${
-                        slot.taken
-                          ? 'cursor-not-allowed border-transparent bg-tle-cream text-tle-faint'
-                          : selectedTime === slot.label
-                            ? 'cursor-pointer border-tle-charcoal bg-tle-charcoal text-white'
-                            : 'cursor-pointer border-black/10 bg-white text-tle-muted hover:border-tle-pink hover:text-tle-pink'
-                      }`}
-                      onClick={() => {
-                        if (slot.taken) return
-                        setSelectedTime(slot.label)
-                      }}
-                      onKeyDown={(e) => {
-                        if (!slot.taken && (e.key === 'Enter' || e.key === ' ')) {
-                          e.preventDefault()
-                          setSelectedTime(slot.label)
-                        }
-                      }}
-                    >
-                      {slot.label}
-                    </div>
-                  ))}
-                </div>
+                <MakeupBookingDateTimePick
+                  availabilityRules={availabilityRules}
+                  calendarDays={availabilityCalendar}
+                  dateIso={preferredDateIso}
+                  onDateIsoChange={(iso) => {
+                    setPreferredDateIso(iso)
+                  }}
+                  selectedTime={selectedTime}
+                  onTimeChange={setSelectedTime}
+                />
 
                 <div className="mt-10 flex items-center justify-between gap-4">
                   <button
@@ -780,7 +804,13 @@ export function LandingPage() {
                   <button
                     type="button"
                     className="inline-flex items-center gap-2.5 rounded-full bg-tle-charcoal px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-pink"
-                    onClick={() => goToStep(3)}
+                    onClick={() => {
+                      if (!preferredDateIso.trim() || !selectedTime) {
+                        setBookingError('Pick a day on the calendar, then pick a time before continuing.')
+                        return
+                      }
+                      goToStep(3)
+                    }}
                   >
                     Continue
                     <span className="material-symbols-outlined text-lg">arrow_forward</span>
@@ -794,30 +824,41 @@ export function LandingPage() {
                     <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">Full Name</label>
                     <input
                       type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
                       className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
                       placeholder="Your full name"
+                      autoComplete="name"
                     />
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">Phone Number</label>
                     <input
                       type="tel"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
                       className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
                       placeholder="+234 xxx xxxx xxx"
+                      autoComplete="tel"
                     />
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">Email Address</label>
                     <input
                       type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
                       className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
                       placeholder="hello@example.com"
+                      autoComplete="email"
                     />
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">Location / Venue</label>
                     <input
                       type="text"
+                      value={customerLocation}
+                      onChange={(e) => setCustomerLocation(e.target.value)}
                       className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
                       placeholder="Your address or venue name"
                     />
@@ -825,18 +866,19 @@ export function LandingPage() {
                   <div className="flex flex-col gap-2">
                     <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">Skin Type</label>
                     <select
+                      value={skinType}
+                      onChange={(e) => setSkinType(e.target.value)}
                       className="w-full cursor-pointer appearance-none rounded-xl border-[1.5px] border-black/10 bg-white bg-[length:12px] bg-[right_16px_center] bg-no-repeat px-[18px] py-3.5 pr-11 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
                       style={{
                         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A7E78' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
                       }}
-                      defaultValue=""
                     >
                       <option value="">Select skin type</option>
-                      <option>Oily</option>
-                      <option>Dry</option>
-                      <option>Combination</option>
-                      <option>Normal</option>
-                      <option>Sensitive</option>
+                      <option value="Oily">Oily</option>
+                      <option value="Dry">Dry</option>
+                      <option value="Combination">Combination</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Sensitive">Sensitive</option>
                     </select>
                   </div>
                   <div className="flex flex-col gap-2">
@@ -845,6 +887,8 @@ export function LandingPage() {
                     </label>
                     <input
                       type="text"
+                      value={allergies}
+                      onChange={(e) => setAllergies(e.target.value)}
                       className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
                       placeholder="e.g. fragrance-free, no latex"
                     />
@@ -855,6 +899,8 @@ export function LandingPage() {
                     Special Notes or Requests
                   </label>
                   <textarea
+                    value={bookingNotes}
+                    onChange={(e) => setBookingNotes(e.target.value)}
                     className="min-h-[100px] w-full resize-y rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm leading-relaxed text-tle-ink outline-none transition-colors focus:border-tle-pink"
                     placeholder="Tell us about your vision, references, or anything we should know..."
                   />
@@ -887,7 +933,7 @@ export function LandingPage() {
                   </div>
                   <div className="flex items-center justify-between border-b border-black/5 py-2.5">
                     <span className="text-[11.5px] font-medium text-tle-muted">Date</span>
-                    <span className="text-[13.5px] font-semibold text-tle-ink">{selectedDateLabel || '—'}</span>
+                    <span className="text-[13.5px] font-semibold text-tle-ink">{preferredDateLabel || '—'}</span>
                   </div>
                   <div className="flex items-center justify-between border-b border-black/5 py-2.5">
                     <span className="text-[11.5px] font-medium text-tle-muted">Time</span>
@@ -952,10 +998,11 @@ export function LandingPage() {
                   </button>
                   <button
                     type="button"
-                    className="inline-flex items-center gap-2.5 rounded-full bg-tle-pink px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-deep"
-                    onClick={confirmBooking}
+                    disabled={bookingSubmitting}
+                    className="inline-flex items-center gap-2.5 rounded-full bg-tle-pink px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-deep disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => void confirmBooking()}
                   >
-                    Pay &amp; Confirm
+                    {bookingSubmitting ? 'Saving…' : 'Pay &amp; Confirm'}
                     <span className="material-symbols-outlined text-lg">check</span>
                   </button>
                 </div>
@@ -990,7 +1037,9 @@ export function LandingPage() {
             ))}
             <div className="flex items-center justify-between pt-2.5">
               <span className="text-[11.5px] font-medium text-tle-muted">Booking Ref</span>
-              <span className="text-[13.5px] font-semibold text-tle-pink">#TLE-20251</span>
+              <span className="font-mono text-[13.5px] font-semibold text-tle-pink">
+                {successDetails.bookingRef ? `#${successDetails.bookingRef}` : '—'}
+              </span>
             </div>
           </div>
           <div className="flex flex-wrap justify-center gap-3.5">
