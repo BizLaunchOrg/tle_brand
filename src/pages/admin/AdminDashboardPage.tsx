@@ -7,6 +7,7 @@ import {
   isCompletedStatus,
   isPendingStatus,
   topStatesByRevenue,
+  uniqueBuyerCount,
   type DateRangeFilter,
 } from '../../lib/adminOrderAnalytics.ts'
 import { fetchOrdersForAdmin } from '../../lib/adminOrders.ts'
@@ -19,15 +20,6 @@ const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
 function filterOrdersByYear(orders: AdminOrderRow[], year: number) {
   return orders.filter((o) => new Date(o.created_at).getFullYear() === year)
-}
-
-function uniqueBuyerCount(orders: AdminOrderRow[]): number {
-  const s = new Set<string>()
-  for (const o of orders) {
-    const e = (o.email || '').trim().toLowerCase()
-    if (e) s.add(e)
-  }
-  return s.size
 }
 
 function revenueCompleted(orders: AdminOrderRow[]) {
@@ -121,6 +113,7 @@ export function AdminDashboardPage() {
   const topStates = useMemo(() => topStatesByRevenue(orders, 10), [orders])
   const recent = orders.slice(0, 12)
   const allTime = useMemo(() => countAndRevenue(orders), [orders])
+  const buyersAllTime = useMemo(() => uniqueBuyerCount(orders), [orders])
 
   const yearOptions = useMemo(() => {
     const ys = new Set<number>()
@@ -184,7 +177,7 @@ export function AdminDashboardPage() {
     {
       label: 'Customers',
       value: String(buyersInRange),
-      hint: 'Unique buyers',
+      hint: `Unique buyers · ${rangeLabel}`,
       icon: 'group' as const,
       iconColor: 'bg-amber-500',
       tint: 'amber' as const,
@@ -224,6 +217,11 @@ export function AdminDashboardPage() {
             {formatNaira(rangeStats.revenue)}
           </p>
           <p className={muted + ' mt-1 text-[12px]'}>{rangeStats.count} orders in this period</p>
+          <p className={muted + ' mt-2 text-[12px]'}>
+            <Link to="/admin/customers" className={link}>
+              Customer directory ({buyersAllTime.toLocaleString()} total) →
+            </Link>
+          </p>
         </div>
 
         <div>
@@ -319,9 +317,10 @@ export function AdminDashboardPage() {
           <p className={ad(theme, 'mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500', 'mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-500')}>
             Quick actions
           </p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-5 gap-2">
             {[
               { to: '/admin/orders', icon: 'add_shopping_cart', label: 'Orders' },
+              { to: '/admin/customers', icon: 'group', label: 'People' },
               { to: '/admin/transactions', icon: 'payments', label: 'Wallet' },
               { to: '/', icon: 'storefront', label: 'Store' },
               { to: '/admin/account', icon: 'tune', label: 'Settings' },
@@ -419,6 +418,12 @@ export function AdminDashboardPage() {
             <OverviewCard key={s.label + '-d'} {...s} theme={theme} />
           ))}
         </div>
+
+        <p className={muted + ' mt-4 text-[13px]'}>
+          <Link to="/admin/customers" className={link}>
+            Open customer directory ({buyersAllTime.toLocaleString()} unique buyers) →
+          </Link>
+        </p>
 
         <div className={surface + ' mt-10 p-6'}>
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -572,7 +577,12 @@ export function AdminDashboardPage() {
                 Lifetime snapshot
               </p>
               <p className={muted + ' mt-1 text-[12px] leading-relaxed'}>
-                {allTime.count} orders · {formatNaira(allTime.revenue)} total revenue · {completedAll.length} completed · {pendingAll.length} pending
+                {allTime.count} orders · {formatNaira(allTime.revenue)} total revenue ·{' '}
+                <Link to="/admin/customers" className={link}>
+                  {buyersAllTime} customers
+                </Link>
+                {' · '}
+                {completedAll.length} completed · {pendingAll.length} pending
               </p>
             </div>
           </div>

@@ -49,10 +49,10 @@ export function Footer() {
           <div className="mb-5 text-[10px] font-bold tracking-[0.25em] text-white uppercase">Services</div>
           <ul className="flex flex-col gap-2.5">
             {[
-              ['Book Makeup', '/#booking-form'],
-              ['Bridal Glam', '/makeup'],
-              ["Men's Grooming", '/makeup'],
-              ['Editorial Looks', '/makeup'],
+              ['Book session', '/#booking-form'],
+              ['Studio session', '/makeup'],
+              ['Home & bridal', '/makeup'],
+              ['Photoshoot packages', '/#photoshoot-promo'],
               ['Pricing', '/#booking-form'],
             ].map(([t, h]) => (
               <li key={t}>

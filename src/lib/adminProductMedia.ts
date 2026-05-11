@@ -31,11 +31,23 @@ export async function uploadProductImageFile(
   })
 
   if (error) {
-    const hint =
-      error.message?.includes('Bucket not found') || error.message?.includes('not found')
-        ? ' Create the "product-media" bucket in Supabase (Storage) or apply the latest migration.'
-        : ''
-    return { ok: false, message: (error.message || 'Upload failed.') + hint }
+    const internal = (error.message || '').toLowerCase()
+    const bucketMissing =
+      internal.includes('bucket not found') ||
+      internal.includes('no such bucket') ||
+      (internal.includes('bucket') &&
+        (internal.includes('not found') || internal.includes('does not exist')))
+    if (bucketMissing) {
+      return {
+        ok: false,
+        message:
+          'Upload could not complete. Create the "product-media" storage bucket in Supabase (or apply the latest migration), then try again.',
+      }
+    }
+    return {
+      ok: false,
+      message: 'Upload could not complete. Sign in as an admin and try again, or check your connection.',
+    }
   }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)

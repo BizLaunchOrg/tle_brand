@@ -44,6 +44,49 @@ export function countAndRevenue(orders: AdminOrderRow[]): { count: number; reven
   return { count: orders.length, revenue }
 }
 
+/** Distinct checkout emails (lowercased) with a non-empty value. */
+export function uniqueBuyerCount(orders: AdminOrderRow[]): number {
+  const s = new Set<string>()
+  for (const o of orders) {
+    const e = (o.email || '').trim().toLowerCase()
+    if (e) s.add(e)
+  }
+  return s.size
+}
+
+export type BuyerRollupRow = {
+  emailNorm: string
+  emailDisplay: string
+  orderCount: number
+  lastOrderAt: string
+  lifetimeSpendNgn: number
+}
+
+/** One row per distinct email; sorted by most recent order first. */
+export function buyerRollupFromOrders(orders: AdminOrderRow[]): BuyerRollupRow[] {
+  const map = new Map<string, { emailDisplay: string; orderCount: number; lastOrderAt: string; lifetimeSpendNgn: number }>()
+  for (const o of orders) {
+    const raw = (o.email || '').trim()
+    const key = raw.toLowerCase()
+    if (!key) continue
+    const spend = Number(o.total_ngn) || 0
+    const cur = map.get(key)
+    if (!cur) {
+      map.set(key, { emailDisplay: raw || key, orderCount: 1, lastOrderAt: o.created_at, lifetimeSpendNgn: spend })
+    } else {
+      cur.orderCount += 1
+      cur.lifetimeSpendNgn += spend
+      if (new Date(o.created_at) > new Date(cur.lastOrderAt)) {
+        cur.lastOrderAt = o.created_at
+        if (raw) cur.emailDisplay = raw
+      }
+    }
+  }
+  return Array.from(map.entries())
+    .map(([emailNorm, v]) => ({ emailNorm, ...v }))
+    .sort((a, b) => new Date(b.lastOrderAt).getTime() - new Date(a.lastOrderAt).getTime())
+}
+
 export type StateSalesRow = { state: string; orders: number; revenue: number }
 
 export function topStatesByRevenue(orders: AdminOrderRow[], limit = 8): StateSalesRow[] {
