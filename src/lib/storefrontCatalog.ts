@@ -11,5 +11,7 @@ export async function fetchStorefrontCatalogProducts(): Promise<Product[]> {
     .order('updated_at', { ascending: false })
 
   if (error || !data?.length) return []
-  return data.map((r) => r.payload as Product).filter((p) => p && typeof p.slug === 'string')
+  return data
+    .map((r) => r.payload as Product)
+    .filter((p) => p && typeof p.slug === 'string' && p.published !== false)
 }

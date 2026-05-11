@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { cartLineKey } from '../data/products.ts'
+import { cartLineKey, displayableImageUrl } from '../data/products.ts'
 import { useCartDrawer } from '../context/CartDrawerContext.tsx'
 
 const formatNaira = (value: number) => `₦${value.toLocaleString()}`
@@ -42,7 +42,7 @@ export function CartDrawer() {
               return (
                 <div key={lineKey} className="flex gap-4 border-b border-black/[0.06] py-4">
                   <Link to={`/product/${item.slug}`} onClick={closeCart} className="shrink-0">
-                    <img src={item.img} alt={item.alt} className="size-[70px] h-[90px] rounded-xl object-cover" />
+                    <img src={displayableImageUrl(item.img)} alt={item.alt} className="size-[70px] h-[90px] rounded-xl object-cover" />
                   </Link>
                   <div className="min-w-0 flex-1">
                     <Link

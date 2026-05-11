@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { cartLineKey, getDisplayPrice, getGalleryUrls, PRODUCTS, type Product } from '../data/products.ts'
+import { cartLineKey, getDefaultImageUrls, getDisplayPrice, getGalleryUrls, PRODUCTS, type Product } from '../data/products.ts'
 import { loadShopState, saveShopState, type PersistedCartLine } from '../lib/shopStorage.ts'
 import {
   fetchUserCartItems,
@@ -60,7 +60,7 @@ const parsePrice = (price: string) => Number(price.replace(/[^\d]/g, '')) || 0
 function buildCartLine(product: Product, variant?: CartVariant): CartItem {
   const variantId = variant?.id
   const urls = getGalleryUrls(product, variantId)
-  const hero = urls[0] ?? product.img
+  const hero = urls[0] ?? getDefaultImageUrls(product)[0] ?? product.img
   const price = getDisplayPrice(product, variantId)
   const alt =
     variant?.label && variant.label.length > 0 ? `${product.alt} — ${variant.label}` : product.alt

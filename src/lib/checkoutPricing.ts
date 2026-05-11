@@ -1,23 +1,20 @@
-/** Nationwide delivery (Nigeria). */
+/** Defaults when `shop_settings` row is missing (see Admin → Account). */
 export const CHECKOUT_DELIVERY_FEE_NGN = 4_000
+export const CHECKOUT_PROCESSING_FEE_NGN = 1_200
 
-/** Processing / handling as a percent of cart subtotal. */
-export const CHECKOUT_PROCESSING_PERCENT = 10
+/** @deprecated Percent-based processing removed; flat fee from shop settings. */
+export const CHECKOUT_PROCESSING_PERCENT = 0
 
-export function computeProcessingFeeNgn(subtotalNgn: number): number {
-  return Math.round((subtotalNgn * CHECKOUT_PROCESSING_PERCENT) / 100)
-}
-
-export function computeCheckoutTotalNgn(subtotalNgn: number): {
-  deliveryNgn: number
-  processingNgn: number
-  totalNgn: number
-} {
-  const deliveryNgn = CHECKOUT_DELIVERY_FEE_NGN
-  const processingNgn = computeProcessingFeeNgn(subtotalNgn)
+export function computeCheckoutTotalWithFlatFees(
+  subtotalNgn: number,
+  deliveryNgn: number,
+  processingNgn: number,
+): { deliveryNgn: number; processingNgn: number; totalNgn: number } {
+  const d = Math.max(0, Math.round(deliveryNgn))
+  const p = Math.max(0, Math.round(processingNgn))
   return {
-    deliveryNgn,
-    processingNgn,
-    totalNgn: subtotalNgn + deliveryNgn + processingNgn,
+    deliveryNgn: d,
+    processingNgn: p,
+    totalNgn: Math.max(0, Math.round(subtotalNgn)) + d + p,
   }
 }
