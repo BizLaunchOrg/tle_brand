@@ -24,7 +24,7 @@ export function ProductCard({
   className = '',
 }: ProductCardProps) {
   const { slug, alt, name, cat, price, promo } = product
-  const promoLabel = promo ?? '10% OFF'
+  const promoLabel = typeof promo === 'string' && promo.trim() ? promo.trim() : null
   const previews = getDefaultImageUrls(product)
   const [activeThumb, setActiveThumb] = useState(0)
   const displayImg = previews[activeThumb] ?? product.img
@@ -49,12 +49,14 @@ export function ProductCard({
           loading="lazy"
           decoding="async"
         />
-        <span
-          className="absolute top-2.5 left-2.5 rounded-md px-2 py-0.5 text-[8px] font-bold tracking-wide text-white uppercase sm:top-3.5 sm:left-3.5 sm:px-2.5 sm:py-1 sm:text-[10px]"
-          style={{ backgroundColor: ORANGE }}
-        >
-          {promoLabel}
-        </span>
+        {promoLabel ? (
+          <span
+            className="absolute top-2.5 left-2.5 rounded-md px-2 py-0.5 text-[8px] font-bold tracking-wide text-white uppercase sm:top-3.5 sm:left-3.5 sm:px-2.5 sm:py-1 sm:text-[10px]"
+            style={{ backgroundColor: ORANGE }}
+          >
+            {promoLabel}
+          </span>
+        ) : null}
       </Link>
 
       {showThumbRow ? (
@@ -90,7 +92,7 @@ export function ProductCard({
           {name}
         </h3>
 
-        <p className="mt-1 font-sans text-base font-bold tabular-nums text-zinc-900 sm:text-xl">{price}</p>
+        <p className="mt-1 font-sans text-base font-bold tabular-nums text-emerald-700 sm:text-xl">{price}</p>
       </Link>
 
       <div className="mt-3.5 flex items-stretch gap-2 sm:mt-5">

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ProductCard } from '../../components/ProductCard.tsx'
-import { PRODUCTS, defaultVariantSelection } from '../../data/products.ts'
+import { defaultVariantSelection } from '../../data/products.ts'
+import { useShopProducts } from '../../context/ShopProductsContext.tsx'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
 
 const MARQUEE_ITEMS = [
@@ -102,6 +103,7 @@ function dayCellCls(unavailable: boolean, isToday: boolean, selected: boolean) {
 }
 
 export function LandingPage() {
+  const products = useShopProducts()
   const wrapRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -153,7 +155,7 @@ export function LandingPage() {
     )
     els.forEach((el) => io.observe(el))
     return () => io.disconnect()
-  }, [])
+  }, [products.length, filterGender, catalogSearch])
 
   const scrollToBooking = useCallback(() => {
     document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -168,13 +170,17 @@ export function LandingPage() {
   )
 
   const visibleProducts = useMemo(() => {
-    return PRODUCTS.filter((p) => {
+    return products.filter((p) => {
       if (filterGender !== 'all' && p.gender !== filterGender) return false
       if (!catalogSearch) return true
       const hay = `${p.name} ${p.cat} ${p.badge} ${p.alt}`.toLowerCase()
       return hay.includes(catalogSearch)
     })
-  }, [filterGender, catalogSearch])
+  }, [catalogSearch, filterGender, products])
+
+  /** Home teaser only: 8 items = two rows of four, then Shop all (full catalog on /shop) */
+  const HOME_SHOP_PREVIEW = 8
+  const homeShopProducts = useMemo(() => visibleProducts.slice(0, HOME_SHOP_PREVIEW), [visibleProducts])
 
   const calendarCells = useMemo(() => {
     const y = calDate.getFullYear()
@@ -431,7 +437,6 @@ export function LandingPage() {
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-tle-pink/15 bg-tle-blush/40 px-4 py-3 text-[13px] text-tle-ink">
               <span>
                 Showing results for <strong className="font-semibold text-tle-pink">&ldquo;{searchParams.get('q')?.trim()}&rdquo;</strong>
-                <span className="text-tle-muted"> ({visibleProducts.length} items)</span>
               </span>
               <button
                 type="button"
@@ -445,25 +450,40 @@ export function LandingPage() {
             </div>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:gap-5 lg:grid-cols-4 lg:gap-6">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-4 md:gap-5">
             {visibleProducts.length === 0 ? (
               <div className="col-span-full rounded-[20px] border border-black/8 bg-tle-cream/80 px-6 py-14 text-center">
-                <p className="font-sans text-lg font-medium text-tle-ink">No products match your search.</p>
-                <p className="mt-2 text-sm text-tle-muted">Try a different word or browse all categories.</p>
-                <button
-                  type="button"
-                  className="mt-6 inline-flex rounded-full border border-tle-pink bg-tle-pink px-6 py-2.5 text-xs font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-deep"
-                  onClick={() => setSearchParams({}, { replace: true })}
-                >
-                  Clear filters
-                </button>
+                {products.length === 0 ? (
+                  <>
+                    <p className="font-sans text-lg font-medium text-tle-ink">New arrivals are on the way.</p>
+                    <p className="mt-2 text-sm text-tle-muted">Check back soon, or open the shop to see the full range when it&apos;s live.</p>
+                    <Link
+                      to="/shop"
+                      className="mt-6 inline-flex rounded-full border border-tle-charcoal bg-tle-charcoal px-6 py-2.5 text-xs font-semibold tracking-wide text-white uppercase no-underline transition-colors hover:bg-tle-pink"
+                    >
+                      Go to shop
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-sans text-lg font-medium text-tle-ink">No products match your search.</p>
+                    <p className="mt-2 text-sm text-tle-muted">Try a different word or browse all categories.</p>
+                    <button
+                      type="button"
+                      className="mt-6 inline-flex rounded-full border border-tle-pink bg-tle-pink px-6 py-2.5 text-xs font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-deep"
+                      onClick={() => setSearchParams({}, { replace: true })}
+                    >
+                      Clear filters
+                    </button>
+                  </>
+                )}
               </div>
             ) : null}
-            {visibleProducts.map((p, idx) => {
+            {homeShopProducts.map((p, idx) => {
               const delay =
                 idx === 0 ? 'delay-100' : idx === 1 ? 'delay-200' : idx === 2 ? 'delay-300' : 'delay-500'
               return (
-                <div key={p.slug} className={`${revealCls} ${delay} ${idx >= 4 ? 'hidden sm:block' : ''}`}>
+                <div key={p.slug} className={`${revealCls} ${delay}`}>
                   <ProductCard
                     product={p}
                     onAddToCart={() => addToCart(p, defaultVariantSelection(p))}
@@ -477,7 +497,7 @@ export function LandingPage() {
           </div>
 
           {visibleProducts.length > 0 ? (
-            <div className="mt-10 flex justify-center sm:mt-12">
+            <div className="mt-8 flex flex-col items-center gap-4 sm:mt-10">
               <Link
                 to="/shop"
                 className="inline-flex items-center gap-2.5 rounded-full border-[1.5px] border-tle-charcoal bg-tle-charcoal px-9 py-3 font-sans text-[11px] font-semibold tracking-[0.16em] text-white uppercase no-underline shadow-[0_10px_28px_rgba(14,14,14,0.15)] transition-all hover:-translate-y-0.5 hover:border-tle-pink hover:bg-tle-pink hover:shadow-[0_14px_36px_rgba(196,105,141,0.25)]"

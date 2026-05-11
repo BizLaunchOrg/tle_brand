@@ -8,13 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import {
-  cartLineKey,
-  getDisplayPrice,
-  getGalleryUrls,
-  getProductBySlug,
-  type Product,
-} from '../data/products.ts'
+import { cartLineKey, getDisplayPrice, getGalleryUrls, PRODUCTS, type Product } from '../data/products.ts'
 import { loadShopState, saveShopState, type PersistedCartLine } from '../lib/shopStorage.ts'
 import {
   fetchUserCartItems,
@@ -26,6 +20,7 @@ import {
 } from '../lib/userShopSync.ts'
 import { isSupabaseConfigured } from '../lib/mapSupabaseAuthError'
 import { useAuth } from './AuthContext'
+import { useShopProducts } from './ShopProductsContext.tsx'
 
 export type CartVariant = { id: string; label: string }
 
@@ -81,10 +76,14 @@ function buildCartLine(product: Product, variant?: CartVariant): CartItem {
   }
 }
 
-function hydrateCart(lines: PersistedCartLine[]): CartItem[] {
+function productBySlug(products: Product[], slug: string): Product | undefined {
+  return products.find((p) => p.slug === slug)
+}
+
+function hydrateCart(lines: PersistedCartLine[], products: Product[]): CartItem[] {
   const out: CartItem[] = []
   for (const line of lines) {
-    const p = getProductBySlug(line.slug)
+    const p = productBySlug(products, line.slug)
     if (!p) continue
     const qty = Math.min(999, Math.max(1, Math.floor(Number(line.quantity)) || 1))
     let variant: CartVariant | undefined
@@ -97,12 +96,12 @@ function hydrateCart(lines: PersistedCartLine[]): CartItem[] {
   return out
 }
 
-function hydrateFavoriteSlugs(slugs: string[]): Product[] {
+function hydrateFavoriteSlugs(slugs: string[], products: Product[]): Product[] {
   const out: Product[] = []
   const seen = new Set<string>()
   for (const slug of slugs) {
     if (seen.has(slug)) continue
-    const p = getProductBySlug(slug)
+    const p = productBySlug(products, slug)
     if (p) {
       seen.add(slug)
       out.push(p)
@@ -111,20 +110,21 @@ function hydrateFavoriteSlugs(slugs: string[]): Product[] {
   return out
 }
 
-function readInitialShop(): { cart: CartItem[]; favorites: Product[] } {
+function readInitialShop(products: Product[]): { cart: CartItem[]; favorites: Product[] } {
   const raw = loadShopState()
   if (!raw) return { cart: [], favorites: [] }
   return {
-    cart: hydrateCart(raw.cart),
-    favorites: hydrateFavoriteSlugs(raw.favoriteSlugs),
+    cart: hydrateCart(raw.cart, products),
+    favorites: hydrateFavoriteSlugs(raw.favoriteSlugs, products),
   }
 }
 
 export function CartDrawerProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
+  const shopProducts = useShopProducts()
   const initRef = useRef<{ cart: CartItem[]; favorites: Product[] } | null>(null)
   const getInit = () => {
-    if (!initRef.current) initRef.current = readInitialShop()
+    if (!initRef.current) initRef.current = readInitialShop(PRODUCTS)
     return initRef.current
   }
   const [cartOpen, setCartOpen] = useState(false)
@@ -132,6 +132,13 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>(() => getInit().cart)
   const [favoriteItems, setFavoriteItems] = useState<Product[]>(() => getInit().favorites)
   const [shopRemoteSynced, setShopRemoteSynced] = useState(false)
+
+  useEffect(() => {
+    const raw = loadShopState()
+    if (!raw) return
+    setCartItems(hydrateCart(raw.cart, shopProducts))
+    setFavoriteItems(hydrateFavoriteSlugs(raw.favoriteSlugs, shopProducts))
+  }, [shopProducts])
 
   useEffect(() => {
     if (!user?.id) {
@@ -161,7 +168,7 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
           quantity: i.quantity,
         }))
         const merged = mergeCartLines(localLines, remoteCart)
-        return hydrateCart(merged)
+        return hydrateCart(merged, shopProducts)
       })
 
       setFavoriteItems((prev) => {
@@ -169,7 +176,7 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
           prev.map((p) => p.slug),
           remoteFav,
         )
-        return hydrateFavoriteSlugs(mergedSlugs)
+        return hydrateFavoriteSlugs(mergedSlugs, shopProducts)
       })
 
       setShopRemoteSynced(true)
@@ -178,7 +185,7 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [user?.id])
+  }, [user?.id, shopProducts])
 
   useEffect(() => {
     if (!user?.id || !shopRemoteSynced) return

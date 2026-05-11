@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { ShopProductsProvider } from './context/ShopProductsContext.tsx'
 import { MainLayout } from './components/MainLayout.tsx'
 import { LandingPage } from './pages/LandingPage/LandingPage.tsx'
 import { MakeupPage } from './pages/MakeupPage/MakeupPage.tsx'
@@ -21,6 +22,7 @@ import { AdminAccountPage } from './pages/admin/AdminAccountPage.tsx'
 function App() {
   return (
     <AuthProvider>
+      <ShopProductsProvider>
       <Routes>
         <Route path="/" element={<MainLayout />}>
           <Route index element={<LandingPage />} />
@@ -39,12 +41,13 @@ function App() {
           <Route element={<AdminLayout />}>
             <Route index element={<AdminDashboardPage />} />
             <Route path="orders" element={<AdminOrdersPage />} />
-            <Route path="transactions" element={<AdminTransactionsPage />} />
             <Route path="products" element={<AdminProductsPage />} />
+            <Route path="transactions" element={<AdminTransactionsPage />} />
             <Route path="account" element={<AdminAccountPage />} />
           </Route>
         </Route>
       </Routes>
+      </ShopProductsProvider>
     </AuthProvider>
   )
 }

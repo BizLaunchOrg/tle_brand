@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ProductCard } from '../../components/ProductCard.tsx'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
-import { PRODUCTS, defaultVariantSelection, type ProductGender } from '../../data/products.ts'
+import { defaultVariantSelection, type ProductGender } from '../../data/products.ts'
+import { useShopProducts } from '../../context/ShopProductsContext.tsx'
 
 type TypeFilter = 'all' | ProductGender
 
@@ -12,7 +13,11 @@ const FILTER_TYPES: { label: string; value: TypeFilter }[] = [
   { label: 'For Him', value: 'him' },
 ]
 
+/** Twelve items = full rows for both 3-wide and 4-wide grids */
+const SHOP_PAGE_SIZE = 12
+
 export function ShopPage() {
+  const products = useShopProducts()
   const [searchParams, setSearchParams] = useSearchParams()
   const { addToCart, toggleFavorite, isFavorite, hasProductInCart } = useCartDrawer()
 
@@ -20,22 +25,39 @@ export function ShopPage() {
   const q = searchText.trim().toLowerCase()
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [page, setPage] = useState(1)
 
   const categories = useMemo(() => {
     const all = new Set<string>()
-    PRODUCTS.forEach((p) => all.add(p.cat))
+    products.forEach((p) => all.add(p.cat))
     return ['all', ...Array.from(all)]
-  }, [])
+  }, [products])
 
   const visibleProducts = useMemo(() => {
-    return PRODUCTS.filter((p) => {
+    return products.filter((p) => {
       if (typeFilter !== 'all' && p.gender !== typeFilter) return false
       if (categoryFilter !== 'all' && p.cat !== categoryFilter) return false
       if (!q) return true
       const hay = `${p.name} ${p.cat} ${p.badge} ${p.alt}`.toLowerCase()
       return hay.includes(q)
     })
-  }, [categoryFilter, q, typeFilter])
+  }, [categoryFilter, products, q, typeFilter])
+
+  const totalPages = Math.max(1, Math.ceil(visibleProducts.length / SHOP_PAGE_SIZE) || 1)
+  const safePage = Math.min(page, totalPages)
+
+  useEffect(() => {
+    setPage(1)
+  }, [q, typeFilter, categoryFilter])
+
+  useEffect(() => {
+    setPage((p) => Math.min(p, totalPages))
+  }, [totalPages])
+
+  const pagedProducts = useMemo(
+    () => visibleProducts.slice((safePage - 1) * SHOP_PAGE_SIZE, safePage * SHOP_PAGE_SIZE),
+    [visibleProducts, safePage],
+  )
 
   const pillCls = (on: boolean) =>
     `rounded-full border-[1.5px] px-4 py-2 font-sans text-[11px] font-semibold tracking-wide uppercase transition-all sm:px-5 ${
@@ -129,18 +151,50 @@ export function ShopPage() {
             <p className="mt-2 text-sm text-tle-muted">Try another type/category or clear search.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 lg:gap-6">
-            {visibleProducts.map((product) => (
-              <ProductCard
-                key={product.slug}
-                product={product}
-                onAddToCart={() => addToCart(product, defaultVariantSelection(product))}
-                inCart={hasProductInCart(product.slug)}
-                isFavorite={isFavorite(product.slug)}
-                onToggleFavorite={() => toggleFavorite(product)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 md:gap-5 lg:grid-cols-4 lg:gap-6">
+              {pagedProducts.map((product) => (
+                <ProductCard
+                  key={product.slug}
+                  product={product}
+                  onAddToCart={() => addToCart(product, defaultVariantSelection(product))}
+                  inCart={hasProductInCart(product.slug)}
+                  isFavorite={isFavorite(product.slug)}
+                  onToggleFavorite={() => toggleFavorite(product)}
+                />
+              ))}
+            </div>
+
+            {visibleProducts.length > SHOP_PAGE_SIZE ? (
+              <nav
+                className="mt-10 flex flex-col items-center justify-center gap-4 border-t border-black/8 pt-8 sm:flex-row sm:gap-6"
+                aria-label="Product pages"
+              >
+                <p className="text-center text-sm text-tle-muted">
+                  Page <span className="font-semibold text-tle-ink">{safePage}</span> of{' '}
+                  <span className="font-semibold text-tle-ink">{totalPages}</span>
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    disabled={safePage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="rounded-full border border-black/10 bg-white px-5 py-2 text-[11px] font-semibold tracking-wide text-tle-ink uppercase transition-colors hover:border-tle-charcoal disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={safePage >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="rounded-full border border-tle-charcoal bg-tle-charcoal px-5 py-2 text-[11px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </nav>
+            ) : null}
+          </>
         )}
       </div>
     </section>

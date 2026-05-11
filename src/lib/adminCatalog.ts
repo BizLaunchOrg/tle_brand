@@ -39,3 +39,39 @@ export async function deleteCatalogProduct(id: string): Promise<boolean> {
   const { error } = await getSupabase().from('catalog_products').delete().eq('id', id)
   return !error
 }
+
+export async function updateCatalogProduct(
+  id: string,
+  product: Product,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!isSupabaseConfigured()) return { ok: false, message: 'Not configured.' }
+  const { error } = await getSupabase()
+    .from('catalog_products')
+    .update({
+      slug: product.slug,
+      payload: product,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+
+  if (error) {
+    if (error.code === '23505') return { ok: false, message: 'That slug is already used by another row.' }
+    return { ok: false, message: 'Could not update product.' }
+  }
+  return { ok: true }
+}
+
+/** For enriching order line items when older rows lack snapshots. */
+export async function fetchCatalogPayloadsBySlugs(slugs: string[]): Promise<Map<string, Product>> {
+  const map = new Map<string, Product>()
+  const uniq = [...new Set(slugs.map((s) => s.trim()).filter(Boolean))]
+  if (!isSupabaseConfigured() || uniq.length === 0) return map
+
+  const { data, error } = await getSupabase().from('catalog_products').select('slug, payload').in('slug', uniq)
+
+  if (error || !data) return map
+  for (const row of data as { slug: string; payload: Product }[]) {
+    if (row?.slug && row.payload && typeof row.payload === 'object') map.set(row.slug, row.payload as Product)
+  }
+  return map
+}

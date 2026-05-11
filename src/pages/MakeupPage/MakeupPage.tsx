@@ -35,6 +35,17 @@ const HIGHLIGHTS = [
   { label: 'Client Rating', value: '4.9/5' },
 ] as const
 
+/** Client review photos in `public/` — HEIC slot falls back to JPEG in browsers that cannot decode HEIC. */
+const REVIEW_IMAGES = [
+  { src: '/Imagereviews1.jpeg', alt: 'Makeup look sample 1', fallback: '/Imagereviews1.jpeg' },
+  { src: '/Imagereviews2.jpeg', alt: 'Makeup look sample 2', fallback: '/Imagereviews2.jpeg' },
+  { src: '/Imagereviews3.HEIC', alt: 'Makeup look sample 3', fallback: '/Imagereviews4.jpeg' },
+  { src: '/Imagereviews4.jpeg', alt: 'Makeup look sample 4', fallback: '/Imagereviews4.jpeg' },
+  { src: '/Imagereviews5.jpeg', alt: 'Makeup look sample 5', fallback: '/Imagereviews5.jpeg' },
+  { src: '/Imagereviews6.jpeg', alt: 'Makeup look sample 6', fallback: '/Imagereviews6.jpeg' },
+  { src: '/Imagereviews7.jpeg', alt: 'Makeup look sample 7', fallback: '/Imagereviews7.jpeg' },
+] as const
+
 export function MakeupPage() {
   const [formStep, setFormStep] = useState(1)
   const [selectedService, setSelectedService] = useState<(typeof SERVICES)[number] | null>(null)
@@ -87,41 +98,23 @@ export function MakeupPage() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            <div className="col-span-2 overflow-hidden rounded-2xl">
-              <img
-                src="/tlepic2.jpeg"
-                alt="Makeup artist at work"
-                className="aspect-[16/9] w-full object-cover object-top transition-transform duration-700 hover:scale-[1.03]"
-              />
-            </div>
-            <div className="overflow-hidden rounded-2xl">
-              <img
-                src="/tlepic1.jpeg"
-                alt="Beauty portrait"
-                className="aspect-square w-full object-cover transition-transform duration-700 hover:scale-[1.03]"
-              />
-            </div>
-            <div className="overflow-hidden rounded-2xl">
-              <img
-                src="/product1.jpeg"
-                alt="Beauty product set"
-                className="aspect-square w-full object-cover transition-transform duration-700 hover:scale-[1.03]"
-              />
-            </div>
-            <div className="overflow-hidden rounded-2xl">
-              <img
-                src="/product5.jpeg"
-                alt="Makeup tools"
-                className="aspect-square w-full object-cover transition-transform duration-700 hover:scale-[1.03]"
-              />
-            </div>
-            <div className="overflow-hidden rounded-2xl">
-              <img
-                src="/product8.jpeg"
-                alt="Makeup palette"
-                className="aspect-square w-full object-cover transition-transform duration-700 hover:scale-[1.03]"
-              />
-            </div>
+            {REVIEW_IMAGES.slice(0, 5).map((item, index) => (
+              <div
+                key={item.src}
+                className={`overflow-hidden rounded-2xl ${index === 0 ? 'col-span-2' : ''}`}
+              >
+                <img
+                  src={item.src}
+                  alt={item.alt}
+                  onError={(e) => {
+                    e.currentTarget.src = item.fallback
+                  }}
+                  className={`w-full object-cover transition-transform duration-700 hover:scale-[1.03] ${
+                    index === 0 ? 'aspect-[16/9] object-top' : 'aspect-square'
+                  }`}
+                />
+              </div>
+            ))}
           </div>
         </div>
 
@@ -358,27 +351,18 @@ export function MakeupPage() {
         </section>
 
         <div className="mb-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="overflow-hidden rounded-2xl">
-            <img
-              src="/tlepic1.jpeg"
-              alt="Beauty session"
-              className="aspect-[4/5] w-full object-cover transition-transform duration-700 hover:scale-[1.03]"
-            />
-          </div>
-          <div className="overflow-hidden rounded-2xl">
-            <img
-              src="/tlepic2.jpeg"
-              alt="Artist portrait"
-              className="aspect-[4/5] w-full object-cover object-top transition-transform duration-700 hover:scale-[1.03]"
-            />
-          </div>
-          <div className="overflow-hidden rounded-2xl sm:col-span-2 lg:col-span-1">
-            <img
-              src="/product8.jpeg"
-              alt="Makeup products"
-              className="aspect-[4/5] w-full object-cover transition-transform duration-700 hover:scale-[1.03]"
-            />
-          </div>
+          {REVIEW_IMAGES.map((item) => (
+            <div key={item.src} className="overflow-hidden rounded-2xl">
+              <img
+                src={item.src}
+                alt={item.alt}
+                onError={(e) => {
+                  e.currentTarget.src = item.fallback
+                }}
+                className="aspect-[4/5] w-full object-cover object-top transition-transform duration-700 hover:scale-[1.03]"
+              />
+            </div>
+          ))}
         </div>
 
         <div className="rounded-[30px] border border-tle-pink/15 bg-white px-5 py-6 shadow-[0_16px_50px_rgba(0,0,0,0.06)] sm:px-7 sm:py-8">

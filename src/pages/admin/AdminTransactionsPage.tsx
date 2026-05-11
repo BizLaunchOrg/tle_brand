@@ -1,17 +1,60 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchOrdersForAdmin } from '../../lib/adminOrders.ts'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
-import { isCompletedStatus, isPendingStatus } from '../../lib/adminOrderAnalytics.ts'
+import {
+  countAndRevenue,
+  filterOrdersByRange,
+  isCompletedStatus,
+  isPendingStatus,
+  type DateRangeFilter,
+} from '../../lib/adminOrderAnalytics.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { ad } from './adminUi.ts'
+import { AdminOrderDetailModal } from './AdminOrderDetailModal.tsx'
+import { AdminRangeTabs, AdminStatusBucketTabs, adminStatusPillClass, type AdminOrderBucket } from './adminRangeTabs.tsx'
+import { ad, adminFont } from './adminUi.ts'
+import { printOrdersStatement } from './statementPrint.ts'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
+
+function overviewShell(tint: 'emerald' | 'sky' | 'amber', theme: 'light' | 'dark') {
+  const map = {
+    emerald: ['border-emerald-100/80 bg-emerald-50/90', 'border-emerald-900/30 bg-emerald-950/25'],
+    sky: ['border-sky-100/80 bg-sky-50/90', 'border-sky-900/30 bg-sky-950/25'],
+    amber: ['border-amber-100/80 bg-amber-50/90', 'border-amber-900/25 bg-amber-950/20'],
+  } as const
+  const [L, D] = map[tint]
+  return ad(theme, L, D)
+}
+
+function rangeLabel(r: DateRangeFilter): string {
+  if (r === 'today') return 'Today'
+  if (r === '7d') return 'Last 7 days'
+  if (r === '30d') return 'Last 30 days'
+  return 'All time'
+}
+
+function bucketLabel(b: AdminOrderBucket): string {
+  if (b === 'pending') return 'Pending pipeline'
+  if (b === 'completed') return 'Completed only'
+  return 'All statuses'
+}
+
+function detailBtn(theme: 'light' | 'dark') {
+  return ad(
+    theme,
+    'inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-[12px] font-bold text-emerald-900 transition hover:bg-emerald-100',
+    'inline-flex items-center gap-1.5 rounded-xl border border-emerald-800/50 bg-emerald-950/30 px-3 py-2 text-[12px] font-bold text-emerald-200 transition hover:bg-emerald-950/50',
+  )
+}
 
 export function AdminTransactionsPage() {
   const { theme } = useAdminTheme()
   const [orders, setOrders] = useState<AdminOrderRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all')
+  const [range, setRange] = useState<DateRangeFilter>('30d')
+  const [bucket, setBucket] = useState<AdminOrderBucket>('all')
+  const [actionMsg, setActionMsg] = useState<string | null>(null)
+  const [detailOrder, setDetailOrder] = useState<AdminOrderRow | null>(null)
 
   useEffect(() => {
     let on = true
@@ -27,106 +70,248 @@ export function AdminTransactionsPage() {
     }
   }, [])
 
+  const ranged = useMemo(() => filterOrdersByRange(orders, range), [orders, range])
   const filtered = useMemo(() => {
-    if (filter === 'pending') return orders.filter((o) => isPendingStatus(o.status))
-    if (filter === 'completed') return orders.filter((o) => isCompletedStatus(o.status))
-    return orders
-  }, [orders, filter])
+    if (bucket === 'pending') return ranged.filter((o) => isPendingStatus(o.status))
+    if (bucket === 'completed') return ranged.filter((o) => isCompletedStatus(o.status))
+    return ranged
+  }, [ranged, bucket])
 
-  const muted = ad(theme, 'text-zinc-500', 'text-zinc-500')
-  const strong = ad(theme, 'text-zinc-900', 'text-zinc-100')
-  const card = ad(
-    theme,
-    'rounded-xl border border-zinc-200/90 bg-white shadow-sm',
-    'rounded-xl border border-zinc-800/90 bg-[#0c0c0e]',
+  const stats = useMemo(() => countAndRevenue(filtered), [filtered])
+  const settled = useMemo(
+    () => filtered.filter((o) => isCompletedStatus(o.status)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0),
+    [filtered],
   )
 
-  const chip = (active: boolean) =>
-    [
-      'rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors',
-      active
-        ? ad(theme, 'bg-zinc-900 text-white', 'bg-zinc-100 text-zinc-900')
-        : ad(theme, 'text-zinc-500 hover:bg-zinc-100', 'text-zinc-500 hover:bg-zinc-800/80'),
-    ].join(' ')
+  const pendingInRange = useMemo(() => ranged.filter((o) => isPendingStatus(o.status)).length, [ranged])
+  const completedInRange = useMemo(() => ranged.filter((o) => isCompletedStatus(o.status)).length, [ranged])
+
+  const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
+  const heading = ad(theme, 'text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl', 'text-2xl font-bold tracking-tight text-white sm:text-3xl')
+  const cardWrap = ad(
+    theme,
+    'rounded-2xl border border-stone-200/90 bg-white shadow-sm',
+    'rounded-2xl border border-neutral-700/90 bg-neutral-900/50 shadow-sm',
+  )
+  const filterCard =
+    'rounded-2xl border p-4 sm:p-5 ' + ad(theme, 'border-stone-200/90 bg-white/90 shadow-sm', 'border-neutral-700/80 bg-neutral-900/35 shadow-sm')
+  const th = ad(
+    theme,
+    'border-b border-stone-100 bg-stone-50/95 px-3 py-3 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-stone-500 sm:px-4',
+    'border-b border-neutral-800 bg-neutral-900/70 px-3 py-3 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-500 sm:px-4',
+  )
+  const td = ad(
+    theme,
+    'border-b border-stone-100/90 px-3 py-3 text-[13px] last:border-b-0 sm:px-4',
+    'border-b border-neutral-800/70 px-3 py-3 text-[13px] last:border-b-0 sm:px-4',
+  )
+
+  const statementSubtitle = `${rangeLabel(range)} · ${bucketLabel(bucket)} · ${filtered.length} row${filtered.length === 1 ? '' : 's'}`
+  const statementNote = 'In the print dialog, choose "Save as PDF" to download a file.'
+
+  const onPrintStatement = () => {
+    setActionMsg(null)
+    const ok = printOrdersStatement(filtered, { subtitle: statementSubtitle, note: statementNote })
+    if (!ok) setActionMsg('Allow pop-ups for this site to print or save as PDF.')
+    else setActionMsg(null)
+  }
 
   if (loading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div
-          className={ad(
-            theme,
-            'size-8 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-800',
-            'size-8 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-200',
-          )}
-        />
+      <div className={adminFont() + ' flex min-h-[40vh] flex-col items-center justify-center gap-3 ' + muted}>
+        <span className="material-symbols-outlined animate-pulse text-3xl font-light text-emerald-600">account_balance_wallet</span>
+        <p className="text-[14px] font-medium">Loading transactions…</p>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <h1 className="font-sans text-2xl font-semibold tracking-tight">Transactions</h1>
-      <p className={muted + ' mt-1 text-sm'}>Each row is a checkout capture (pay-on-delivery flow).</p>
+    <div className={adminFont() + ' mx-auto max-w-6xl pb-8'}>
+      {detailOrder ? (
+        <AdminOrderDetailModal order={detailOrder} onClose={() => setDetailOrder(null)} headline="Transaction details" />
+      ) : null}
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        <button type="button" className={chip(filter === 'all')} onClick={() => setFilter('all')}>
-          All · {orders.length}
-        </button>
-        <button type="button" className={chip(filter === 'pending')} onClick={() => setFilter('pending')}>
-          Pending · {orders.filter((o) => isPendingStatus(o.status)).length}
-        </button>
-        <button type="button" className={chip(filter === 'completed')} onClick={() => setFilter('completed')}>
-          Completed · {orders.filter((o) => isCompletedStatus(o.status)).length}
-        </button>
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="flex size-10 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-600/25">
+              <span className="material-symbols-outlined text-[22px] font-light">payments</span>
+            </span>
+            <h1 className={heading}>Transactions</h1>
+          </div>
+          <p className={muted + ' mt-2 max-w-2xl text-[14px] leading-relaxed'}>
+            One row per checkout. Tap <strong className={ad(theme, 'text-stone-700', 'text-neutral-300')}>Details</strong> for the full breakdown — contact, address, line items, and amounts.
+          </p>
+        </div>
+        <div className="flex w-full shrink-0 flex-col items-stretch gap-2 lg:w-auto lg:items-end">
+          <button
+            type="button"
+            onClick={onPrintStatement}
+            className={
+              'inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-[14px] font-bold shadow-md shadow-emerald-600/20 transition hover:brightness-105 active:scale-[0.99] ' +
+              ad(theme, 'bg-emerald-600 text-white', 'bg-emerald-600 text-white')
+            }
+          >
+            <span className="material-symbols-outlined text-[22px] font-light">picture_as_pdf</span>
+            Download statement
+          </button>
+          <p className={muted + ' max-w-[280px] text-center text-[11px] lg:text-right'}>
+            Opens a print-ready page — choose &quot;Save as PDF&quot; to download.
+          </p>
+        </div>
       </div>
 
-      <ul className="mt-6 space-y-3">
-        {filtered.map((o) => (
-          <li key={o.id} className={card + ' flex flex-wrap items-center justify-between gap-4 p-4'}>
-            <div className="flex min-w-0 items-center gap-3">
-              <span
-                className={ad(
-                  theme,
-                  'flex size-11 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600',
-                  'flex size-11 items-center justify-center rounded-xl bg-zinc-800 text-zinc-400',
-                )}
-              >
-                <span className="material-symbols-outlined text-[24px] leading-none">payments</span>
-              </span>
-              <div className="min-w-0">
-                <p className={'font-mono text-[12px] font-medium ' + strong}>{o.id.slice(0, 13)}…</p>
-                <p className={'truncate text-[13px] ' + strong}>{o.email}</p>
-                <p className={'text-[11px] ' + muted}>
-                  {new Date(o.created_at).toLocaleString(undefined, {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  })}
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className={'text-lg font-semibold tabular-nums ' + ad(theme, 'text-tle-deep', 'text-tle-light')}>
-                {formatNaira(Number(o.total_ngn) || 0)}
-              </p>
-              <p className={'text-[11px] ' + muted}>COD / manual settlement</p>
-              <span
-                className={[
-                  'mt-1 inline-block rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
-                  isCompletedStatus(o.status)
-                    ? ad(theme, 'bg-emerald-500/15 text-emerald-800', 'bg-emerald-500/10 text-emerald-400')
-                    : isPendingStatus(o.status)
-                      ? ad(theme, 'bg-amber-500/15 text-amber-900', 'bg-amber-500/10 text-amber-400')
-                      : ad(theme, 'bg-zinc-100 text-zinc-600', 'bg-zinc-800 text-zinc-400'),
-                ].join(' ')}
-              >
-                {o.status}
-              </span>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {actionMsg ? (
+        <p
+          className={
+            'mt-4 rounded-2xl border px-4 py-3 text-[13px] font-medium ' +
+            ad(theme, 'border-amber-200 bg-amber-50 text-amber-950', 'border-amber-800/50 bg-amber-950/40 text-amber-100')
+          }
+        >
+          {actionMsg}
+        </p>
+      ) : null}
 
-      {filtered.length === 0 ? <p className={muted + ' mt-8 text-center text-sm'}>No transactions in this view.</p> : null}
+      <div className={'mt-6 ' + filterCard}>
+        <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-[0.14em] text-stone-500', 'text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500')}>
+          Date range
+        </p>
+        <p className={muted + ' mt-1 text-[12px]'}>Filters the list, summary cards, statement, and detail views.</p>
+        <div className="mt-3">
+          <AdminRangeTabs value={range} onChange={setRange} theme={theme} compact />
+        </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className={'rounded-2xl border p-4 shadow-sm ' + overviewShell('emerald', theme)}>
+          <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-800/80', 'text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-300/90')}>
+            In this view
+          </p>
+          <p className={ad(theme, 'mt-2 text-2xl font-bold tabular-nums text-stone-900', 'mt-2 text-2xl font-bold tabular-nums text-white')}>{stats.count}</p>
+          <p className={muted + ' mt-1 text-[11px]'}>Transactions listed</p>
+        </div>
+        <div className={'rounded-2xl border p-4 shadow-sm ' + overviewShell('sky', theme)}>
+          <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-[0.12em] text-sky-900/75', 'text-[10px] font-bold uppercase tracking-[0.12em] text-sky-200/90')}>
+            Gross total
+          </p>
+          <p className={ad(theme, 'mt-2 text-xl font-bold tabular-nums text-stone-900 sm:text-2xl', 'mt-2 text-xl font-bold tabular-nums text-white sm:text-2xl')}>{formatNaira(stats.revenue)}</p>
+          <p className={muted + ' mt-1 text-[11px]'}>All amounts in view</p>
+        </div>
+        <div className={'rounded-2xl border p-4 shadow-sm ' + overviewShell('emerald', theme)}>
+          <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-900/80', 'text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-300/90')}>
+            Settled
+          </p>
+          <p className={ad(theme, 'mt-2 text-xl font-bold tabular-nums text-emerald-800 sm:text-2xl', 'mt-2 text-xl font-bold tabular-nums text-emerald-300 sm:text-2xl')}>{formatNaira(settled)}</p>
+          <p className={muted + ' mt-1 text-[11px]'}>Completed / delivered</p>
+        </div>
+      </div>
+
+      <div className={'mt-6 ' + filterCard}>
+        <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-[0.14em] text-stone-500', 'text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500')}>
+          Status
+        </p>
+        <div className="mt-3">
+          <AdminStatusBucketTabs
+            value={bucket}
+            onChange={setBucket}
+            theme={theme}
+            counts={{
+              all: ranged.length,
+              pending: pendingInRange,
+              completed: completedInRange,
+            }}
+          />
+        </div>
+        <p className={muted + ' mt-4 text-[12px] leading-relaxed'}>
+          <span className="material-symbols-outlined mr-1 align-text-bottom text-[16px] font-light text-emerald-600">info</span>
+          The statement includes <strong className={ad(theme, 'text-stone-700', 'text-neutral-300')}>only rows in this view</strong> (up to 500 loaded). Widen filters for more history.
+        </p>
+      </div>
+
+      <div className="mt-6 space-y-3 md:hidden">
+        {filtered.length === 0 ? (
+          <div className={'rounded-2xl border px-4 py-14 text-center text-[14px] ' + cardWrap + ' ' + muted}>Nothing in this view.</div>
+        ) : (
+          filtered.map((o) => (
+            <div key={o.id} className={'rounded-2xl border p-4 ' + cardWrap}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className={'font-mono text-[11px] ' + muted}>{o.id.slice(0, 12)}…</p>
+                  <p className={'truncate font-semibold ' + ad(theme, 'text-stone-900', 'text-white')}>{o.email}</p>
+                  <p className={muted + ' mt-1 text-[12px]'}>
+                    {new Date(o.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className={ad(theme, 'text-lg font-bold tabular-nums text-emerald-700', 'text-lg font-bold tabular-nums text-emerald-300')}>{formatNaira(Number(o.total_ngn) || 0)}</p>
+                  <span className={'mt-1 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ' + adminStatusPillClass(o.status, theme)}>
+                    {o.status}
+                  </span>
+                </div>
+              </div>
+              <button type="button" onClick={() => setDetailOrder(o)} className={'mt-4 w-full justify-center ' + detailBtn(theme)}>
+                <span className="material-symbols-outlined text-[18px] font-light">visibility</span>
+                View full details
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className={'mt-6 hidden overflow-hidden md:block ' + cardWrap}>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] border-collapse text-left">
+            <thead>
+              <tr>
+                <th className={th}>Time</th>
+                <th className={th}>Reference</th>
+                <th className={th}>Customer</th>
+                <th className={th + ' text-right'}>Amount</th>
+                <th className={th}>Status</th>
+                <th className={th}>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className={td + ' py-16 text-center ' + muted}>
+                    Nothing in this view.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((o) => (
+                  <tr key={o.id} className={ad(theme, 'transition-colors hover:bg-emerald-50/40', 'transition-colors hover:bg-emerald-950/15')}>
+                    <td className={td + ' whitespace-nowrap tabular-nums ' + muted}>
+                      {new Date(o.created_at).toLocaleString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                    <td className={td + ' font-mono text-[12px] ' + ad(theme, 'text-stone-700', 'text-neutral-300')}>{o.id.slice(0, 14)}…</td>
+                    <td className={td + ' max-w-[200px] truncate font-medium ' + ad(theme, 'text-stone-900', 'text-neutral-100')}>{o.email}</td>
+                    <td className={td + ' text-right text-[14px] font-bold tabular-nums ' + ad(theme, 'text-emerald-700', 'text-emerald-300')}>
+                      {formatNaira(Number(o.total_ngn) || 0)}
+                    </td>
+                    <td className={td}>
+                      <span className={'inline-block rounded-full px-2.5 py-1 text-[11px] font-bold uppercase ' + adminStatusPillClass(o.status, theme)}>
+                        {o.status}
+                      </span>
+                    </td>
+                    <td className={td}>
+                      <button type="button" onClick={() => setDetailOrder(o)} className={detailBtn(theme)}>
+                        <span className="material-symbols-outlined text-[18px] font-light">visibility</span>
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
