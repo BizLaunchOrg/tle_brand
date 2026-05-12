@@ -9,6 +9,7 @@ import {
   getActiveColorOption,
   getDefaultImageUrls,
   getGalleryUrls,
+  parseProductPriceNgn,
   type Product,
 } from '../../data/products.ts'
 import { OrderRelativeTime } from './OrderRelativeTime.tsx'
@@ -87,10 +88,6 @@ function shippingRows(shipping: Record<string, unknown>): { label: string; value
   return out
 }
 
-function parsePriceNgn(s: string): number {
-  return Number(String(s).replace(/[^\d]/g, '')) || 0
-}
-
 type LineDisplayExt = {
   key: string
   slug: string
@@ -118,7 +115,7 @@ function buildLineDisplaysExt(raw: unknown): LineDisplayExt[] {
     const name = typeof o.name === 'string' ? o.name : slug || 'Item'
     const qty = Math.min(999, Math.max(1, Math.floor(Number(o.quantity)) || 1))
     const priceStr = typeof o.price === 'string' ? o.price : typeof o.price === 'number' ? formatNaira(o.price) : '₦0'
-    const unit = parsePriceNgn(priceStr)
+    const unit = parseProductPriceNgn(priceStr)
     const variantId = typeof o.variantId === 'string' && o.variantId.trim() ? o.variantId.trim() : undefined
     const variantLabel =
       typeof o.variantLabel === 'string' && o.variantLabel.trim()

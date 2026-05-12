@@ -46,9 +46,18 @@ export type Product = {
   stockUnlimited?: boolean
 }
 
-/** Parse ₦-style amounts to integer naira (digits only). */
-export function parseProductPriceNgn(price: string | undefined): number {
-  return Number(String(price ?? '').replace(/[^\d]/g, '')) || 0
+/**
+ * Parse ₦-style amounts to integer naira.
+ * Avoid stripping `.` then concatenating digits (e.g. "6000.00" → 600000).
+ */
+export function parseProductPriceNgn(price: string | number | undefined): number {
+  if (price === null || price === undefined) return 0
+  if (typeof price === 'number' && Number.isFinite(price)) return Math.round(price)
+  let s = String(price).trim()
+  if (!s) return 0
+  s = s.replace(/₦/gi, '').replace(/\s/g, '').replace(/,/g, '')
+  const n = Number(s)
+  return Number.isFinite(n) ? Math.round(n) : 0
 }
 
 /** For her / for him lists include unisex pieces; the Unisex tab lists only pieces marked unisex. */
