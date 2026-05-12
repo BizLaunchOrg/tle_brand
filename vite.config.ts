@@ -22,7 +22,30 @@ export default defineConfig(({ mode }) => {
         name: 'tle-manifest-link-base',
         transformIndexHtml(html) {
           const storeManifest = `${base}manifest.webmanifest`.replace(/([^:]\/)\/+/g, '$1')
-          return html.replace(/href="manifest\.webmanifest"/, `href="${storeManifest}"`)
+          const withManifest = html.replace(/href="manifest\.webmanifest"/, `href="${storeManifest}"`)
+          const sync = `
+    <script>
+(function () {
+  try {
+    var link = document.getElementById('tle-web-manifest')
+    if (!link) return
+    var base = ${JSON.stringify(base)}
+    var p = location.pathname
+    var b = base === '/' ? '' : (base.length > 1 && base.endsWith('/') ? base.slice(0, -1) : base)
+    var isAdmin = p === b + '/admin' || p.startsWith(b + '/admin/')
+    if (!isAdmin) return
+    var href = link.getAttribute('href') || ''
+    var adminHref = href.replace(/manifest\\.webmanifest(\\?.*)?$/i, function (m, q) {
+      return 'manifest-admin.webmanifest' + (q || '')
+    })
+    if (adminHref !== href) link.setAttribute('href', adminHref)
+  } catch (e) {}
+})()
+    </script>`
+          return withManifest.replace(
+            /(<link rel="manifest" id="tle-web-manifest"[^>]*\/>)/,
+            (_, tag) => tag + sync,
+          )
         },
       },
     ],
