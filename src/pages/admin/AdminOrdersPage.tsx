@@ -118,7 +118,7 @@ export function AdminOrdersPage() {
   const { theme } = useAdminTheme()
   const [orders, setOrders] = useState<AdminOrderRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [range, setRange] = useState<DateRangeFilter>('30d')
+  const [range, setRange] = useState<DateRangeFilter>('today')
   const [listTab, setListTab] = useState<'all' | 'attention'>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
@@ -252,7 +252,11 @@ export function AdminOrdersPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className={heading}>Orders</h1>
-          <p className={muted + ' mt-1 max-w-2xl text-[13px]'}>Website checkout. Open a row for full details.</p>
+          <p className={muted + ' mt-1 max-w-2xl text-[13px]'}>
+            Website checkout. New orders are marked{' '}
+            <strong className={ad(theme, 'font-semibold text-stone-800', 'font-semibold text-neutral-100')}>Paid</strong>{' '}
+            when checkout completes (no card gateway yet). Open a row for full details.
+          </p>
         </div>
       </div>
 

@@ -82,7 +82,7 @@ export function AdminTransactionsPage() {
   const { theme } = useAdminTheme()
   const [orders, setOrders] = useState<AdminOrderRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [range, setRange] = useState<DateRangeFilter>('30d')
+  const [range, setRange] = useState<DateRangeFilter>('today')
   const [bucket, setBucket] = useState<AdminOrderBucket>('all')
   const [actionMsg, setActionMsg] = useState<string | null>(null)
   useEffect(() => {

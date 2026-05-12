@@ -130,6 +130,8 @@ export async function createOrder(params: {
     return { ok: false, message: 'Checkout is not configured.' }
   }
 
+  // No online payment gateway yet: treat a successful checkout as paid so admin + stats match reality.
+  // When you add Paystack/Stripe, set status from the provider (e.g. pending → paid) instead of forcing here.
   const { data, error } = await getSupabase()
     .from('orders')
     .insert({
@@ -141,6 +143,7 @@ export async function createOrder(params: {
       delivery_ngn: params.deliveryNgn,
       processing_ngn: params.processingNgn,
       total_ngn: params.totalNgn,
+      status: 'paid',
     })
     .select('id')
     .maybeSingle()

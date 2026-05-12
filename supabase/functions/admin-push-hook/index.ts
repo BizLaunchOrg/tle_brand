@@ -12,6 +12,9 @@
  *
  * SUPABASE_URL is provided automatically. Use service role via legacy SUPABASE_SERVICE_ROLE_KEY
  * or default entry in SUPABASE_SECRET_KEYS (JSON); the function supports both.
+ *
+ * Logs: Supabase often shows a generic “Boot” line when an isolate starts; that is not a push.
+ * After deploy, look for JSON lines with "source":"admin-push-hook" (insert_event / done / skipped).
  */
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
@@ -45,26 +48,42 @@ function json(status: number, body: Record<string, unknown>) {
   })
 }
 
+/** Visible in Dashboard → Edge Functions → admin-push-hook → Logs (unlike generic “Boot” lines). */
+function logHook(msg: string, extra?: Record<string, unknown>) {
+  console.log(JSON.stringify({ source: 'admin-push-hook', msg, ...extra }))
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json(405, { ok: false, error: 'method' })
 
   const secret = Deno.env.get('WEBHOOK_SECRET')?.trim()
   const headerSecret = req.headers.get('x-webhook-secret')?.trim()
-  if (!secret || secret !== headerSecret) return json(401, { ok: false, error: 'unauthorized' })
+  if (!secret || secret !== headerSecret) {
+    logHook('reject', { reason: 'bad_or_missing_x_webhook_secret' })
+    return json(401, { ok: false, error: 'unauthorized' })
+  }
 
   let body: Record<string, unknown>
   try {
     body = (await req.json()) as Record<string, unknown>
   } catch {
+    logHook('reject', { reason: 'invalid_json' })
     return json(400, { ok: false, error: 'invalid json' })
   }
 
-  const type = (body.type ?? body.eventType) as string | undefined
+  const type = (body.type ?? body.eventType ?? body.event_type) as string | undefined
   const table = body.table as string | undefined
   const schema = body.schema as string | undefined
   const record = body.record as Record<string, unknown> | undefined
 
   if (schema !== 'public' || String(type || '').toUpperCase() !== 'INSERT' || !table || !record) {
+    logHook('skipped', {
+      reason: 'payload_shape',
+      schema,
+      type,
+      table,
+      hasRecord: Boolean(record),
+    })
     return json(200, {
       ok: true,
       skipped: true,
@@ -73,13 +92,19 @@ Deno.serve(async (req) => {
     })
   }
 
+  logHook('insert_event', { table })
+
   const publicUrl = (Deno.env.get('PUBLIC_APP_URL') ?? '').trim().replace(/\/$/, '')
-  if (!publicUrl) return json(500, { ok: false, error: 'PUBLIC_APP_URL not set' })
+  if (!publicUrl) {
+    logHook('error', { reason: 'PUBLIC_APP_URL not set' })
+    return json(500, { ok: false, error: 'PUBLIC_APP_URL not set' })
+  }
 
   const vapidSubject = Deno.env.get('VAPID_SUBJECT')?.trim()
   const vapidPublic = Deno.env.get('VAPID_PUBLIC_KEY')?.trim()
   const vapidPrivate = Deno.env.get('VAPID_PRIVATE_KEY')?.trim()
   if (!vapidSubject || !vapidPublic || !vapidPrivate) {
+    logHook('error', { reason: 'VAPID_* secrets not set' })
     return json(500, { ok: false, error: 'VAPID_* secrets not set' })
   }
 
@@ -92,20 +117,27 @@ Deno.serve(async (req) => {
 
   if (table === 'orders') {
     const id = String(record.id ?? '')
-    if (!id) return json(200, { ok: true, skipped: true, reason: 'no id' })
+    if (!id) {
+      logHook('skipped', { reason: 'no id', table })
+      return json(200, { ok: true, skipped: true, reason: 'no id' })
+    }
     title = 'New order'
     notifBody = String(record.email ?? 'New checkout')
     openUrl = `${publicUrl}/admin/orders/${encodeURIComponent(id)}`
     tag = `order-${id}`
   } else if (table === 'makeup_bookings') {
     const id = String(record.id ?? '')
-    if (!id) return json(200, { ok: true, skipped: true, reason: 'no id' })
+    if (!id) {
+      logHook('skipped', { reason: 'no id', table })
+      return json(200, { ok: true, skipped: true, reason: 'no id' })
+    }
     const name = String(record.customer_name ?? 'Client')
     title = 'New makeup booking'
     notifBody = `${name} — ${String(record.service_name ?? 'Makeup')}`
     openUrl = `${publicUrl}/admin/makeup-bookings?open=${encodeURIComponent(id)}`
     tag = `makeup-${id}`
   } else {
+    logHook('skipped', { reason: 'table', table })
     return json(200, { ok: true, skipped: true, reason: 'table' })
   }
 
@@ -115,6 +147,7 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const serviceKey = getServiceRoleKey()
   if (!supabaseUrl || !serviceKey) {
+    logHook('error', { reason: 'supabase_service_key' })
     return json(500, {
       ok: false,
       error: 'supabase_service_key',
@@ -125,6 +158,7 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceKey)
   const { data: admins, error: adminErr } = await supabase.from('admin_users').select('user_id')
   if (adminErr || !admins?.length) {
+    logHook('done', { sent: 0, note: adminErr?.message ?? 'no admin_users' })
     return json(200, { ok: true, sent: 0, note: 'no admin_users' })
   }
 
@@ -135,6 +169,11 @@ Deno.serve(async (req) => {
     .in('user_id', userIds)
 
   if (subErr || !subs?.length) {
+    logHook('done', {
+      sent: 0,
+      note: subErr?.message ?? 'no subscriptions',
+      adminCount: userIds.length,
+    })
     return json(200, { ok: true, sent: 0, note: subErr?.message ?? 'no subscriptions' })
   }
 
@@ -157,10 +196,11 @@ Deno.serve(async (req) => {
         await supabase.from('push_subscriptions').delete().eq('id', row.id)
         removed += 1
       } else {
-        console.error('push failed', statusCode, e)
+        logHook('push_failed', { statusCode, message: String(e) })
       }
     }
   }
 
+  logHook('done', { sent, removed, targets: rows.length })
   return json(200, { ok: true, sent, removed, targets: rows.length })
 })
