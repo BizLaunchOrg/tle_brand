@@ -1,9 +1,22 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useLocation } from 'react-router-dom'
 import { getSupabase } from '../../lib/supabaseClient'
 import { isSupabaseConfigured, mapSupabaseAuthError } from '../../lib/mapSupabaseAuthError'
 import { useAuth } from '../../context/AuthContext'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { ad, adminFont } from './adminUi.ts'
+import {
+  getAdminBrowserNotifyEnabled,
+  setAdminBrowserNotifyEnabled,
+} from '../../lib/adminBrowserNotifications.ts'
+import {
+  getExistingPushSubscription,
+  getVapidPublicKeyForPush,
+  isPushApiSupported,
+  subscribeAdminPush,
+  syncAdminWebPushLocalFromBrowser,
+  unsubscribeAdminPush,
+} from '../../lib/adminPushSubscribe.ts'
 import {
   DEFAULT_DELIVERY_FEE_NGN,
   DEFAULT_PROCESSING_FEE_NGN,
@@ -16,6 +29,7 @@ const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 export function AdminAccountPage() {
   const { user } = useAuth()
   const { theme } = useAdminTheme()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -28,10 +42,36 @@ export function AdminAccountPage() {
   const [processingFee, setProcessingFee] = useState(String(DEFAULT_PROCESSING_FEE_NGN))
   const [busyFees, setBusyFees] = useState(false)
   const [feesLoaded, setFeesLoaded] = useState(false)
+  const [notifyEnabled, setNotifyEnabled] = useState(false)
+  const [notifBusy, setNotifBusy] = useState(false)
+  const [pushSubscribed, setPushSubscribed] = useState(false)
 
   useEffect(() => {
     if (user?.email) setEmail(user.email)
   }, [user?.email])
+
+  useEffect(() => {
+    setNotifyEnabled(getAdminBrowserNotifyEnabled())
+  }, [])
+
+  useEffect(() => {
+    if (location.hash !== '#admin-push') return
+    window.requestAnimationFrame(() => {
+      document.getElementById('admin-push')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [location.hash])
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      await syncAdminWebPushLocalFromBrowser()
+      const sub = await getExistingPushSubscription()
+      if (!cancelled) setPushSubscribed(!!sub)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let on = true
@@ -141,10 +181,55 @@ export function AdminAccountPage() {
     setNotice('Checkout fees saved. New checkouts use these amounts.')
   }
 
+  const notificationsActive = pushSubscribed || notifyEnabled
+
+  const onNotifications = async () => {
+    setError(null)
+    setNotice(null)
+    if (notificationsActive) {
+      setNotifBusy(true)
+      await unsubscribeAdminPush()
+      setAdminBrowserNotifyEnabled(false)
+      setNotifyEnabled(false)
+      const sub = await getExistingPushSubscription()
+      setPushSubscribed(!!sub)
+      await syncAdminWebPushLocalFromBrowser()
+      setNotifBusy(false)
+      setNotice('Notifications are off.')
+      return
+    }
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setNotice('This browser does not support notifications.')
+      return
+    }
+    setNotifBusy(true)
+    const perm = await Notification.requestPermission()
+    if (perm !== 'granted') {
+      setNotifBusy(false)
+      setNotice('Notifications stay off until you allow them in your browser or phone settings.')
+      return
+    }
+    const tryPush = Boolean(getVapidPublicKeyForPush()) && isPushApiSupported()
+    if (tryPush) {
+      const res = await subscribeAdminPush()
+      if (res.ok) {
+        setPushSubscribed(true)
+        setNotifBusy(false)
+        setNotice('Notifications are on.')
+        return
+      }
+    }
+    setAdminBrowserNotifyEnabled(true)
+    setNotifyEnabled(true)
+    setPushSubscribed(!!(await getExistingPushSubscription()))
+    setNotifBusy(false)
+    setNotice('Notifications are on while you keep admin open in a tab.')
+  }
+
   return (
     <div className={adminFont() + ' mx-auto w-full max-w-lg pb-10'}>
       <h1 className={heading}>Account</h1>
-      <p className={muted + ' mt-1 text-[14px] leading-relaxed'}>Sign-in, passwords, and store checkout fees.</p>
+      <p className={muted + ' mt-1 text-[14px] leading-relaxed'}>Sign-in, passwords, store checkout fees, and alerts.</p>
 
       {error ? (
         <p
@@ -168,6 +253,21 @@ export function AdminAccountPage() {
           {notice}
         </p>
       ) : null}
+
+      <div id="admin-push" className={surface + ' mt-6 scroll-mt-24 space-y-3'}>
+        <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>
+          Notifications
+        </h2>
+        <p className={muted + ' text-[13px] leading-relaxed'}>New orders and makeup bookings.</p>
+        <button
+          type="button"
+          disabled={notifBusy}
+          onClick={() => void onNotifications()}
+          className={btn + ' w-full py-3.5 text-[15px] sm:w-auto sm:py-2.5 sm:text-[13px]'}
+        >
+          {notifBusy ? 'Please wait…' : notificationsActive ? 'Turn off notifications' : 'Allow notifications'}
+        </button>
+      </div>
 
       <form onSubmit={onSaveFees} className={surface + ' mt-8 space-y-5'}>
         <div>

@@ -6,6 +6,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['"Open Sans"', 'system-ui', 'sans-serif'],
+        heading: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
       },
       colors: {
         tle: {
@@ -43,7 +44,7 @@ export default {
         },
       },
       animation: {
-        marquee: 'marquee 22s linear infinite',
+        marquee: 'marquee 30s linear infinite',
         'tle-float': 'tle-float 8s ease-in-out infinite alternate',
         'tle-bar': 'tle-bar 2.4s ease-in-out infinite',
         'tle-slot-card': 'tle-slot-card 5.5s ease-in-out infinite',

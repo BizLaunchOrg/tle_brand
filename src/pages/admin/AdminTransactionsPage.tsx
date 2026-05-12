@@ -9,12 +9,41 @@ import {
   isPendingStatus,
   type DateRangeFilter,
 } from '../../lib/adminOrderAnalytics.ts'
+import { firstLineItemDisplayableImage } from '../../lib/adminOrderLineSnapshots.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { AdminRangeTabs, AdminStatusBucketTabs, adminStatusPillClass, type AdminOrderBucket } from './adminRangeTabs.tsx'
 import { ad, adminFont } from './adminUi.ts'
 import { printOrdersStatement } from './statementPrint.ts'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
+
+function TxLineThumb({ lineItems, theme }: { lineItems: unknown; theme: 'light' | 'dark' }) {
+  const [bad, setBad] = useState(false)
+  const src = firstLineItemDisplayableImage(lineItems)
+  if (!src || bad) {
+    return (
+      <div
+        className={
+          'flex size-12 shrink-0 items-center justify-center rounded-xl border ' +
+          ad(theme, 'border-stone-200 bg-stone-100', 'border-neutral-700 bg-neutral-800')
+        }
+      >
+        <span className="material-symbols-outlined text-[20px] opacity-50">inventory_2</span>
+      </div>
+    )
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      className="size-12 shrink-0 rounded-xl border border-black/10 object-cover"
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setBad(true)}
+    />
+  )
+}
 
 function overviewShell(tint: 'emerald' | 'sky' | 'amber', theme: 'light' | 'dark') {
   const map = {
@@ -229,8 +258,9 @@ export function AdminTransactionsPage() {
         ) : (
           filtered.map((o) => (
             <div key={o.id} className={'rounded-2xl border p-4 ' + cardWrap}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+              <div className="flex items-start gap-3">
+                <TxLineThumb lineItems={o.line_items} theme={theme} />
+                <div className="min-w-0 flex-1">
                   <p className={'font-mono text-[11px] ' + muted}>{o.id.slice(0, 12)}…</p>
                   <p className={'truncate font-semibold ' + ad(theme, 'text-stone-900', 'text-white')}>{o.email}</p>
                   <p className={muted + ' mt-1 text-[12px]'}>
@@ -262,6 +292,7 @@ export function AdminTransactionsPage() {
           <table className="w-full min-w-[760px] border-collapse text-left">
             <thead>
               <tr>
+                <th className={th + ' w-14'} aria-label="Preview" />
                 <th className={th}>Time</th>
                 <th className={th}>Reference</th>
                 <th className={th}>Customer</th>
@@ -273,13 +304,16 @@ export function AdminTransactionsPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className={td + ' py-16 text-center ' + muted}>
+                  <td colSpan={7} className={td + ' py-16 text-center ' + muted}>
                     Nothing in this view.
                   </td>
                 </tr>
               ) : (
                 filtered.map((o) => (
                   <tr key={o.id} className={ad(theme, 'transition-colors hover:bg-emerald-50/40', 'transition-colors hover:bg-emerald-950/15')}>
+                    <td className={td + ' align-middle'}>
+                      <TxLineThumb lineItems={o.line_items} theme={theme} />
+                    </td>
                     <td className={td + ' whitespace-nowrap tabular-nums ' + muted}>
                       {new Date(o.created_at).toLocaleString(undefined, {
                         month: 'short',

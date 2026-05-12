@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { fetchOrdersForAdmin, updateOrderStatus } from '../../lib/adminOrders.ts'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import { filterOrdersByRange, isCompletedStatus, type DateRangeFilter } from '../../lib/adminOrderAnalytics.ts'
+import { normalizeOrderLineItems } from '../../lib/adminOrderLineSnapshots.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { adminStatusPillClass } from './adminRangeTabs.tsx'
 import { ad, adminFont } from './adminUi.ts'
@@ -17,19 +18,6 @@ const DATE_OPTIONS: { id: DateRangeFilter; label: string }[] = [
   { id: '30d', label: 'Last 30 days' },
   { id: 'all', label: 'All time' },
 ]
-
-function normalizeOrderLineItems(raw: unknown): unknown[] {
-  if (Array.isArray(raw)) return raw
-  if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw) as unknown
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
-  }
-  return []
-}
 
 function orderLineSummary(line_items: unknown): string {
   const items = normalizeOrderLineItems(line_items)
@@ -126,8 +114,8 @@ function formatOrderWhen(iso: string): string {
 function selectField(theme: 'light' | 'dark') {
   return ad(
     theme,
-    'cursor-pointer rounded-xl border border-stone-200 bg-white px-3 py-2 text-[13px] font-semibold text-stone-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20',
-    'cursor-pointer rounded-xl border border-neutral-600 bg-neutral-950 px-3 py-2 text-[13px] font-semibold text-neutral-100 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25',
+    'min-h-[44px] w-full cursor-pointer rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-[14px] font-semibold text-stone-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 sm:min-h-0 sm:py-2 sm:text-[13px]',
+    'min-h-[44px] w-full cursor-pointer rounded-xl border border-neutral-600 bg-neutral-950 px-3 py-2.5 text-[14px] font-semibold text-neutral-100 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25 sm:min-h-0 sm:py-2 sm:text-[13px]',
   )
 }
 
@@ -347,12 +335,12 @@ export function AdminOrdersPage() {
       </div>
 
       <div className={'mt-6 min-w-0 ' + cardWrap}>
-        <div className={'flex flex-wrap gap-2 border-b px-3 py-2 sm:px-4 ' + ad(theme, 'border-stone-100', 'border-neutral-800')}>
+        <div className={'flex flex-nowrap gap-2 overflow-x-auto border-b px-3 py-2 [-webkit-overflow-scrolling:touch] sm:px-4 ' + ad(theme, 'border-stone-100', 'border-neutral-800')}>
           <button
             type="button"
             onClick={() => setListTab('all')}
             className={
-              'rounded-lg px-4 py-2 text-[13px] font-bold transition ' +
+              'shrink-0 rounded-lg px-4 py-2.5 text-[13px] font-bold transition sm:py-2 ' +
               (listTab === 'all'
                 ? ad(theme, 'bg-emerald-600 text-white', 'bg-emerald-600 text-white')
                 : ad(theme, 'text-stone-600 hover:bg-stone-50', 'text-neutral-400 hover:bg-neutral-800/60'))
@@ -364,7 +352,7 @@ export function AdminOrdersPage() {
             type="button"
             onClick={() => setListTab('attention')}
             className={
-              'relative rounded-lg px-4 py-2 text-[13px] font-bold transition ' +
+              'relative shrink-0 rounded-lg px-4 py-2.5 text-[13px] font-bold transition sm:py-2 ' +
               (listTab === 'attention'
                 ? ad(theme, 'bg-emerald-600 text-white', 'bg-emerald-600 text-white')
                 : ad(theme, 'text-stone-600 hover:bg-stone-50', 'text-neutral-400 hover:bg-neutral-800/60'))
@@ -383,35 +371,47 @@ export function AdminOrdersPage() {
           </button>
         </div>
 
-        <div className={'flex flex-col gap-3 border-b px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:px-4 ' + ad(theme, 'border-stone-100 bg-stone-50/40', 'border-neutral-800 bg-neutral-950/25')}>
-          <select className={'min-w-0 flex-1 sm:max-w-[160px] ' + selectField(theme)} value={range} aria-label="Date range" onChange={(e) => setRange(e.target.value as DateRangeFilter)}>
-            {DATE_OPTIONS.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <select className={'min-w-0 flex-1 sm:max-w-[180px] ' + selectField(theme)} value={statusFilter} aria-label="Order status" onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="all">Order status · All</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </option>
-            ))}
-          </select>
-          <select className={'min-w-0 flex-1 sm:max-w-[180px] ' + selectField(theme)} value={paymentFilter} aria-label="Payment status" onChange={(e) => setPaymentFilter(e.target.value as 'all' | 'paid' | 'unpaid')}>
-            <option value="all">Payment · All</option>
-            <option value="paid">Paid</option>
-            <option value="unpaid">Unpaid</option>
-          </select>
-          <div className={'relative min-w-0 flex-[1_1_200px] sm:max-w-xs ' + ad(theme, '', '')}>
-            <span className={'material-symbols-outlined pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[20px] ' + muted}>search</span>
+        <div
+          className={
+            'flex flex-col gap-2.5 border-b px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:px-4 ' +
+            ad(theme, 'border-stone-100 bg-stone-50/40', 'border-neutral-800 bg-neutral-950/25')
+          }
+        >
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-1 sm:flex-wrap sm:gap-2">
+            <select className={selectField(theme)} value={range} aria-label="Date range" onChange={(e) => setRange(e.target.value as DateRangeFilter)}>
+              {DATE_OPTIONS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <select className={selectField(theme)} value={statusFilter} aria-label="Order status" onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="all">Order status · All</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </option>
+              ))}
+            </select>
+            <select
+              className={selectField(theme) + ' col-span-2 w-full sm:max-w-[200px]'}
+              value={paymentFilter}
+              aria-label="Payment status"
+              onChange={(e) => setPaymentFilter(e.target.value as 'all' | 'paid' | 'unpaid')}
+            >
+              <option value="all">Payment · All</option>
+              <option value="paid">Paid</option>
+              <option value="unpaid">Unpaid</option>
+            </select>
+          </div>
+          <div className={'relative min-h-[44px] w-full min-w-0 sm:max-w-xs sm:flex-1 ' + ad(theme, '', '')}>
+            <span className={'material-symbols-outlined pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[20px] ' + muted}>search</span>
             <input
               type="search"
               placeholder="Search orders…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className={selectField(theme) + ' w-full pl-10'}
+              className={selectField(theme) + ' h-full min-h-[44px] w-full pl-11'}
             />
           </div>
         </div>
