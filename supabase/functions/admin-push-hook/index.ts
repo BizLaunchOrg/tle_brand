@@ -28,6 +28,35 @@ type SubRow = {
   keys_auth: string
 }
 
+function formatNgn(n: unknown): string {
+  const v = typeof n === 'number' ? n : Number(n)
+  if (!Number.isFinite(v) || v < 0) return '—'
+  return `₦${Math.round(v).toLocaleString('en-NG')}`
+}
+
+/** Title: price-first; body: product lines (truncated for OS limits). */
+function buildOrderPushCopy(record: Record<string, unknown>): { title: string; body: string } {
+  const total = formatNgn(record.total_ngn)
+  const title = `New order · ${total}`
+
+  const raw = record.line_items
+  const items: unknown[] = Array.isArray(raw) ? raw : []
+  const parts: string[] = []
+  for (let i = 0; i < items.length && parts.length < 4; i++) {
+    const o = items[i] as Record<string, unknown>
+    const name = String(o.name ?? 'Item').trim() || 'Item'
+    const q = Math.round(Number(o.quantity ?? 1)) || 1
+    const vl = o.variantLabel != null ? String(o.variantLabel).trim() : ''
+    const label = vl ? `${name} (${vl})` : name
+    parts.push(`${label} ×${q}`)
+  }
+  let body = parts.join(' · ')
+  if (items.length > 4) body += ` +${items.length - 4} more`
+  if (!body) body = String(record.email ?? '').trim() || 'Order placed'
+  if (body.length > 200) body = `${body.slice(0, 197)}…`
+  return { title, body }
+}
+
 /** Supabase-hosted functions may expose only `SUPABASE_SECRET_KEYS` (JSON); legacy `SUPABASE_SERVICE_ROLE_KEY` still exists on some projects. */
 function getServiceRoleKey(): string | undefined {
   const legacy = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim()
@@ -215,8 +244,9 @@ Deno.serve(async (req) => {
       logHook('skipped', { reason: 'no id', table })
       return json(200, { ok: true, skipped: true, reason: 'no id' })
     }
-    title = 'New order'
-    notifBody = String(record.email ?? 'New checkout')
+    const copy = buildOrderPushCopy(record)
+    title = copy.title
+    notifBody = copy.body
     openUrl = `${publicUrl}/admin/orders/${encodeURIComponent(id)}`
     tag = `order-${id}`
   } else if (table === 'makeup_bookings') {
@@ -261,6 +291,7 @@ Deno.serve(async (req) => {
   let sent = 0
   let removed = 0
   const rows = subs as SubRow[]
+  const failures: { statusCode: number; note: string }[] = []
 
   for (const row of rows) {
     const subscription = {
@@ -277,11 +308,26 @@ Deno.serve(async (req) => {
         await supabase.from('push_subscriptions').delete().eq('id', row.id)
         removed += 1
       } else {
-        logHook('push_failed', { statusCode, message: String(e) })
+        const note =
+          statusCode === 400
+            ? 'stale_or_mismatched_subscription'
+            : String(e).slice(0, 100)
+        failures.push({ statusCode, note })
       }
     }
   }
 
-  logHook('done', { sent, removed, targets: rows.length })
-  return json(200, { ok: true, sent, removed, targets: rows.length })
+  if (failures.length > 0) {
+    logHook('push_failures', {
+      failed: failures.length,
+      targets: rows.length,
+      sent,
+      sample: failures.slice(0, 2),
+      hint:
+        'Each saved device/browser gets one send; 400 often means an old subscription (new VAPID keys, cleared site data). Turn notifications off/on on Admin → Account on that device.',
+    })
+  }
+
+  logHook('done', { sent, removed, failed: failures.length, targets: rows.length })
+  return json(200, { ok: true, sent, removed, failed: failures.length, targets: rows.length })
 })
