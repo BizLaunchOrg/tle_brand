@@ -8,8 +8,8 @@
  *   PUBLIC_APP_URL       — optional override; e.g. https://your-store.vercel.app (same as Admin → Account “Public site URL” in shop_settings.public_app_url)
  *   APP_URL / SITE_URL / STORE_URL / FRONTEND_URL — optional alternates if you prefer those names
  *   VAPID_SUBJECT        — e.g. mailto:you@yourdomain.com
- *   VAPID_PUBLIC_KEY     — same value as VITE_VAPID_PUBLIC_KEY in the frontend
- *   VAPID_PRIVATE_KEY    — keep secret; generate with: npx web-push generate-vapid-keys
+ *   VAPID_PUBLIC_KEY     — same value as VITE_VAPID_PUBLIC_KEY in the frontend (generate: npm run vapid:keys)
+ *   VAPID_PRIVATE_KEY    — from same command; never commit; Edge secret only
  *
  * SUPABASE_URL is provided automatically. Use service role via legacy SUPABASE_SERVICE_ROLE_KEY
  * or default entry in SUPABASE_SECRET_KEYS (JSON); the function supports both.
@@ -51,7 +51,10 @@ function json(status: number, body: Record<string, unknown>) {
 
 /** Visible in Dashboard → Edge Functions → admin-push-hook → Logs (unlike generic “Boot” lines). */
 function logHook(msg: string, extra?: Record<string, unknown>) {
-  console.log(JSON.stringify({ source: 'admin-push-hook', msg, ...extra }))
+  const rest = { ...(extra ?? {}) }
+  delete rest.source
+  delete rest.msg
+  console.log(JSON.stringify({ source: 'admin-push-hook', msg, ...rest }))
 }
 
 /** HTTPS (or http://localhost) origin only — paths are stripped. */
@@ -179,14 +182,24 @@ Deno.serve(async (req) => {
     })
   }
 
-  logHook('public_url', { source: publicSource })
+  logHook('public_url', { publicUrlSource: publicSource })
 
   const vapidSubject = Deno.env.get('VAPID_SUBJECT')?.trim()
   const vapidPublic = Deno.env.get('VAPID_PUBLIC_KEY')?.trim()
   const vapidPrivate = Deno.env.get('VAPID_PRIVATE_KEY')?.trim()
   if (!vapidSubject || !vapidPublic || !vapidPrivate) {
-    logHook('error', { reason: 'VAPID_* secrets not set' })
-    return json(500, { ok: false, error: 'VAPID_* secrets not set' })
+    const missing: string[] = []
+    if (!vapidSubject) missing.push('VAPID_SUBJECT')
+    if (!vapidPublic) missing.push('VAPID_PUBLIC_KEY')
+    if (!vapidPrivate) missing.push('VAPID_PRIVATE_KEY')
+    logHook('error', { reason: 'VAPID_* secrets not set', missing })
+    return json(500, {
+      ok: false,
+      error: 'vapid_secrets_missing',
+      missing,
+      hint:
+        'Supabase → Project Settings → Edge Functions → Secrets: add VAPID_SUBJECT (e.g. mailto:you@yourdomain.com), VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY. Run `npm run vapid:keys` in the repo, paste keys into Supabase, put the same public key in Vercel as VITE_VAPID_PUBLIC_KEY, redeploy the site, then re-enable Admin → Account notifications.',
+    })
   }
 
   webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate)
