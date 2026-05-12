@@ -87,7 +87,7 @@ export function AdminDashboardPage() {
   const { theme } = useAdminTheme()
   const [orders, setOrders] = useState<AdminOrderRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [range, setRange] = useState<DateRangeFilter>('7d')
+  const [range, setRange] = useState<DateRangeFilter>('today')
   const [yearSel, setYearSel] = useState(() => new Date().getFullYear())
 
   useEffect(() => {
