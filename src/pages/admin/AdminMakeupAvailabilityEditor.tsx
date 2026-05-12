@@ -268,29 +268,21 @@ export function AdminMakeupAvailabilityEditor() {
   return (
     <div className={['space-y-8', adminFont()].join(' ')}>
       <div>
-        <h2 className={ad(theme, 'text-lg font-bold text-stone-900', 'text-lg font-bold text-white')}>
-          Set hours by calendar (recommended)
-        </h2>
-        <p className={muted + ' mt-2 max-w-3xl text-[14px] leading-relaxed'}>
-          <strong className="font-semibold text-inherit">Step 1:</strong> use the arrows to choose a month.{' '}
-          <strong className="font-semibold text-inherit">Step 2:</strong> tap a future day.{' '}
-          <strong className="font-semibold text-inherit">Step 3:</strong> choose whether that day is off, uses your weekly
-          pattern, or has its own start times — then save.
+        <h2 className={ad(theme, 'text-lg font-bold text-stone-900', 'text-lg font-bold text-white')}>Calendar</h2>
+        <p className={muted + ' mt-2 max-w-2xl text-[13px]'}>
+          Choose month → tap a day → closed, weekly pattern, or custom slots → save.
         </p>
-        <ul className={muted + ' mt-3 list-inside list-disc space-y-1 text-[13px]'}>
-          <li>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="size-2 shrink-0 rounded-full bg-emerald-500" /> Green ring = you picked exact hours for that
-              date.
-            </span>
-          </li>
-          <li>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="size-2 shrink-0 rounded-full bg-rose-500" /> Red = day off (no bookings).
-            </span>
-          </li>
-          <li>Plain = follows the optional weekly rules below (or every hour if you have not set those either).</li>
-        </ul>
+        <p className={muted + ' mt-2 text-[12px]'}>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+            Green: custom hours.
+          </span>{' '}
+          <span className="inline-flex items-center gap-1.5">
+            <span className="size-2 shrink-0 rounded-full bg-rose-500" aria-hidden />
+            Red: closed.
+          </span>{' '}
+          No dot: uses weekly rules below (or all slots if none set).
+        </p>
       </div>
 
       {msg ? (
@@ -349,7 +341,7 @@ export function AdminMakeupAvailabilityEditor() {
 
         <div className={surface}>
           {!selectedIso ? (
-            <p className={muted + ' text-[14px] leading-relaxed'}>Tap a date on the calendar to set or clear hours for that day.</p>
+            <p className={muted + ' text-[13px]'}>Select a date on the calendar.</p>
           ) : (
             <>
               <p className={muted + ' text-[11px] font-bold uppercase tracking-wide'}>Selected date</p>
@@ -358,7 +350,7 @@ export function AdminMakeupAvailabilityEditor() {
               </p>
 
               <fieldset className="mt-5 space-y-3">
-                <legend className={muted + ' mb-2 text-[11px] font-bold uppercase tracking-wide'}>How should this day work?</legend>
+                <legend className={muted + ' mb-2 text-[11px] font-bold uppercase tracking-wide'}>This day</legend>
                 <label
                   className={
                     'flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 ' +
@@ -374,11 +366,10 @@ export function AdminMakeupAvailabilityEditor() {
                   />
                   <span>
                     <span className={ad(theme, 'block text-[13px] font-semibold text-stone-900', 'block text-[13px] font-semibold text-white')}>
-                      Same as my weekly pattern
+                      Weekly pattern
                     </span>
-                    <span className={muted + ' mt-0.5 block text-[12px] leading-relaxed'}>
-                      Removes a special rule for this date. Clients see whatever you set under &quot;Weekly repeat&quot; for
-                      that weekday — or every hour if you have no weekly rules.
+                    <span className={muted + ' mt-0.5 block text-[12px]'}>
+                      Clears this date. Uses that weekday&apos;s weekly rule, or all slots if none.
                     </span>
                   </span>
                 </label>
@@ -397,11 +388,9 @@ export function AdminMakeupAvailabilityEditor() {
                   />
                   <span>
                     <span className={ad(theme, 'block text-[13px] font-semibold text-stone-900', 'block text-[13px] font-semibold text-white')}>
-                      Day off — no bookings
+                      Closed
                     </span>
-                    <span className={muted + ' mt-0.5 block text-[12px] leading-relaxed'}>
-                      Clients can still pick this date on the website, but they will not see any time slots.
-                    </span>
+                    <span className={muted + ' mt-0.5 block text-[12px]'}>No time slots that day.</span>
                   </span>
                 </label>
                 <label
@@ -419,18 +408,16 @@ export function AdminMakeupAvailabilityEditor() {
                   />
                   <span>
                     <span className={ad(theme, 'block text-[13px] font-semibold text-stone-900', 'block text-[13px] font-semibold text-white')}>
-                      Choose exact start times for this date only
+                      Custom times
                     </span>
-                    <span className={muted + ' mt-0.5 block text-[12px] leading-relaxed'}>
-                      Tap the hours below, then save. Only those times appear after the client picks this day.
-                    </span>
+                    <span className={muted + ' mt-0.5 block text-[12px]'}>Choose slots below, then save.</span>
                   </span>
                 </label>
               </fieldset>
 
               {panelMode === 'custom' ? (
                 <div className="mt-4">
-                  <p className={muted + ' mb-2 text-[11px] font-bold uppercase tracking-wide'}>Times open on this date</p>
+                  <p className={muted + ' mb-2 text-[11px] font-bold uppercase tracking-wide'}>Slots this date</p>
                   <div className="flex flex-wrap gap-2">
                     {CANONICAL_MAKEUP_TIME_LABELS.map((t) => {
                       const on = draftSlots.has(t)
@@ -480,12 +467,11 @@ export function AdminMakeupAvailabilityEditor() {
         >
           <span className="inline-flex items-center gap-2">
             <span className="material-symbols-outlined text-[20px] transition-transform group-open:rotate-90">chevron_right</span>
-            Optional: weekly repeat (same times every Monday, etc.)
+            Optional: weekly repeat
           </span>
         </summary>
-        <p className={muted + ' mt-3 max-w-3xl text-[13px] leading-relaxed'}>
-          Use this if many days share the same pattern. It does <em>not</em> pick specific calendar dates — for a one-off
-          change (public holiday, late start), use the calendar above instead.
+        <p className={muted + ' mt-3 max-w-2xl text-[12px]'}>
+          Same start time on selected weekdays. One-off changes: use the calendar above.
         </p>
 
         <div className="mt-5 flex flex-wrap gap-2">

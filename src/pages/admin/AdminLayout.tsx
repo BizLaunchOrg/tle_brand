@@ -185,6 +185,21 @@ function AdminLayoutInner() {
     }
   }
 
+  /** PWA “Add to Home Screen” uses manifest start_url — point merchants at /admin while they are in admin. */
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const link = document.getElementById('tle-web-manifest') as HTMLLinkElement | null
+    if (!link) return
+    const raw = import.meta.env.BASE_URL || '/'
+    const prefix = raw.endsWith('/') ? raw : `${raw}/`
+    const storeManifest = `${prefix}manifest.webmanifest`.replace(/([^:]\/)\/+/g, '$1')
+    const adminManifest = `${prefix}manifest-admin.webmanifest`.replace(/([^:]\/)\/+/g, '$1')
+    link.setAttribute('href', adminManifest)
+    return () => {
+      link.setAttribute('href', storeManifest)
+    }
+  }, [])
+
   useEffect(() => {
     ensureAdminOrdersSeenBaseline()
     ensureAdminMakeupBookingsSeenBaseline()

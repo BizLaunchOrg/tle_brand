@@ -5,7 +5,9 @@ import {
   cartLineKey,
   getDisplayPrice,
   getGalleryUrls,
+  parseProductPriceNgn,
   productDescriptionPlainText,
+  productSalePill,
 } from '../../data/products.ts'
 import { useShopProducts } from '../../context/ShopProductsContext.tsx'
 
@@ -56,6 +58,11 @@ export function ProductDetailPage() {
     () => (product ? productDescriptionPlainText(product.description) : ''),
     [product],
   )
+
+  const saleLabel = product ? productSalePill(product) : ''
+  const displayN = useMemo(() => parseProductPriceNgn(displayPrice), [displayPrice])
+  const compareN = product ? parseProductPriceNgn(product.compareAt) : 0
+  const showCompareAt = Boolean(saleLabel && product?.compareAt?.trim() && compareN > displayN && displayN > 0)
 
   const selectedVariant =
     product && colorId ? product.colorOptions?.find((c) => c.id === colorId) : undefined
@@ -160,17 +167,19 @@ export function ProductDetailPage() {
                   </div>
                 </>
               ) : null}
-              {product.promo ? (
+              {saleLabel ? (
                 <span
                   className="pointer-events-none absolute top-4 left-4 rounded-lg px-3 py-1 text-[10px] font-bold tracking-wide text-white uppercase sm:top-5 sm:left-5 sm:text-[11px]"
                   style={{ backgroundColor: ORANGE }}
                 >
-                  {product.promo}
+                  {saleLabel}
                 </span>
               ) : null}
-              <span className="pointer-events-none absolute top-4 right-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold tracking-wide text-white uppercase backdrop-blur-sm sm:text-[11px]">
-                {product.badge}
-              </span>
+              {product.badge?.trim() ? (
+                <span className="pointer-events-none absolute top-4 right-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold tracking-wide text-white uppercase backdrop-blur-sm sm:text-[11px]">
+                  {product.badge.trim()}
+                </span>
+              ) : null}
             </div>
 
             {images.length > 1 ? (
@@ -210,8 +219,13 @@ export function ProductDetailPage() {
               {product.name}
             </h1>
 
-            <p className="mt-4 font-sans text-[clamp(1.5rem,3vw,2rem)] font-bold tabular-nums text-emerald-700">
-              {displayPrice}
+            <p className="mt-4 flex flex-col gap-1">
+              {showCompareAt ? (
+                <span className="font-sans text-lg font-semibold tabular-nums text-tle-muted line-through decoration-tle-muted/80">
+                  {product.compareAt}
+                </span>
+              ) : null}
+              <span className="font-sans text-[clamp(1.5rem,3vw,2rem)] font-bold tabular-nums text-emerald-700">{displayPrice}</span>
             </p>
 
             {product.tags && product.tags.length > 0 ? (

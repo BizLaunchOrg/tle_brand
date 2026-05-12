@@ -1,16 +1,16 @@
 import type { CatalogProductRow } from './adminCatalog'
 import type { AdminOrderRow } from './adminOrders'
 
-function parsePriceNgn(price: string | undefined): number {
-  return Number(String(price ?? '').replace(/[^\d]/g, '')) || 0
-}
+import type { Product } from '../data/products.ts'
+import { parseProductPriceNgn } from '../data/products.ts'
 
 /** Sum of (unit price × stock) using optional `stock` on each product; stock omitted counts as 0. */
 export function computeInventoryValueNgn(rows: CatalogProductRow[]): number {
   let sum = 0
   for (const r of rows) {
-    const p = r.payload
-    const unit = parsePriceNgn(p.price)
+    const p = r.payload as Product
+    if (p.stockUnlimited === true) continue
+    const unit = parseProductPriceNgn(p.price)
     const stock = typeof p.stock === 'number' && Number.isFinite(p.stock) ? Math.max(0, Math.floor(p.stock)) : 0
     sum += unit * stock
   }
@@ -32,7 +32,11 @@ export function computeSoldUnitsFromOrders(orders: AdminOrderRow[]): number {
   return n
 }
 
-/** Rows with explicit stock ≤ 0 (does not count rows with no stock field). */
+/** Rows with explicit stock ≤ 0 (does not count rows with no stock field). Unlimited stock is never OOS. */
 export function countExplicitOutOfStock(rows: CatalogProductRow[]): number {
-  return rows.filter((r) => typeof r.payload.stock === 'number' && r.payload.stock <= 0).length
+  return rows.filter((r) => {
+    const p = r.payload as Product
+    if (p.stockUnlimited === true) return false
+    return typeof p.stock === 'number' && p.stock <= 0
+  }).length
 }

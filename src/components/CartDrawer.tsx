@@ -53,7 +53,8 @@ export function CartDrawer() {
                       {item.name}
                     </Link>
                     <div className="mb-1 text-[10.5px] tracking-wide text-tle-muted uppercase">
-                      {item.cat} · {item.badge}
+                      {item.cat}
+                      {item.badge?.trim() ? ` · ${item.badge.trim()}` : ''}
                       {item.variantLabel ? ` · ${item.variantLabel}` : ''}
                     </div>
                     <div className="flex items-center gap-2.5">

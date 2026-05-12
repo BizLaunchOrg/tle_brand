@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ProductCard } from '../../components/ProductCard.tsx'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
-import { defaultVariantSelection, type ProductGender } from '../../data/products.ts'
+import { defaultVariantSelection, productMatchesGender, type ProductGender } from '../../data/products.ts'
 import { useShopProducts } from '../../context/ShopProductsContext.tsx'
 
 type TypeFilter = 'all' | ProductGender
@@ -11,6 +11,7 @@ const FILTER_TYPES: { label: string; value: TypeFilter }[] = [
   { label: 'All', value: 'all' },
   { label: 'For Her', value: 'her' },
   { label: 'For Him', value: 'him' },
+  { label: 'Unisex', value: 'unisex' },
 ]
 
 /** Twelve items = full rows for both 3-wide and 4-wide grids */
@@ -35,10 +36,10 @@ export function ShopPage() {
 
   const visibleProducts = useMemo(() => {
     return products.filter((p) => {
-      if (typeFilter !== 'all' && p.gender !== typeFilter) return false
+      if (typeFilter !== 'all' && !productMatchesGender(p, typeFilter)) return false
       if (categoryFilter !== 'all' && p.cat !== categoryFilter) return false
       if (!q) return true
-      const hay = `${p.name} ${p.cat} ${p.badge} ${p.alt}`.toLowerCase()
+      const hay = `${p.name} ${p.cat} ${p.badge ?? ''} ${p.alt}`.toLowerCase()
       return hay.includes(q)
     })
   }, [categoryFilter, products, q, typeFilter])
@@ -148,7 +149,15 @@ export function ShopPage() {
         {visibleProducts.length === 0 ? (
           <div className="rounded-[20px] border border-black/8 bg-white px-6 py-14 text-center">
             <p className="font-sans text-lg font-medium text-tle-ink">No products match your filters.</p>
-            <p className="mt-2 text-sm text-tle-muted">Try another type/category or clear search.</p>
+            {typeFilter === 'unisex' ? (
+              <p className="mt-2 text-sm text-tle-muted">
+                Nothing is listed under Unisex yet. You can still browse{' '}
+                <strong className="font-semibold text-tle-ink">For Her</strong>,{' '}
+                <strong className="font-semibold text-tle-ink">For Him</strong>, or all products together.
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-tle-muted">Try another type/category or clear search.</p>
+            )}
           </div>
         ) : (
           <>

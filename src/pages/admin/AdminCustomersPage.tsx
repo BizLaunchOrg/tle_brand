@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchOrdersForAdmin } from '../../lib/adminOrders.ts'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import { buyerRollupFromOrders, uniqueBuyerCount } from '../../lib/adminOrderAnalytics.ts'
+import { OrderRelativeTime } from './OrderRelativeTime.tsx'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { ad, adminFont } from './adminUi.ts'
 
@@ -66,9 +67,7 @@ export function AdminCustomersPage() {
     <div className={['mx-auto max-w-6xl space-y-6', adminFont()].join(' ')}>
       <div>
         <h1 className={heading}>Customers</h1>
-        <p className={muted + ' mt-2 max-w-2xl text-[14px] leading-relaxed'}>
-          Unique buyers are counted by checkout email. This list is built from the same recent orders feed as the rest of admin (newest first, up to 500 orders).
-        </p>
+        <p className={muted + ' mt-2 max-w-md text-[13px]'}>One row per email. From your latest 500 orders.</p>
       </div>
 
       <div className={surface + ' p-5 sm:p-6'}>
@@ -123,12 +122,8 @@ export function AdminCustomersPage() {
                       {r.emailDisplay}
                     </td>
                     <td className={td + ' text-right tabular-nums ' + muted}>{r.orderCount}</td>
-                    <td className={td + ' whitespace-nowrap tabular-nums ' + muted}>
-                      {new Date(r.lastOrderAt).toLocaleString(undefined, {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
+                    <td className={td + ' max-w-[140px]'}>
+                      <OrderRelativeTime iso={r.lastOrderAt} theme={theme} />
                     </td>
                     <td className={td + ' text-right font-semibold tabular-nums ' + ad(theme, 'text-emerald-800', 'text-emerald-300')}>
                       {formatNaira(r.lifetimeSpendNgn)}

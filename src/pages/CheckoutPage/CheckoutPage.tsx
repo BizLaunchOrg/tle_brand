@@ -172,7 +172,7 @@ export function CheckoutPage() {
           quantity: item.quantity,
           image,
           category: item.cat,
-          badge: item.badge,
+          badge: typeof item.badge === 'string' && item.badge.trim() ? item.badge.trim() : undefined,
         }
       })
 

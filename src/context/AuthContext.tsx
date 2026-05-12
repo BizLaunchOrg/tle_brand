@@ -82,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminResolved, setAdminResolved] = useState(false)
   const adminSeqRef = useRef(0)
+  const lastCheckedUserIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -98,11 +99,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const seq = ++adminSeqRef.current
       if (!su) {
         if (adminSeqRef.current !== seq) return
+        lastCheckedUserIdRef.current = null
         setIsAdmin(false)
         setAdminResolved(true)
         return
       }
-      setAdminResolved(false)
+      const prevId = lastCheckedUserIdRef.current
+      const isNewUser = prevId !== su.id
+      lastCheckedUserIdRef.current = su.id
+      if (isNewUser) setAdminResolved(false)
       const ok = await resolveAdminAccess(su)
       if (adminSeqRef.current !== seq) return
       setIsAdmin(ok)
@@ -201,6 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isSupabaseConfigured()) {
       await getSupabase().auth.signOut()
     }
+    lastCheckedUserIdRef.current = null
     setUser(null)
     setIsAdmin(false)
     setAdminResolved(true)

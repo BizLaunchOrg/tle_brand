@@ -49,7 +49,8 @@ export function FavoritesDrawer() {
                     {item.name}
                   </Link>
                   <div className="mb-2 text-[10.5px] tracking-wide text-tle-muted uppercase">
-                    {item.cat} · {item.badge}
+                    {item.cat}
+                    {item.badge?.trim() ? ` · ${item.badge.trim()}` : ''}
                   </div>
                   <div className="font-sans text-base font-semibold text-tle-gold">{item.price}</div>
                   <div className="mt-3 flex items-center gap-2">

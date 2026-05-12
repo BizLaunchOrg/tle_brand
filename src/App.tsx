@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ShopProductsProvider } from './context/ShopProductsContext.tsx'
 import { MainLayout } from './components/MainLayout.tsx'
@@ -47,6 +47,7 @@ function App() {
             <Route path="orders" element={<AdminOrdersPage />} />
             <Route path="orders/:orderId" element={<AdminOrderDetailPage />} />
             <Route path="products" element={<AdminProductsPage />} />
+            <Route path="categories" element={<Navigate to="/admin/products" replace />} />
             <Route path="customers" element={<AdminCustomersPage />} />
             <Route path="makeup-bookings" element={<AdminMakeupBookingsPage />} />
             <Route path="makeup-hours" element={<AdminMakeupHoursPage />} />
