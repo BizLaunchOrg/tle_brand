@@ -48,14 +48,28 @@ export type Product = {
 
 /**
  * Parse ₦-style amounts to integer naira.
- * Avoid stripping `.` then concatenating digits (e.g. "6000.00" → 600000).
+ * - "6000.00" / "6,000.00" → use Number (do not strip `.` with digits-only).
+ * - "6000,00" / "6.000,00" (decimal comma) → treat last `,xx` as decimals, not thousands.
  */
 export function parseProductPriceNgn(price: string | number | undefined): number {
   if (price === null || price === undefined) return 0
   if (typeof price === 'number' && Number.isFinite(price)) return Math.round(price)
   let s = String(price).trim()
   if (!s) return 0
-  s = s.replace(/₦/gi, '').replace(/\s/g, '').replace(/,/g, '')
+  s = s.replace(/₦/gi, '').replace(/\s/g, '')
+
+  const lastComma = s.lastIndexOf(',')
+  if (lastComma !== -1) {
+    const tail = s.slice(lastComma + 1)
+    if (/^\d{1,2}$/.test(tail)) {
+      const head = s.slice(0, lastComma)
+      const headNorm = head.includes('.') ? head.replace(/\./g, '').replace(/,/g, '') : head.replace(/,/g, '')
+      s = `${headNorm}.${tail}`
+    } else {
+      s = s.replace(/,/g, '')
+    }
+  }
+
   const n = Number(s)
   return Number.isFinite(n) ? Math.round(n) : 0
 }
