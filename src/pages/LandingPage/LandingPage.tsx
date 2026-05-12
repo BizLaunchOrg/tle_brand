@@ -8,7 +8,6 @@ import {
   MAKEUP_HIGHLIGHT_TAGS,
   PHOTOSHOOT_PACKAGES,
   bookableServiceFromPhotoshootLine,
-  isPhotoshootService,
 } from '../../data/bookingServices.ts'
 import { formatBookingDateLabel } from '../../lib/makeupBookingDates.ts'
 import { insertMakeupBooking } from '../../lib/makeupBookings.ts'
@@ -107,6 +106,7 @@ export function LandingPage() {
   const [bookingSubmitting, setBookingSubmitting] = useState(false)
   const [bookingError, setBookingError] = useState<string | null>(null)
   const [availabilityRules, setAvailabilityRules] = useState<MakeupAvailabilityRuleRow[]>([])
+  const [bookingStep1Focus, setBookingStep1Focus] = useState<'all' | 'photoshoot'>('all')
   const [availabilityCalendar, setAvailabilityCalendar] = useState<MakeupCalendarDay[]>([])
 
   useEffect(() => {
@@ -123,6 +123,25 @@ export function LandingPage() {
       document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
   }, [location.hash, location.pathname])
+
+  const bookingIntent = searchParams.get('booking')
+  useEffect(() => {
+    if (bookingIntent !== 'photoshoot') return
+    setBookingStep1Focus('photoshoot')
+    setFormStep(1)
+    setBookingError(null)
+    requestAnimationFrame(() => {
+      document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('booking')
+        return next
+      },
+      { replace: true },
+    )
+  }, [bookingIntent, setSearchParams])
 
   useEffect(() => {
     const root = wrapRef.current
@@ -167,6 +186,15 @@ export function LandingPage() {
     },
     [scrollToBooking],
   )
+
+  const openHeroPhotoshootBooking = useCallback(() => {
+    setBookingStep1Focus('photoshoot')
+    setFormStep(1)
+    setBookingError(null)
+    requestAnimationFrame(() => {
+      document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [])
 
   const visibleProducts = useMemo(() => {
     return products.filter((p) => {
@@ -285,33 +313,23 @@ export function LandingPage() {
             <div className="mb-8 flex items-center gap-3.5 max-lg:justify-center">
               <div className="h-px w-9 bg-tle-gold" />
               <span className="text-[10px] font-semibold tracking-[0.25em] text-tle-gold uppercase">
-                Beauty &amp; Aesthetics · Lagos
+              Tobilicious · by Lady Emma
+                 
               </span>
             </div>
 
-            <h1 className="mb-8 w-full font-sans text-[clamp(2.65rem,9.5vw,6.625rem)] leading-none font-semibold tracking-tight max-lg:text-center lg:text-[clamp(3rem,7.2vw,6.625rem)]">
-              <span className="whitespace-nowrap lg:hidden">
-                <span className="text-tle-ink">Define</span>{' '}
-                <span className="font-medium italic text-tle-pink">Beauty</span>
+            <h1 className="mb-8 w-full max-w-[min(100%,20ch)] font-sans text-[clamp(2.35rem,7.5vw,5.5rem)] font-semibold leading-[1.02] tracking-tight max-lg:mx-auto max-lg:text-center lg:max-w-none lg:text-[clamp(2.75rem,6.5vw,5.75rem)]">
+              <span className="block uppercase tracking-[0.14em] text-tle-ink max-lg:tracking-[0.1em] sm:tracking-[0.18em]">
+                Show up
               </span>
-              <span className="hidden text-tle-ink lg:block">Define</span>
-              <span className="hidden font-medium italic text-tle-pink lg:block">Beauty</span>
-              <span
-                className="mt-2 block font-bold text-transparent lg:mt-0"
-                style={{ WebkitTextStroke: '1.8px #181818' }}
-              >
-                Boldly.
+              <span className="mt-2 block uppercase tracking-[0.16em] font-medium italic text-tle-pink sm:mt-2.5 sm:tracking-[0.2em]">
+                Majestically
               </span>
             </h1>
 
-            <p className="mb-11 hidden max-w-[min(100%,42rem)] text-[17px] font-normal leading-[1.72] text-black lg:block dark:text-black">
-              Premium aesthetics for everyone—curated products and professional makeup for him and her, with strong
-              standards for quality, performance, and skin compatibility. Our artists tailor every session to you, keeping
-              your natural features and personal style at the center of every look we create.
-            </p>
-            <p className="mb-11 max-w-[min(100%,20rem)] text-[13px] font-normal leading-[1.6] text-black sm:max-w-[22rem] sm:text-[14px] sm:leading-[1.65] lg:hidden dark:text-black">
-              Curated beauty and pro makeup in Lagos—for him and her—with sessions built around your look and quality you
-              can trust.
+            <p className="mb-11 max-w-[min(100%,42rem)] text-[13px] font-normal leading-[1.65] text-black sm:text-[15px] sm:leading-[1.7] lg:text-[17px] lg:leading-[1.72] max-lg:mx-auto max-lg:text-center lg:mx-0 lg:text-left dark:text-black">
+              From curated fashion finds and styles to flawless glam, TLE is designed for people who love beauty,
+              confidence, and intentional style.
             </p>
 
             <div className="mb-12 flex max-lg:justify-center flex-wrap items-center justify-start gap-3.5">
@@ -326,7 +344,7 @@ export function LandingPage() {
                 to="/#booking-form"
                 className="inline-flex items-center gap-2.5 rounded-full border-[1.5px] border-tle-pink/70 bg-white px-9 py-[17px] font-sans text-xs font-semibold tracking-[0.12em] text-tle-pink uppercase shadow-[0_2px_12px_rgba(196,105,141,0.12)] no-underline transition-all hover:-translate-y-0.5 hover:border-tle-deep hover:bg-tle-blush hover:text-tle-deep hover:shadow-[0_8px_24px_rgba(196,105,141,0.22)]"
               >
-                Book Makeup
+                Book a Makeup Session
                 <span className="material-symbols-outlined text-lg leading-none">calendar_month</span>
               </Link>
             </div>
@@ -334,20 +352,20 @@ export function LandingPage() {
             <div className="mb-8 flex max-lg:justify-center items-center gap-3.5">
               <div className="flex">
                 {[
-                  'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=68&h=68&fit=crop&crop=face',
-                  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=68&h=68&fit=crop&crop=face',
-                  'https://images.unsplash.com/photo-1607746882042-944635dfe10e?w=68&h=68&fit=crop&crop=face',
-                ].map((src, i) => (
+                  { src: '/Imagereviews4.jpeg', alt: 'Client makeup look review' },
+                  { src: '/Imagereviews5.jpeg', alt: 'Client makeup look review' },
+                  { src: '/Imagereviews6.jpeg', alt: 'Client makeup look review' },
+                ].map((item, i) => (
                   <img
-                    key={src}
-                    src={src}
-                    alt=""
+                    key={item.src}
+                    src={item.src}
+                    alt={item.alt}
                     className={`size-[34px] rounded-full border-[2.5px] border-white object-cover shadow-md ${i > 0 ? '-ml-2.5' : ''}`}
                   />
                 ))}
               </div>
               <div className="text-left leading-snug max-lg:text-center">
-                <strong className="block text-[13px] font-semibold text-tle-ink">2,400+ happy clients</strong>
+                <strong className="block text-[13px] font-semibold text-tle-ink">100+ happy clients</strong>
                 <span className="text-[11.5px] text-tle-muted">
                   <span className="text-[#E8A23C]">★★★★★</span> &nbsp;4.9 across all services
                 </span>
@@ -368,21 +386,28 @@ export function LandingPage() {
               alt="TLE-BRAND Beauty Model"
               className="absolute inset-0 size-full object-cover object-top"
             />
-            <div className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-r from-white/[0.08] to-transparent via-transparent" />
-            <div className="absolute top-8 left-6 z-10 rounded-full bg-tle-charcoal px-[18px] py-2 text-[9px] font-semibold tracking-[0.2em] text-white uppercase sm:left-7 lg:top-10 lg:left-8">
-              New · 2025 Collection
-            </div>
-            <div className="pointer-events-none absolute bottom-8 left-1/2 z-20 w-[min(100%,calc(100%-2rem))] max-w-[300px] -translate-x-1/2 sm:bottom-10 sm:left-auto sm:right-8 sm:translate-x-0 sm:max-w-[280px] lg:bottom-12 lg:right-10 lg:max-w-[300px] xl:bottom-14 xl:right-12 xl:max-w-[320px]">
-              <div className="animate-tle-slot-card rounded-[22px] border border-white/40 bg-white/12 p-5 shadow-[0_24px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl ring-1 ring-white/25 xl:p-6">
-                <div className="mb-2 text-[9.5px] font-semibold tracking-[0.22em] text-amber-100 uppercase drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)] sm:text-[10px] lg:mb-2.5">
-                  Next slot open
-                </div>
-                <div className="mb-1.5 font-sans text-[clamp(1.75rem,4.2vw,2.35rem)] font-semibold leading-none text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.65)] lg:mb-2">
-                  Today
-                </div>
-                <div className="text-[11.5px] leading-snug text-white/95 drop-shadow-[0_1px_5px_rgba(0,0,0,0.7)] lg:text-[13px]">
-                  3 times available · from ₦25,000
-                </div>
+            <div className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-t from-black/55 via-black/15 to-transparent lg:bg-gradient-to-r lg:from-white/[0.12] lg:via-transparent lg:to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[3] h-32 bg-gradient-to-t from-black/40 to-transparent lg:hidden" aria-hidden />
+
+            <div className="absolute inset-x-4 bottom-5 z-20 max-w-md pointer-events-none sm:inset-x-auto sm:right-6 sm:bottom-8 sm:max-w-sm lg:right-10 lg:bottom-12 lg:max-w-[24rem]">
+              <div className="pointer-events-auto rounded-[26px] border border-white/55 bg-white/[0.97] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] backdrop-blur-md sm:p-6">
+                <p className="inline-flex rounded-full border border-tle-gold/35 bg-tle-gold/10 px-3 py-1 font-sans text-[9px] font-bold tracking-[0.2em] text-tle-gold uppercase">
+                  Exclusive offer
+                </p>
+                <h3 className="mt-3 font-sans text-[clamp(1.05rem,3.8vw,1.35rem)] font-semibold leading-snug text-tle-ink">
+                  Book a makeup session and enjoy an exclusive studio photoshoot experience.
+                </h3>
+                <p className="mt-2 text-[12.5px] leading-relaxed text-tle-muted">
+                  Tap below to choose your photoshoot bundle (outfits &amp; edited pictures), then pick your date and time.
+                </p>
+                <button
+                  type="button"
+                  onClick={openHeroPhotoshootBooking}
+                  className="mt-4 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full border-0 bg-tle-charcoal px-5 py-3.5 font-sans text-[11px] font-bold tracking-[0.14em] text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-pink hover:shadow-[0_12px_28px_rgba(196,105,141,0.35)] sm:w-auto sm:px-7"
+                >
+                  Book makeup + photoshoot
+                  <span className="material-symbols-outlined text-[18px] leading-none">calendar_month</span>
+                </button>
               </div>
             </div>
           </div>
@@ -519,7 +544,7 @@ export function LandingPage() {
                 <p className="mb-9 max-w-[400px] text-[14.5px] font-light leading-[1.85] text-white/50">
                   Studio session at <span className="text-white/75">₦35,000</span>. Home service from{' '}
                   <span className="text-white/75">₦50,000</span> and bridal from <span className="text-white/75">₦100,000</span> — both
-                  depend on location. Scroll down to book, including our photoshoot bundles.
+                  depend on location. Use the hero offer for photoshoot bundles, or book any option below.
                 </p>
                 <div className="mb-10 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                   {MAKEUP_HIGHLIGHT_TAGS.map((name) => (
@@ -566,7 +591,7 @@ export function LandingPage() {
               className="absolute -right-8 -bottom-11 w-[44%] rounded-full border-[6px] border-tle-cream object-cover shadow-xl max-md:hidden"
             />
             <div className="absolute top-8 -left-8 rounded-[18px] bg-tle-pink px-6 py-5 text-white shadow-[0_20px_44px_rgba(196,105,141,0.32)] max-md:hidden">
-              <div className="font-sans text-[44px] font-bold leading-none">2.4K</div>
+              <div className="font-sans text-[44px] font-bold leading-none">100+</div>
               <div className="text-[11px] font-medium tracking-wide opacity-80">Happy Clients</div>
             </div>
           </div>
@@ -614,75 +639,13 @@ export function LandingPage() {
         {!showSuccess && (
           <section className={`${revealCls} px-4 py-20 md:px-16`} id="booking-form">
             <div className="mx-auto max-w-[800px]">
-              <div
-                id="photoshoot-promo"
-                className="relative mb-12 overflow-hidden rounded-[28px] border-2 border-tle-gold/35 bg-tle-charcoal px-5 py-7 shadow-[0_20px_56px_rgba(14,14,14,0.18)] sm:px-8 sm:py-8"
-              >
-                <div className="pointer-events-none absolute -right-16 top-0 h-48 w-48 rounded-full bg-tle-pink/15 blur-3xl" aria-hidden />
-                <div className="pointer-events-none absolute -left-10 bottom-0 h-36 w-36 rounded-full bg-tle-gold/10 blur-3xl" aria-hidden />
-                <div className="relative z-[1] flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
-                  <div className="min-w-0 flex-1">
-                    <p className="inline-flex rounded-full border border-tle-gold/30 bg-tle-gold/10 px-3 py-1 font-sans text-[9px] font-bold tracking-[0.2em] text-tle-gold uppercase">
-                      Featured add-on
-                    </p>
-                    <h3 className="mt-3 font-sans text-[clamp(1.35rem,3.5vw,1.85rem)] font-semibold leading-tight text-white">
-                      Photoshoot packages — outfits &amp; edited pictures
-                    </h3>
-                    <p className="mt-2 max-w-md text-[13px] leading-relaxed text-white/55">
-                      Tap a package to go to booking — you&apos;ll pick your day on the calendar, then your time.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (selectedService.name && isPhotoshootService(selectedService.name)) goToStep(2)
-                      else goToStep(1)
-                    }}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-tle-gold px-7 py-3.5 font-sans text-[11px] font-bold tracking-[0.14em] text-tle-charcoal uppercase shadow-lg shadow-black/20 transition-all hover:-translate-y-0.5 hover:bg-white"
-                  >
-                    Book now
-                    <span className="material-symbols-outlined text-lg">calendar_month</span>
-                  </button>
-                </div>
-                <div className="relative z-[1] mt-7 grid gap-3 sm:grid-cols-3">
-                  {PHOTOSHOOT_PACKAGES.map((p) => {
-                    const sel = selectedService.name === bookableServiceFromPhotoshootLine(p.line)?.name
-                    return (
-                      <div
-                        key={p.line}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => pickPhotoshootPackage(p.line)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            pickPhotoshootPackage(p.line)
-                          }
-                        }}
-                        className={
-                          'cursor-pointer rounded-2xl border px-4 py-3.5 text-center outline-none transition-all sm:text-left ' +
-                          (sel
-                            ? 'border-tle-gold bg-tle-gold/20 ring-2 ring-tle-gold/50'
-                            : 'border-white/12 bg-white/[0.07] hover:border-tle-gold/40 hover:bg-white/[0.1]')
-                        }
-                      >
-                        <p className="text-[12px] font-semibold leading-snug text-white/95 sm:text-[12.5px]">{p.line}</p>
-                        <p className="mt-1.5 font-sans text-base font-semibold text-tle-gold sm:text-lg">{p.price}</p>
-                        <p className="mt-2 text-[10px] font-semibold tracking-wide text-tle-gold/90 uppercase">Select &amp; continue</p>
-                      </div>
-                    )
-                  })}
-                </div>
-                <p className="relative z-[1] mt-4 text-center text-[10.5px] font-medium tracking-wide text-white/45 sm:text-left">
-                  Terms and conditions apply.
-                </p>
-              </div>
-
               <h2 className="mb-3 text-center font-sans text-[clamp(2.25rem,4vw,3.25rem)] font-semibold text-tle-ink">
                 Schedule Your <em className="font-sans font-medium italic text-tle-pink">Session</em>
               </h2>
               <p className="mb-14 text-center text-[14.5px] font-light text-tle-muted">
-                Pick your service, pick the day and time you want, tell us about you — and you&apos;re set.
+                {bookingStep1Focus === 'photoshoot'
+                  ? 'Choose your photoshoot bundle (makeup session included), then pick your date and time.'
+                  : "Pick your service, pick the day and time you want, tell us about you — and you're set."}
               </p>
 
               {bookingError ? (
@@ -727,58 +690,121 @@ export function LandingPage() {
               </div>
 
               <div className={formStep === 1 ? 'block' : 'hidden'}>
-                <div className="mb-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {BOOKABLE_SERVICES.map((s) => {
-                    const sel = selectedService.name === s.name
-                    return (
-                      <div
-                        key={s.name}
-                        role="button"
-                        tabIndex={0}
-                        className={`relative cursor-pointer overflow-hidden rounded-[18px] border-[1.5px] p-5 transition-all ${
-                          sel ? 'border-tle-pink bg-tle-blush' : 'border-black/10 hover:border-tle-pink/40'
-                        }`}
-                        onClick={() => setSelectedService({ name: s.name, price: s.price })}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            setSelectedService({ name: s.name, price: s.price })
-                          }
+                {bookingStep1Focus === 'photoshoot' ? (
+                  <>
+                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <p className="text-center text-[13px] leading-relaxed text-tle-muted sm:text-left">
+                        Studio photoshoot packages with edited pictures — your makeup session is part of this offer. Tap a
+                        card to go straight to date &amp; time.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setBookingStep1Focus('all')}
+                        className="shrink-0 self-center rounded-full border border-black/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-tle-muted transition-colors hover:border-tle-pink hover:text-tle-pink sm:self-start"
+                      >
+                        Studio / home / bridal instead
+                      </button>
+                    </div>
+                    <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {PHOTOSHOOT_PACKAGES.map((p) => {
+                        const s = bookableServiceFromPhotoshootLine(p.line)
+                        if (!s) return null
+                        return (
+                          <div
+                            key={p.line}
+                            role="button"
+                            tabIndex={0}
+                            className="relative cursor-pointer overflow-hidden rounded-[18px] border-[1.5px] border-tle-gold/35 bg-gradient-to-b from-tle-blush/60 to-white p-5 text-left transition-all hover:border-tle-gold hover:shadow-md"
+                            onClick={() => pickPhotoshootPackage(p.line)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                pickPhotoshootPackage(p.line)
+                              }
+                            }}
+                          >
+                            <div className="mb-3 flex size-[42px] items-center justify-center rounded-xl bg-white text-tle-gold ring-1 ring-tle-gold/25">
+                              <span className="material-symbols-outlined text-2xl">{s.icon}</span>
+                            </div>
+                            <div className="mb-1 text-[13.5px] font-semibold leading-snug text-tle-ink">{p.line}</div>
+                            <div className="font-sans text-[17px] font-semibold text-tle-gold">{p.price}</div>
+                            <p className="mt-2 text-[11.5px] leading-snug text-tle-muted">{s.desc}</p>
+                            <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-tle-pink">Continue to date &amp; time →</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="mb-6 text-center text-[13px] text-tle-muted">
+                      Want the{' '}
+                      <button
+                        type="button"
+                        className="font-semibold text-tle-pink underline decoration-tle-pink/40 underline-offset-2 hover:decoration-tle-pink"
+                        onClick={() => {
+                          setBookingStep1Focus('photoshoot')
+                          setBookingError(null)
                         }}
                       >
-                        <span
-                          className={`absolute top-3.5 right-3.5 flex size-5 items-center justify-center rounded-full bg-tle-pink ${sel ? 'flex' : 'hidden'}`}
-                        >
-                          <span className="material-symbols-outlined text-sm text-white">check</span>
-                        </span>
-                        <div
-                          className={`mb-3.5 flex size-[42px] items-center justify-center rounded-xl text-tle-pink ${sel ? 'bg-white' : 'bg-tle-blush'}`}
-                        >
-                          <span className="material-symbols-outlined text-2xl">{s.icon}</span>
-                        </div>
-                        <div className="mb-1 text-[13.5px] font-semibold leading-snug text-tle-ink">{s.name}</div>
-                        <div className="font-sans text-[17px] font-semibold text-tle-gold">{s.price}</div>
-                        <p className="mt-2 text-[11.5px] leading-snug text-tle-muted">{s.desc}</p>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="mt-10 flex justify-end">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-2.5 rounded-full bg-tle-charcoal px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-pink disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={() => {
-                      if (!selectedService.name) {
-                        setBookingError('Please select a service to continue.')
-                        return
-                      }
-                      goToStep(2)
-                    }}
-                  >
-                    Continue
-                    <span className="material-symbols-outlined text-lg">arrow_forward</span>
-                  </button>
-                </div>
+                        photoshoot bundles
+                      </button>
+                      ? (Makeup session included.)
+                    </p>
+                    <div className="mb-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {BOOKABLE_SERVICES.filter((s) => s.duration !== 'Photoshoot').map((s) => {
+                        const sel = selectedService.name === s.name
+                        return (
+                          <div
+                            key={s.name}
+                            role="button"
+                            tabIndex={0}
+                            className={`relative cursor-pointer overflow-hidden rounded-[18px] border-[1.5px] p-5 transition-all ${
+                              sel ? 'border-tle-pink bg-tle-blush' : 'border-black/10 hover:border-tle-pink/40'
+                            }`}
+                            onClick={() => setSelectedService({ name: s.name, price: s.price })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                setSelectedService({ name: s.name, price: s.price })
+                              }
+                            }}
+                          >
+                            <span
+                              className={`absolute top-3.5 right-3.5 flex size-5 items-center justify-center rounded-full bg-tle-pink ${sel ? 'flex' : 'hidden'}`}
+                            >
+                              <span className="material-symbols-outlined text-sm text-white">check</span>
+                            </span>
+                            <div
+                              className={`mb-3.5 flex size-[42px] items-center justify-center rounded-xl text-tle-pink ${sel ? 'bg-white' : 'bg-tle-blush'}`}
+                            >
+                              <span className="material-symbols-outlined text-2xl">{s.icon}</span>
+                            </div>
+                            <div className="mb-1 text-[13.5px] font-semibold leading-snug text-tle-ink">{s.name}</div>
+                            <div className="font-sans text-[17px] font-semibold text-tle-gold">{s.price}</div>
+                            <p className="mt-2 text-[11.5px] leading-snug text-tle-muted">{s.desc}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="mt-10 flex justify-end">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-2.5 rounded-full bg-tle-charcoal px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-pink disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => {
+                          if (!selectedService.name) {
+                            setBookingError('Please select a service to continue.')
+                            return
+                          }
+                          goToStep(2)
+                        }}
+                      >
+                        Continue
+                        <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className={formStep === 2 ? 'block' : 'hidden'}>
