@@ -101,8 +101,9 @@ export async function updateShopFees(
   }
 
   if (publicAppUrlInput !== undefined) {
-    const normalized = publicAppUrlInput.trim() === '' ? null : normalizeStorePublicUrl(publicAppUrlInput)
-    if (publicAppUrlInput.trim() !== '' && !normalized) {
+    const raw = publicAppUrlInput == null ? '' : publicAppUrlInput.trim()
+    const normalized = raw === '' ? null : normalizeStorePublicUrl(raw)
+    if (raw !== '' && !normalized) {
       return { ok: false, message: 'Public site URL looks invalid. Use your live origin, e.g. https://your-app.vercel.app' }
     }
     patch.public_app_url = normalized
