@@ -20,13 +20,13 @@ import { useShopProducts } from '../../context/ShopProductsContext.tsx'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
 
 const MARQUEE_ITEMS = [
-  'Premium Beauty',
-  'Makeup Sessions',
-  'Him & Her',
-  'Lagos, Nigeria',
-  'Aesthetic Products',
-  'Professional Artists',
-  'Free Delivery Over 100K',
+  'Soft Glam',
+  'Bridal Beauty',
+  'Statement Jewelry',
+  'Fashion Pieces',
+  'Luxury Accessories',
+  'Elevated Style',
+  'Makeup Studio',
 ] as const
 
 const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
@@ -319,7 +319,7 @@ export function LandingPage() {
             </div>
 
             <h1 className="font-heading mb-8 w-full max-w-[min(100%,22ch)] leading-[1.06] max-lg:mx-auto max-lg:text-center lg:max-w-[min(100%,18ch)]">
-              <span className="block text-[clamp(2.1rem,5.2vw,3.35rem)] font-light tracking-[-0.04em] text-tle-ink">
+              <span className="block whitespace-nowrap text-[clamp(2.1rem,5.2vw,3.35rem)] font-medium tracking-[-0.04em] text-tle-ink">
                 Show up
               </span>
               <span className="mt-1.5 block text-[clamp(2.45rem,6.8vw,4.85rem)] font-semibold tracking-[-0.045em] text-tle-pink sm:mt-2">
@@ -328,7 +328,7 @@ export function LandingPage() {
             </h1>
 
             <p className="mb-11 max-w-[min(100%,42rem)] text-[13px] font-normal leading-[1.65] text-black sm:text-[15px] sm:leading-[1.7] lg:text-[17px] lg:leading-[1.72] max-lg:mx-auto max-lg:text-center lg:mx-0 lg:text-left dark:text-black">
-              From curated fashion finds and styles to flawless glam, TLE is designed for people who love beauty,
+              From curated fashion pieces to flawless glam, TLE is designed for people who love beauty,
               confidence, and intentional style.
             </p>
 
@@ -413,15 +413,15 @@ export function LandingPage() {
           </div>
         </section>
 
-        <div className="flex overflow-hidden bg-tle-charcoal py-[18px]">
+        <div className="flex overflow-hidden bg-tle-charcoal py-[22px] sm:py-6">
           <div className="flex animate-marquee whitespace-nowrap">
             {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((text, i) => (
               <span
                 key={i}
-                className="inline-flex shrink-0 items-center gap-5 px-5 text-[10.5px] font-semibold tracking-[0.25em] text-white/55 uppercase"
+                className="inline-flex shrink-0 items-center gap-6 px-6 text-[11.5px] font-semibold tracking-[0.12em] text-white/70 normal-case sm:text-xs sm:tracking-[0.14em]"
               >
                 {text}{' '}
-                <span className="size-1 shrink-0 rounded-full bg-tle-gold" />
+                <span className="size-1.5 shrink-0 rounded-full bg-tle-gold" />
               </span>
             ))}
           </div>
@@ -527,26 +527,26 @@ export function LandingPage() {
           ) : null}
         </section>
 
-        <div className={`${revealCls} px-4 pb-24 md:px-10 lg:px-16`} id="makeup">
-          <div className="relative overflow-hidden rounded-[36px] bg-tle-charcoal px-6 py-12 md:px-14 md:py-[90px] lg:px-20">
+        <div className={`${revealCls} px-4 pb-20 md:px-10 lg:px-16`} id="makeup">
+          <div className="relative overflow-hidden rounded-[36px] bg-tle-charcoal px-6 py-10 md:px-12 md:py-14 lg:px-16">
             <div className="pointer-events-none absolute -top-20 -right-20 size-80 rounded-full border border-tle-gold/15" />
             <div className="pointer-events-none absolute right-24 -bottom-12 size-[200px] rounded-full border border-tle-gold/10" />
-            <div className="relative z-[2] grid gap-12 md:grid-cols-2 md:gap-20">
+            <div className="relative z-[2] grid gap-8 md:grid-cols-2 md:gap-12">
               <div>
-                <div className="mb-5 text-[10px] font-semibold tracking-[0.22em] text-tle-gold uppercase">Makeup &amp; Aesthetics</div>
-                <h2 className="mb-5 font-sans text-[clamp(2.5rem,4.5vw,4rem)] leading-[1.05] font-semibold text-white">
+                <div className="mb-4 text-[10px] font-semibold tracking-[0.22em] text-tle-gold uppercase">Makeup &amp; Aesthetics</div>
+                <h2 className="mb-4 font-sans text-[clamp(2.25rem,4vw,3.25rem)] leading-[1.08] font-semibold text-white">
                   Book Your
                   <br />
                   <em className="font-sans font-medium italic text-tle-pink">Glow-Up</em>
                   <br />
                   Session.
                 </h2>
-                <p className="mb-9 max-w-[400px] text-[14.5px] font-light leading-[1.85] text-white/50">
+                <p className="mb-7 max-w-[400px] text-[14.5px] font-light leading-[1.85] text-white/50">
                   Studio session at <span className="text-white/75">₦35,000</span>. Home service from{' '}
                   <span className="text-white/75">₦50,000</span> and bridal from <span className="text-white/75">₦100,000</span> — both
                   depend on location. Use the hero offer for photoshoot bundles, or book any option below.
                 </p>
-                <div className="mb-10 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                <div className="mb-8 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                   {MAKEUP_HIGHLIGHT_TAGS.map((name) => (
                     <div
                       key={name}
@@ -566,7 +566,7 @@ export function LandingPage() {
                 </Link>
               </div>
               <div className="overflow-hidden rounded-2xl">
-                <div className="h-full min-h-[320px] overflow-hidden md:min-h-[520px]">
+                <div className="h-full min-h-[260px] overflow-hidden md:min-h-[380px]">
                   <img
                     src="/tlepic2.jpeg"
                     alt="Book your glow-up session"
@@ -600,10 +600,11 @@ export function LandingPage() {
               <div className="h-px w-[22px] bg-tle-gold" />
               <span className="text-[10px] font-semibold tracking-[0.22em] text-tle-gold uppercase">Our Story</span>
             </div>
-            <h2 className="mb-5 font-sans text-[clamp(2.25rem,4vw,3.375rem)] leading-tight font-semibold text-tle-ink">
-              Beauty for <em className="font-sans font-medium italic text-tle-pink">Everyone.</em>
-              <br />
-              No Exceptions.
+            <h2 className="font-heading mb-5 text-[clamp(2.25rem,4vw,3.375rem)] leading-[1.12] font-semibold tracking-tight">
+              <span className="text-tle-ink">The </span>
+              <span className="text-tle-gold">Royal</span>
+              <span className="text-tle-ink"> In </span>
+              <span className="text-tle-pink">You.</span>
             </h2>
             <p className="mb-10 text-[15px] font-light leading-[1.9] text-tle-muted">
               TLE-BRAND was born from one belief — that beauty belongs to everyone. We create and curate premium aesthetic
