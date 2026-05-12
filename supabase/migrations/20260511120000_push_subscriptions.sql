@@ -4,6 +4,7 @@
 --   public.orders        → POST https://<project-ref>.supabase.co/functions/v1/admin-push-hook
 --   public.makeup_bookings → same URL
 -- Header on each: x-webhook-secret = same value as Edge secret WEBHOOK_SECRET.
+-- Push link base URL: save in Admin → Account (shop_settings.public_app_url) or set Edge secret PUBLIC_APP_URL.
 
 create table if not exists public.push_subscriptions (
   id uuid primary key default gen_random_uuid(),

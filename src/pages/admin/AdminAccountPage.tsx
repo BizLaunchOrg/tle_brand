@@ -20,7 +20,8 @@ import {
 import {
   DEFAULT_DELIVERY_FEE_NGN,
   DEFAULT_PROCESSING_FEE_NGN,
-  fetchShopFees,
+  fetchShopAccountSettings,
+  normalizeStorePublicUrl,
   updateShopFees,
 } from '../../lib/shopSettings.ts'
 
@@ -40,6 +41,7 @@ export function AdminAccountPage() {
 
   const [deliveryFee, setDeliveryFee] = useState(String(DEFAULT_DELIVERY_FEE_NGN))
   const [processingFee, setProcessingFee] = useState(String(DEFAULT_PROCESSING_FEE_NGN))
+  const [publicAppUrl, setPublicAppUrl] = useState('')
   const [busyFees, setBusyFees] = useState(false)
   const [feesLoaded, setFeesLoaded] = useState(false)
   const [notifyEnabled, setNotifyEnabled] = useState(false)
@@ -82,10 +84,16 @@ export function AdminAccountPage() {
   useEffect(() => {
     let on = true
     void (async () => {
-      const fees = await fetchShopFees()
+      const s = await fetchShopAccountSettings()
       if (!on) return
-      setDeliveryFee(String(fees.deliveryFeeNgn))
-      setProcessingFee(String(fees.processingFeeNgn))
+      setDeliveryFee(String(s.deliveryFeeNgn))
+      setProcessingFee(String(s.processingFeeNgn))
+      if (s.publicAppUrl) {
+        setPublicAppUrl(s.publicAppUrl)
+      } else if (typeof window !== 'undefined') {
+        const o = normalizeStorePublicUrl(window.location.origin)
+        setPublicAppUrl(o ?? window.location.origin)
+      }
       setFeesLoaded(true)
     })()
     return () => {
@@ -178,13 +186,13 @@ export function AdminAccountPage() {
       return
     }
     setBusyFees(true)
-    const res = await updateShopFees(d, p)
+    const res = await updateShopFees(d, p, publicAppUrl)
     setBusyFees(false)
     if (!res.ok) {
       setError(res.message)
       return
     }
-    setNotice('Checkout fees saved. New checkouts use these amounts.')
+    setNotice('Store settings saved. Checkout fees and push notification links use these values.')
   }
 
   const notificationsActive = pushSubscribed || notifyEnabled
@@ -235,7 +243,9 @@ export function AdminAccountPage() {
   return (
     <div className={adminFont() + ' mx-auto w-full max-w-lg pb-10'}>
       <h1 className={heading}>Account</h1>
-      <p className={muted + ' mt-1 text-[14px] leading-relaxed'}>Sign-in, passwords, store checkout fees, and alerts.</p>
+      <p className={muted + ' mt-1 text-[14px] leading-relaxed'}>
+        Sign-in, passwords, your live site URL (for admin push links), checkout fees, and alerts.
+      </p>
 
       {error ? (
         <p
@@ -294,11 +304,26 @@ export function AdminAccountPage() {
 
       <form onSubmit={onSaveFees} className={surface + ' mt-8 space-y-5'}>
         <div>
-          <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>Checkout fees</h2>
+          <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>
+            Store settings
+          </h2>
           <p className={muted + ' mt-1 text-[13px] leading-relaxed'}>
-            Flat amounts added to every website order (delivery + processing). Stored in the database; checkout and receipts use these values.
+            Your public site origin is used by server push (new order links). It defaults to this browser’s address; set your production URL (e.g. Vercel) if you manage the store from another device. Checkout fees apply to every website order.
           </p>
         </div>
+        <label>
+          <span className={label}>Public site URL</span>
+          <input
+            type="url"
+            className={input}
+            value={publicAppUrl}
+            disabled={!feesLoaded}
+            onChange={(e) => setPublicAppUrl(e.target.value)}
+            placeholder="https://your-store.vercel.app"
+            autoComplete="off"
+          />
+          <p className={muted + ' mt-1 text-[11px]'}>No path — origin only. Clear the field and save to unset (then set Edge secret PUBLIC_APP_URL instead).</p>
+        </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label>
             <span className={label}>Delivery (₦)</span>
@@ -328,7 +353,7 @@ export function AdminAccountPage() {
           </label>
         </div>
         <button type="submit" disabled={busyFees || !feesLoaded} className={btn + ' w-full sm:w-auto'}>
-          {busyFees ? 'Saving…' : 'Save checkout fees'}
+          {busyFees ? 'Saving…' : 'Save store settings'}
         </button>
       </form>
 
