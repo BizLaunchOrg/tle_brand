@@ -8,7 +8,15 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { cartLineKey, getDefaultImageUrls, getDisplayPrice, getGalleryUrls, PRODUCTS, type Product } from '../data/products.ts'
+import {
+  cartLineKey,
+  getDefaultImageUrls,
+  getDisplayPrice,
+  getGalleryUrls,
+  parseProductPriceNgn,
+  PRODUCTS,
+  type Product,
+} from '../data/products.ts'
 import { loadShopState, saveShopState, type PersistedCartLine } from '../lib/shopStorage.ts'
 import {
   fetchUserCartItems,
@@ -54,8 +62,6 @@ type CartDrawerContextValue = {
 }
 
 const CartDrawerContext = createContext<CartDrawerContextValue | null>(null)
-
-const parsePrice = (price: string) => Number(price.replace(/[^\d]/g, '')) || 0
 
 function buildCartLine(product: Product, variant?: CartVariant): CartItem {
   const variantId = variant?.id
@@ -289,7 +295,7 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
   const cartCount = useMemo(() => cartItems.reduce((sum, item) => sum + item.quantity, 0), [cartItems])
   const favoriteCount = useMemo(() => favoriteItems.length, [favoriteItems])
   const cartSubtotal = useMemo(
-    () => cartItems.reduce((sum, item) => sum + parsePrice(item.price) * item.quantity, 0),
+    () => cartItems.reduce((sum, item) => sum + parseProductPriceNgn(item.price) * item.quantity, 0),
     [cartItems],
   )
 

@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { cartLineKey, displayableImageUrl, getDefaultImageUrls } from '../../data/products.ts'
+import {
+  cartLineKey,
+  displayableImageUrl,
+  getDefaultImageUrls,
+  parseProductPriceNgn,
+} from '../../data/products.ts'
 import { NIGERIAN_STATES } from '../../data/nigerianStates.ts'
 import { useAuth } from '../../context/AuthContext'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
@@ -9,8 +14,6 @@ import { fetchShopFees } from '../../lib/shopSettings.ts'
 import { createOrder } from '../../lib/userShopSync.ts'
 
 const formatNaira = (value: number) => `₦${value.toLocaleString()}`
-
-const parsePrice = (price: string) => Number(price.replace(/[^\d]/g, '')) || 0
 
 type OrderReceipt = {
   id: string
@@ -365,7 +368,7 @@ export function CheckoutPage() {
             <ul className="mt-6 max-h-[260px] space-y-4 overflow-y-auto border-t border-black/[0.06] pt-6">
               {cartItems.map((item) => {
                 const lineKey = cartLineKey(item.slug, item.variantId)
-                const lineTotal = parsePrice(item.price) * item.quantity
+                const lineTotal = parseProductPriceNgn(item.price) * item.quantity
                 return (
                   <li key={lineKey} className="flex gap-3">
                     <img src={displayableImageUrl(item.img)} alt="" className="size-14 shrink-0 rounded-xl object-cover" />
