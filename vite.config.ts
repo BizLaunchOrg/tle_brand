@@ -32,11 +32,13 @@ export default defineConfig(({ mode }) => {
     var base = ${JSON.stringify(base)}
     var p = location.pathname
     var b = base === '/' ? '' : (base.length > 1 && base.endsWith('/') ? base.slice(0, -1) : base)
-    var isAdmin = p === b + '/admin' || p.startsWith(b + '/admin/')
+    var rel = !b ? p : (p.indexOf(b) === 0 ? p.slice(b.length) || '/' : p)
+    var isAdmin = rel === '/admin' || rel.startsWith('/admin/')
     if (!isAdmin) return
     var href = link.getAttribute('href') || ''
     var adminHref = href.replace(/manifest\\.webmanifest(\\?.*)?$/i, function (m, q) {
-      return 'manifest-admin.webmanifest' + (q || '')
+      var u = 'manifest-admin.webmanifest' + (q || '')
+      return u.indexOf('tleAdmin=') === -1 ? u + (q ? '&' : '?') + 'tleAdmin=1' : u
     })
     if (adminHref !== href) link.setAttribute('href', adminHref)
   } catch (e) {}

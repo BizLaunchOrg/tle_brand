@@ -197,7 +197,8 @@ function AdminLayoutInner() {
     const base = import.meta.env.BASE_URL || '/'
     const prefix = base.endsWith('/') ? base : `${base}/`
     const storeManifestHref = `${prefix}manifest.webmanifest`.replace(/([^:]\/)\/+/g, '$1')
-    const adminManifestHref = `${prefix}manifest-admin.webmanifest`.replace(/([^:]\/)\/+/g, '$1')
+    const adminManifestHref =
+      `${prefix}manifest-admin.webmanifest?tleAdmin=1`.replace(/([^:]\/)\/+/g, '$1')
 
     link.setAttribute('href', adminManifestHref)
     return () => {
