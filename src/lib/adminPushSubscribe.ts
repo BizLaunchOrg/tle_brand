@@ -70,7 +70,7 @@ export async function subscribeAdminPush(): Promise<{ ok: true } | { ok: false; 
 
   const sub = await reg.pushManager.subscribe({
     userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(vapid),
+    applicationServerKey: urlBase64ToUint8Array(vapid) as BufferSource,
   })
 
   const json = sub.toJSON()
