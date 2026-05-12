@@ -45,14 +45,20 @@ export function displayableImageUrl(raw: string | undefined): string {
   if (u.startsWith('blob:') || u.startsWith('data:')) return u
   if (/^https?:\/\//i.test(u)) return u
   if (u.startsWith('//')) return `https:${u}`
+
+  const supabaseBase = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') ?? ''
+
+  // Full storage path without origin (some snapshots only store the path part)
+  if (supabaseBase && /^\/?storage\/v1\/object\/public\/product-media\//i.test(u)) {
+    const path = u.replace(/^\/+/, '')
+    return `${supabaseBase}/${path}`
+  }
   if (u.startsWith('/') && typeof window !== 'undefined') return `${window.location.origin}${u}`
   // Bare storage path (some imports store without host)
   if (/^(storage\/v1\/|object\/public\/)/i.test(u)) {
-    const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '')
-    if (base) return `${base}/${u.replace(/^\//, '')}`
+    if (supabaseBase) return `${supabaseBase}/${u.replace(/^\//, '')}`
   }
 
-  const supabaseBase = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') ?? ''
   // Supabase Storage: catalog / orders often store only the object key under bucket `product-media`
   // (e.g. `uuid/1730000000000-abc12345.jpg` from admin uploads).
   if (

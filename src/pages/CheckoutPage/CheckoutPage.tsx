@@ -157,20 +157,24 @@ export function CheckoutPage() {
 
     setBusy(true)
     try {
-      const lineItems = cartItems.map((item) => ({
-        slug: item.slug,
-        variantId: item.variantId,
-        variantLabel: item.variantLabel,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        image:
-          displayableImageUrl(
-            (typeof item.img === 'string' && item.img.trim() ? item.img.trim() : getDefaultImageUrls(item)[0]) || undefined,
-          ) || undefined,
-        category: item.cat,
-        badge: item.badge,
-      }))
+      const lineItems = cartItems.map((item) => {
+        const fromCart =
+          (typeof item.img === 'string' && item.img.trim() ? item.img.trim() : undefined) ??
+          getDefaultImageUrls(item).find((x) => typeof x === 'string' && x.trim())
+        const raw = fromCart?.trim()
+        const image = raw ? displayableImageUrl(raw) || undefined : undefined
+        return {
+          slug: item.slug,
+          variantId: item.variantId,
+          variantLabel: item.variantLabel,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image,
+          category: item.cat,
+          badge: item.badge,
+        }
+      })
 
       const subtotal = cartSubtotal
       const fees = computeCheckoutTotalWithFlatFees(

@@ -15,6 +15,7 @@ import { useAdminTheme } from './AdminThemeContext.tsx'
 import { adminStatusPillClass } from './adminRangeTabs.tsx'
 import { ad, adminFont } from './adminUi.ts'
 import { isCompletedStatus } from '../../lib/adminOrderAnalytics.ts'
+import { normalizeOrderLineItems, pickLineImageFromItem } from '../../lib/adminOrderLineSnapshots.ts'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
@@ -105,28 +106,6 @@ type LineDisplayExt = {
   extras: { k: string; v: string }[]
 }
 
-function normalizeOrderLineItems(raw: unknown): unknown[] {
-  if (Array.isArray(raw)) return raw
-  if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw) as unknown
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
-  }
-  return []
-}
-
-function pickLineImage(o: Record<string, unknown>): string | undefined {
-  const keys = ['image', 'img', 'photo', 'picture', 'thumbnail', 'imageUrl', 'thumbnailUrl', 'src'] as const
-  for (const k of keys) {
-    const v = o[k]
-    if (typeof v === 'string' && v.trim()) return v.trim()
-  }
-  return undefined
-}
-
 function buildLineDisplaysExt(raw: unknown): LineDisplayExt[] {
   const arr = normalizeOrderLineItems(raw)
   const out: LineDisplayExt[] = []
@@ -154,7 +133,7 @@ function buildLineDisplaysExt(raw: unknown): LineDisplayExt[] {
           ? o.cat.trim()
           : undefined
     const badge = typeof o.badge === 'string' && o.badge.trim() ? o.badge.trim() : undefined
-    const image = pickLineImage(o)
+    const image = pickLineImageFromItem(o)
 
     const extras: { k: string; v: string }[] = []
     for (const [k, v] of Object.entries(o)) {
@@ -201,7 +180,7 @@ function firstNonEmptyImageUrl(...candidates: (string | undefined)[]): string | 
 function applyCatalogEnrichment(lines: LineDisplayExt[], catalog: Map<string, Product>): LineDisplayExt[] {
   return lines.map((line) => {
     const key = line.slug.trim()
-    const p = catalog.get(key)
+    const p = catalog.get(key) ?? catalog.get(key.toLowerCase())
     if (!p) return line
     const img = firstNonEmptyImageUrl(
       line.image,

@@ -108,7 +108,7 @@ function MobileNavItem({
   dot?: boolean
 }) {
   return (
-    <NavLink to={to} end={end} className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-2 no-underline">
+    <NavLink to={to} end={end} className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-2.5 no-underline">
       {({ isActive }) => (
         <>
           <span className="relative inline-flex">
@@ -168,7 +168,7 @@ function AdminLayoutInner() {
   const sidebar = ad(theme, 'border-stone-200/90 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)]', 'border-neutral-800 bg-[#101412]')
 
   const mainPad =
-    'min-w-0 flex-1 px-4 py-5 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-6 lg:px-8 lg:py-8 lg:pb-10'
+    'min-w-0 flex-1 px-4 py-5 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-6 lg:px-8 lg:py-8 lg:pb-10'
 
   const initials = (user?.name || user?.email || '?')
     .split(/\s+/)
@@ -390,7 +390,17 @@ function AdminLayoutInner() {
                   TLE · Admin
                 </Link>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                <Link
+                  to="/admin/account#admin-push"
+                  className={ad(
+                    theme,
+                    'rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-900 no-underline hover:bg-emerald-100',
+                    'rounded-full border border-emerald-800/60 bg-emerald-950/40 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 no-underline hover:bg-emerald-900/50',
+                  )}
+                >
+                  Push alerts
+                </Link>
                 <button
                   type="button"
                   onClick={() => void copyStoreLink()}
@@ -496,8 +506,8 @@ function AdminLayoutInner() {
           <nav
             className={ad(
               theme,
-              'fixed bottom-0 left-0 right-0 z-40 flex border-t border-stone-200/90 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-1 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] backdrop-blur-md lg:hidden',
-              'fixed bottom-0 left-0 right-0 z-40 flex border-t border-neutral-800 bg-[#101412]/95 pb-[env(safe-area-inset-bottom)] pt-1 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] backdrop-blur-md lg:hidden',
+              'fixed bottom-0 left-0 right-0 z-40 flex rounded-t-2xl border-t border-stone-200/90 bg-white/95 pt-2 pb-[calc(0.65rem+env(safe-area-inset-bottom))] shadow-[0_-10px_28px_rgba(0,0,0,0.08)] backdrop-blur-md lg:hidden',
+              'fixed bottom-0 left-0 right-0 z-40 flex rounded-t-2xl border-t border-neutral-800 bg-[#101412]/95 pt-2 pb-[calc(0.65rem+env(safe-area-inset-bottom))] shadow-[0_-10px_28px_rgba(0,0,0,0.35)] backdrop-blur-md lg:hidden',
             )}
             aria-label="Admin navigation"
           >
@@ -507,7 +517,7 @@ function AdminLayoutInner() {
             <MobileNavItem to="/admin/customers" label="People" icon="group" theme={theme} />
             <MobileNavItem to="/admin/makeup-bookings" label="Makeup" icon="face_retouching_natural" theme={theme} dot={makeupAlertCount > 0} />
             <MobileNavItem to="/admin/transactions" label="Wallet" icon="account_balance_wallet" theme={theme} dot={orderAlertCount > 0} />
-            <MobileNavItem to="/admin/account" label="More" icon="menu" theme={theme} />
+            <MobileNavItem to="/admin/account" label="Account" icon="notifications" theme={theme} />
           </nav>
         </div>
       </div>

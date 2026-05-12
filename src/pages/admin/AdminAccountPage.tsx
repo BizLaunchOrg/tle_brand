@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useLocation } from 'react-router-dom'
 import { getSupabase } from '../../lib/supabaseClient'
 import { isSupabaseConfigured, mapSupabaseAuthError } from '../../lib/mapSupabaseAuthError'
 import { useAuth } from '../../context/AuthContext'
@@ -6,7 +7,6 @@ import { useAdminTheme } from './AdminThemeContext.tsx'
 import { ad, adminFont } from './adminUi.ts'
 import {
   getAdminBrowserNotifyEnabled,
-  requestNotificationPermission,
   setAdminBrowserNotifyEnabled,
 } from '../../lib/adminBrowserNotifications.ts'
 import {
@@ -29,6 +29,7 @@ const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 export function AdminAccountPage() {
   const { user } = useAuth()
   const { theme } = useAdminTheme()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -42,9 +43,8 @@ export function AdminAccountPage() {
   const [busyFees, setBusyFees] = useState(false)
   const [feesLoaded, setFeesLoaded] = useState(false)
   const [notifyEnabled, setNotifyEnabled] = useState(false)
-  const [notifyBusy, setNotifyBusy] = useState(false)
+  const [notifBusy, setNotifBusy] = useState(false)
   const [pushSubscribed, setPushSubscribed] = useState(false)
-  const [pushBusy, setPushBusy] = useState(false)
 
   useEffect(() => {
     if (user?.email) setEmail(user.email)
@@ -53,6 +53,13 @@ export function AdminAccountPage() {
   useEffect(() => {
     setNotifyEnabled(getAdminBrowserNotifyEnabled())
   }, [])
+
+  useEffect(() => {
+    if (location.hash !== '#admin-push') return
+    window.requestAnimationFrame(() => {
+      document.getElementById('admin-push')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [location.hash])
 
   useEffect(() => {
     let cancelled = false
@@ -174,77 +181,49 @@ export function AdminAccountPage() {
     setNotice('Checkout fees saved. New checkouts use these amounts.')
   }
 
-  const notifySupported = typeof window !== 'undefined' && 'Notification' in window
-  const notifyPermission = notifySupported ? Notification.permission : 'denied'
+  const notificationsActive = pushSubscribed || notifyEnabled
 
-  const onToggleNotify = async () => {
+  const onNotifications = async () => {
     setError(null)
     setNotice(null)
-    if (!notifySupported) {
-      setError('This browser does not support notifications.')
-      return
-    }
-    if (notifyEnabled) {
+    if (notificationsActive) {
+      setNotifBusy(true)
+      await unsubscribeAdminPush()
       setAdminBrowserNotifyEnabled(false)
       setNotifyEnabled(false)
-      setNotice('Browser alerts are off. Badges in the sidebar still update while you are in admin.')
+      const sub = await getExistingPushSubscription()
+      setPushSubscribed(!!sub)
+      await syncAdminWebPushLocalFromBrowser()
+      setNotifBusy(false)
+      setNotice('Notifications are off.')
       return
     }
-    setNotifyBusy(true)
-    const perm = await requestNotificationPermission()
-    setNotifyBusy(false)
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setNotice('This browser does not support notifications.')
+      return
+    }
+    setNotifBusy(true)
+    const perm = await Notification.requestPermission()
     if (perm !== 'granted') {
-      setError(
-        'Permission was not granted. On mobile, check site settings for this store and allow notifications.',
-      )
-      setAdminBrowserNotifyEnabled(false)
-      setNotifyEnabled(false)
+      setNotifBusy(false)
+      setNotice('Notifications stay off until you allow them in your browser or phone settings.')
       return
+    }
+    const tryPush = Boolean(getVapidPublicKeyForPush()) && isPushApiSupported()
+    if (tryPush) {
+      const res = await subscribeAdminPush()
+      if (res.ok) {
+        setPushSubscribed(true)
+        setNotifBusy(false)
+        setNotice('Notifications are on.')
+        return
+      }
     }
     setAdminBrowserNotifyEnabled(true)
     setNotifyEnabled(true)
-    setNotice('Tab alerts on. You will see pings while admin stays open in a tab. For alerts when the browser is closed, use phone push above.')
-  }
-
-  const pushConfigured = Boolean(getVapidPublicKeyForPush())
-  const pushApiOk = typeof window !== 'undefined' && isPushApiSupported()
-
-  const onTogglePush = async () => {
-    setError(null)
-    setNotice(null)
-    if (pushSubscribed) {
-      setPushBusy(true)
-      const res = await unsubscribeAdminPush()
-      setPushBusy(false)
-      if (!res.ok) {
-        setError(res.message)
-        return
-      }
-      setPushSubscribed(false)
-      setNotice('Phone push is off for this device.')
-      return
-    }
-    if (!pushConfigured) {
-      setError('This build is missing VITE_VAPID_PUBLIC_KEY. Add the public VAPID key in your host env and redeploy.')
-      return
-    }
-    if (!pushApiOk) {
-      setError(
-        'This browser does not support Web Push here. Try Chrome or Edge on Android, or install the site to the home screen on iOS 16.4+.',
-      )
-      return
-    }
-    setPushBusy(true)
-    const res = await subscribeAdminPush()
-    setPushBusy(false)
-    if (!res.ok) {
-      setError(res.message)
-      return
-    }
-    setPushSubscribed(true)
-    setNotice(
-      'Phone push is on for this device. New orders and makeup bookings are sent through Google or Apple push services (usually within seconds, not guaranteed instant).',
-    )
+    setPushSubscribed(!!(await getExistingPushSubscription()))
+    setNotifBusy(false)
+    setNotice('Notifications are on while you keep admin open in a tab.')
   }
 
   return (
@@ -275,61 +254,18 @@ export function AdminAccountPage() {
         </p>
       ) : null}
 
-      <div className={surface + ' mt-8 space-y-4'}>
-        <div>
-          <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>
-            Phone notifications (Web Push)
-          </h2>
-          <p className={muted + ' mt-1 text-[13px] leading-relaxed'}>
-            Same delivery path as most apps: your phone shows a banner when a new order or makeup booking is saved,
-            even if the store tab is closed (after you enable this and your developer connects Supabase webhooks). Tap
-            the banner to open that order or booking. This uses a tiny service worker — not a heavy offline cache.
-          </p>
-        </div>
-        {!pushConfigured ? (
-          <p className={'text-[12px] font-medium ' + ad(theme, 'text-amber-800', 'text-amber-200')}>
-            Waiting on configuration: set <span className="font-mono">VITE_VAPID_PUBLIC_KEY</span> in production, run the
-            database migration for <span className="font-mono">push_subscriptions</span>, deploy the Edge Function{' '}
-            <span className="font-mono">admin-push-hook</span>, and add two Database Webhooks (see comments in{' '}
-            <span className="font-mono">supabase/functions/admin-push-hook/index.ts</span>).
-          </p>
-        ) : null}
-        <p className={'text-[12px] font-medium ' + muted}>
-          This device: {pushSubscribed ? 'subscribed' : 'not subscribed'}
-          {pushApiOk ? '' : ' — push API not available in this context.'}
-        </p>
+      <div id="admin-push" className={surface + ' mt-6 scroll-mt-24 space-y-3'}>
+        <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>
+          Notifications
+        </h2>
+        <p className={muted + ' text-[13px] leading-relaxed'}>New orders and makeup bookings.</p>
         <button
           type="button"
-          disabled={pushBusy || !pushConfigured || !pushApiOk}
-          onClick={() => void onTogglePush()}
-          className={btn + ' w-full sm:w-auto'}
+          disabled={notifBusy}
+          onClick={() => void onNotifications()}
+          className={btn + ' w-full py-3.5 text-[15px] sm:w-auto sm:py-2.5 sm:text-[13px]'}
         >
-          {pushBusy ? 'Working…' : pushSubscribed ? 'Turn off phone push on this device' : 'Turn on phone push on this device'}
-        </button>
-      </div>
-
-      <div className={surface + ' mt-6 space-y-4'}>
-        <div>
-          <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>
-            Tab-only alerts (fallback)
-          </h2>
-          <p className={muted + ' mt-1 text-[13px] leading-relaxed'}>
-            Optional extra pings using the regular browser notification API while an admin tab is open or in the
-            background. Turned off automatically when phone push is active on this device so you do not get duplicates.
-          </p>
-        </div>
-        <p className={'text-[12px] font-medium ' + muted}>
-          Status:{' '}
-          {!notifySupported
-            ? 'Not supported in this browser.'
-            : notifyPermission === 'granted'
-              ? 'Permission granted.'
-              : notifyPermission === 'denied'
-                ? 'Blocked — allow notifications for this site in browser settings.'
-                : 'Not asked yet — use the button below.'}
-        </p>
-        <button type="button" disabled={notifyBusy || !notifySupported} onClick={() => void onToggleNotify()} className={btn + ' w-full sm:w-auto'}>
-          {notifyBusy ? 'Working…' : notifyEnabled ? 'Turn off tab alerts' : 'Turn on tab alerts'}
+          {notifBusy ? 'Please wait…' : notificationsActive ? 'Turn off notifications' : 'Allow notifications'}
         </button>
       </div>
 

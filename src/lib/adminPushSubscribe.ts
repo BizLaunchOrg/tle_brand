@@ -42,25 +42,25 @@ export async function getExistingPushSubscription(): Promise<PushSubscription | 
 }
 
 export async function subscribeAdminPush(): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (!isSupabaseConfigured()) return { ok: false, message: 'Supabase is not configured.' }
-  if (!isPushApiSupported()) return { ok: false, message: 'Push is not supported in this browser.' }
+  if (!isSupabaseConfigured()) return { ok: false, message: 'unavailable' }
+  if (!isPushApiSupported()) return { ok: false, message: 'unavailable' }
 
   const vapid = getVapidPublicKeyForPush()
-  if (!vapid) return { ok: false, message: 'Missing VITE_VAPID_PUBLIC_KEY on the site build.' }
+  if (!vapid) return { ok: false, message: 'unavailable' }
 
   const { data: sessionData } = await getSupabase().auth.getSession()
   const user = sessionData.session?.user
-  if (!user) return { ok: false, message: 'Sign in to admin first.' }
+  if (!user) return { ok: false, message: 'unavailable' }
 
   const reg = await registerAdminPushServiceWorker()
-  if (!reg) return { ok: false, message: 'Could not register the service worker (HTTPS required on mobile).' }
+  if (!reg) return { ok: false, message: 'unavailable' }
 
   let perm = Notification.permission
   if (perm === 'default') {
     perm = await Notification.requestPermission()
   }
   if (perm !== 'granted') {
-    return { ok: false, message: 'Notification permission is required for phone alerts.' }
+    return { ok: false, message: 'unavailable' }
   }
 
   const existing = await reg.pushManager.getSubscription()
@@ -78,7 +78,8 @@ export async function subscribeAdminPush(): Promise<{ ok: true } | { ok: false; 
   const p256dh = json.keys?.p256dh
   const auth = json.keys?.auth
   if (!endpoint || !p256dh || !auth) {
-    return { ok: false, message: 'Push subscription keys were incomplete.' }
+    await sub.unsubscribe().catch(() => {})
+    return { ok: false, message: 'unavailable' }
   }
 
   const { error } = await getSupabase().from('push_subscriptions').upsert(
@@ -94,7 +95,7 @@ export async function subscribeAdminPush(): Promise<{ ok: true } | { ok: false; 
 
   if (error) {
     await sub.unsubscribe().catch(() => {})
-    return { ok: false, message: error.message || 'Could not save push subscription.' }
+    return { ok: false, message: 'unavailable' }
   }
 
   setAdminWebPushActive(true)
@@ -102,7 +103,7 @@ export async function subscribeAdminPush(): Promise<{ ok: true } | { ok: false; 
 }
 
 export async function unsubscribeAdminPush(): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (!isSupabaseConfigured()) return { ok: false, message: 'Supabase is not configured.' }
+  if (!isSupabaseConfigured()) return { ok: false, message: 'unavailable' }
 
   const { data: sessionData } = await getSupabase().auth.getSession()
   const user = sessionData.session?.user
@@ -125,8 +126,6 @@ export async function unsubscribeAdminPush(): Promise<{ ok: true } | { ok: false
   setAdminWebPushActive(false)
   return { ok: true }
 }
-
-/** Align local “push active” flag with the browser subscription (e.g. after refresh). */
 export async function syncAdminWebPushLocalFromBrowser(): Promise<void> {
   if (!isPushApiSupported()) {
     setAdminWebPushActive(false)
