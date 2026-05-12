@@ -313,16 +313,16 @@ export function LandingPage() {
             <div className="mb-8 flex items-center gap-3.5 max-lg:justify-center">
               <div className="h-px w-9 bg-tle-gold" />
               <span className="text-[10px] font-semibold tracking-[0.25em] text-tle-gold uppercase">
-              Tobilicious · by Lady Emma
+              Tobilicious by Lady Emma
                  
               </span>
             </div>
 
-            <h1 className="mb-8 w-full max-w-[min(100%,20ch)] font-sans text-[clamp(2.35rem,7.5vw,5.5rem)] font-semibold leading-[1.02] tracking-tight max-lg:mx-auto max-lg:text-center lg:max-w-none lg:text-[clamp(2.75rem,6.5vw,5.75rem)]">
-              <span className="block uppercase tracking-[0.14em] text-tle-ink max-lg:tracking-[0.1em] sm:tracking-[0.18em]">
+            <h1 className="font-heading mb-8 w-full max-w-[min(100%,22ch)] leading-[1.06] max-lg:mx-auto max-lg:text-center lg:max-w-[min(100%,18ch)]">
+              <span className="block text-[clamp(2.1rem,5.2vw,3.35rem)] font-light tracking-[-0.04em] text-tle-ink">
                 Show up
               </span>
-              <span className="mt-2 block uppercase tracking-[0.16em] font-medium italic text-tle-pink sm:mt-2.5 sm:tracking-[0.2em]">
+              <span className="mt-1.5 block text-[clamp(2.45rem,6.8vw,4.85rem)] font-semibold tracking-[-0.045em] text-tle-pink sm:mt-2">
                 Majestically
               </span>
             </h1>
@@ -380,11 +380,11 @@ export function LandingPage() {
             </div>
           </div>
 
-          <div className="relative min-h-[55vh] overflow-hidden bg-tle-cream lg:min-h-0">
+          <div className="relative min-h-[55vh] overflow-hidden bg-tle-cream lg:min-h-0" id="photoshoot-promo">
             <img
-              src="https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=900&h=1200&fit=crop&crop=top"
-              alt="TLE-BRAND Beauty Model"
-              className="absolute inset-0 size-full object-cover object-top"
+              src="/promo-hero.png"
+              alt="TLE-BRAND studio portrait"
+              className="absolute inset-0 size-full object-cover object-[center_22%] max-lg:object-[center_15%]"
             />
             <div className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-t from-black/55 via-black/15 to-transparent lg:bg-gradient-to-r lg:from-white/[0.12] lg:via-transparent lg:to-transparent" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[3] h-32 bg-gradient-to-t from-black/40 to-transparent lg:hidden" aria-hidden />

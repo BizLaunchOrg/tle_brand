@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
+  fetchMakeupBookingByIdForAdmin,
   fetchMakeupBookingsForAdmin,
   updateMakeupBookingStatus,
   type MakeupBookingRow,
@@ -27,6 +28,7 @@ function sourceLabel(source: string): string {
 
 export function AdminMakeupBookingsPage() {
   const { theme } = useAdminTheme()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<MakeupBookingRow[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -35,6 +37,7 @@ export function AdminMakeupBookingsPage() {
   const [actionMsg, setActionMsg] = useState<string | null>(null)
   const [detailRow, setDetailRow] = useState<MakeupBookingRow | null>(null)
   const [copyHint, setCopyHint] = useState<string | null>(null)
+  const openedFromQueryRef = useRef<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -54,6 +57,44 @@ export function AdminMakeupBookingsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const openIdRaw = searchParams.get('open')
+  useEffect(() => {
+    const raw = openIdRaw?.trim()
+    if (!raw) {
+      openedFromQueryRef.current = null
+      return
+    }
+    if (loading) return
+    if (openedFromQueryRef.current === raw) return
+    openedFromQueryRef.current = raw
+
+    void (async () => {
+      let row = rows.find((r) => r.id === raw) ?? null
+      if (!row) row = await fetchMakeupBookingByIdForAdmin(raw)
+
+      setSearchParams(
+        (sp) => {
+          const next = new URLSearchParams(sp)
+          next.delete('open')
+          return next
+        },
+        { replace: true },
+      )
+
+      if (!row) {
+        setActionMsg('Could not open that booking. It may have been removed or you may not have access.')
+        openedFromQueryRef.current = null
+        return
+      }
+
+      const tabFor: Tab =
+        row.status === 'pending' ? 'pending' : row.status === 'accepted' ? 'accepted' : 'rejected'
+      setTab(tabFor)
+      setDetailRow(row)
+      openedFromQueryRef.current = null
+    })()
+  }, [loading, openIdRaw, rows, setSearchParams])
 
   useEffect(() => {
     if (!copyHint) return

@@ -5,8 +5,27 @@ import { useAuth } from '../../context/AuthContext'
 import { AdminThemeProvider, useAdminTheme } from './AdminThemeContext.tsx'
 import { ad, adminFont } from './adminUi.ts'
 import {
+  getAdminBrowserNotifyEnabled,
+  markBookingNotified,
+  markOrderNotified,
+  showMakeupBookingNotification,
+  showOrderNotification,
+  wasBookingAlreadyNotified,
+  wasOrderAlreadyNotified,
+} from '../../lib/adminBrowserNotifications.ts'
+import { getAdminWebPushActive } from '../../lib/adminPushLocalFlag.ts'
+import { syncAdminWebPushLocalFromBrowser } from '../../lib/adminPushSubscribe.ts'
+import {
+  countNewMakeupBookingsSince,
+  ensureAdminMakeupBookingsSeenBaseline,
+  fetchNewMakeupBookingIdsSince,
+  getAdminMakeupBookingsLastSeenAt,
+  markAdminMakeupBookingsSeenNow,
+} from '../../lib/adminMakeupAlerts.ts'
+import {
   countNewOrdersSince,
   ensureAdminOrdersSeenBaseline,
+  fetchNewOrderIdsSince,
   getAdminOrdersLastSeenAt,
   markAdminOrdersSeenNow,
 } from '../../lib/adminOrderAlerts.ts'
@@ -134,6 +153,7 @@ function AdminLayoutInner() {
   const { theme, toggleTheme } = useAdminTheme()
   const location = useLocation()
   const [orderAlertCount, setOrderAlertCount] = useState(0)
+  const [makeupAlertCount, setMakeupAlertCount] = useState(0)
   const storeOrigin = typeof window !== 'undefined' ? window.location.origin : ''
 
   const shell = [
@@ -167,6 +187,8 @@ function AdminLayoutInner() {
 
   useEffect(() => {
     ensureAdminOrdersSeenBaseline()
+    ensureAdminMakeupBookingsSeenBaseline()
+    void syncAdminWebPushLocalFromBrowser()
   }, [])
 
   useEffect(() => {
@@ -175,20 +197,59 @@ function AdminLayoutInner() {
       markAdminOrdersSeenNow()
       setOrderAlertCount(0)
     }
+    if (p === '/admin/makeup-bookings') {
+      markAdminMakeupBookingsSeenNow()
+      setMakeupAlertCount(0)
+    }
   }, [location.pathname])
 
   useEffect(() => {
-    const refresh = () => {
-      const since = getAdminOrdersLastSeenAt()
-      if (!since) return
-      void countNewOrdersSince(since).then(setOrderAlertCount)
+    const refresh = async () => {
+      const orderSince = getAdminOrdersLastSeenAt()
+      const makeupSince = getAdminMakeupBookingsLastSeenAt()
+      if (orderSince) {
+        const n = await countNewOrdersSince(orderSince)
+        setOrderAlertCount(n)
+      }
+      if (makeupSince) {
+        const m = await countNewMakeupBookingsSince(makeupSince)
+        setMakeupAlertCount(m)
+      }
+
+      if (
+        typeof window !== 'undefined' &&
+        'Notification' in window &&
+        !getAdminWebPushActive() &&
+        getAdminBrowserNotifyEnabled() &&
+        Notification.permission === 'granted'
+      ) {
+        if (orderSince) {
+          const orderIds = await fetchNewOrderIdsSince(orderSince)
+          for (const id of orderIds) {
+            if (!wasOrderAlreadyNotified(id)) {
+              showOrderNotification(id)
+              markOrderNotified(id)
+            }
+          }
+        }
+        if (makeupSince) {
+          const bookingIds = await fetchNewMakeupBookingIdsSince(makeupSince)
+          for (const id of bookingIds) {
+            if (!wasBookingAlreadyNotified(id)) {
+              showMakeupBookingNotification(id)
+              markBookingNotified(id)
+            }
+          }
+        }
+      }
     }
-    refresh()
-    const id = window.setInterval(refresh, 45_000)
-    window.addEventListener('focus', refresh)
+    void refresh()
+    const id = window.setInterval(() => void refresh(), 45_000)
+    const onFocus = () => void refresh()
+    window.addEventListener('focus', onFocus)
     return () => {
       window.clearInterval(id)
-      window.removeEventListener('focus', refresh)
+      window.removeEventListener('focus', onFocus)
     }
   }, [])
 
@@ -245,7 +306,7 @@ function AdminLayoutInner() {
           <nav className="flex flex-1 flex-col gap-0.5 px-3">
             <NavItem to="/admin" end label="Dashboard" theme={theme} icon="dashboard" />
             <NavItem to="/admin/customers" label="Customers" theme={theme} icon="group" />
-            <NavItem to="/admin/makeup-bookings" label="Makeup requests" theme={theme} icon="face_retouching_natural" />
+            <NavItem to="/admin/makeup-bookings" label="Makeup requests" theme={theme} icon="face_retouching_natural" badge={makeupAlertCount} />
             <NavItem to="/admin/makeup-hours" label="Makeup hours" theme={theme} icon="schedule" />
             <NavItem to="/admin/orders" label="Orders" theme={theme} icon="receipt_long" badge={orderAlertCount} />
             <NavItem to="/admin/products" label="Products" theme={theme} icon="inventory_2" />
@@ -444,7 +505,7 @@ function AdminLayoutInner() {
             <MobileNavItem to="/admin/orders" label="Orders" icon="receipt_long" theme={theme} dot={orderAlertCount > 0} />
             <MobileNavItem to="/admin/products" label="Stock" icon="inventory_2" theme={theme} />
             <MobileNavItem to="/admin/customers" label="People" icon="group" theme={theme} />
-            <MobileNavItem to="/admin/makeup-bookings" label="Makeup" icon="face_retouching_natural" theme={theme} />
+            <MobileNavItem to="/admin/makeup-bookings" label="Makeup" icon="face_retouching_natural" theme={theme} dot={makeupAlertCount > 0} />
             <MobileNavItem to="/admin/transactions" label="Wallet" icon="account_balance_wallet" theme={theme} dot={orderAlertCount > 0} />
             <MobileNavItem to="/admin/account" label="More" icon="menu" theme={theme} />
           </nav>

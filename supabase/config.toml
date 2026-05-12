@@ -1,0 +1,6 @@
+# Edge Functions: https://supabase.com/docs/guides/functions
+# Link project: supabase link --project-ref <your-project-ref>
+# Deploy: supabase functions deploy admin-push-hook --no-verify-jwt
+
+[functions.admin-push-hook]
+verify_jwt = false

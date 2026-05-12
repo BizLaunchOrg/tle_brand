@@ -74,6 +74,14 @@ export async function fetchMakeupBookingsForAdmin(limit = 200): Promise<MakeupBo
   return data as MakeupBookingRow[]
 }
 
+export async function fetchMakeupBookingByIdForAdmin(id: string): Promise<MakeupBookingRow | null> {
+  if (!isSupabaseConfigured() || !id.trim()) return null
+  const { data, error } = await getSupabase().from('makeup_bookings').select('*').eq('id', id).maybeSingle()
+
+  if (error || !data) return null
+  return data as MakeupBookingRow
+}
+
 export async function updateMakeupBookingStatus(
   id: string,
   status: 'pending' | 'accepted' | 'rejected',
