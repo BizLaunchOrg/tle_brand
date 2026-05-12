@@ -33,7 +33,10 @@ export default defineConfig(({ mode }) => {
     var p = location.pathname
     var b = base === '/' ? '' : (base.length > 1 && base.endsWith('/') ? base.slice(0, -1) : base)
     var rel = !b ? p : (p.indexOf(b) === 0 ? p.slice(b.length) || '/' : p)
-    var isAdmin = rel === '/admin' || rel.startsWith('/admin/')
+    var isAdmin =
+      rel === '/admin' ||
+      rel.startsWith('/admin/') ||
+      rel.endsWith('/admin-install.html')
     if (!isAdmin) return
     var href = link.getAttribute('href') || ''
     var adminHref = href.replace(/manifest\\.webmanifest(\\?.*)?$/i, function (m, q) {
