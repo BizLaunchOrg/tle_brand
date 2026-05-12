@@ -5,7 +5,8 @@
  *
  * Edge secrets (Dashboard → Project Settings → Edge Functions → Secrets):
  *   WEBHOOK_SECRET       — long random string; must match webhook header
- *   PUBLIC_APP_URL       — e.g. https://your-store.vercel.app (no trailing slash)
+ *   PUBLIC_APP_URL       — optional override; e.g. https://your-store.vercel.app (same as Admin → Account “Public site URL” in shop_settings.public_app_url)
+ *   APP_URL / SITE_URL / STORE_URL / FRONTEND_URL — optional alternates if you prefer those names
  *   VAPID_SUBJECT        — e.g. mailto:you@yourdomain.com
  *   VAPID_PUBLIC_KEY     — same value as VITE_VAPID_PUBLIC_KEY in the frontend
  *   VAPID_PRIVATE_KEY    — keep secret; generate with: npx web-push generate-vapid-keys
@@ -17,7 +18,7 @@
  * After deploy, look for JSON lines with "source":"admin-push-hook" (insert_event / done / skipped).
  */
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3.6.7'
 
 type SubRow = {
@@ -51,6 +52,43 @@ function json(status: number, body: Record<string, unknown>) {
 /** Visible in Dashboard → Edge Functions → admin-push-hook → Logs (unlike generic “Boot” lines). */
 function logHook(msg: string, extra?: Record<string, unknown>) {
   console.log(JSON.stringify({ source: 'admin-push-hook', msg, ...extra }))
+}
+
+/** HTTPS (or http://localhost) origin only — paths are stripped. */
+function normalizePublicOrigin(raw: string | null | undefined): string | null {
+  if (raw == null || typeof raw !== 'string') return null
+  let s = raw.trim()
+  if (!s) return null
+  if (!/^https?:\/\//i.test(s)) {
+    if (s.startsWith('//')) s = `https:${s}`
+    else if (/^localhost\b|^127\./i.test(s)) s = `http://${s}`
+    else s = `https://${s}`
+  }
+  try {
+    const u = new URL(s)
+    return `${u.protocol}//${u.host}`
+  } catch {
+    return null
+  }
+}
+
+function resolvePublicAppUrlFromEnv(): string | null {
+  const keys = ['PUBLIC_APP_URL', 'APP_URL', 'SITE_URL', 'STORE_URL', 'FRONTEND_URL'] as const
+  for (const k of keys) {
+    const v = normalizePublicOrigin(Deno.env.get(k))
+    if (v) return v
+  }
+  return null
+}
+
+async function resolvePublicAppUrlFromDb(supabase: SupabaseClient): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('shop_settings')
+    .select('public_app_url')
+    .eq('id', 'default')
+    .maybeSingle()
+  if (error || !data) return null
+  return normalizePublicOrigin((data as { public_app_url?: string | null }).public_app_url)
 }
 
 Deno.serve(async (req) => {
@@ -94,11 +132,40 @@ Deno.serve(async (req) => {
 
   logHook('insert_event', { table })
 
-  const publicUrl = (Deno.env.get('PUBLIC_APP_URL') ?? '').trim().replace(/\/$/, '')
-  if (!publicUrl) {
-    logHook('error', { reason: 'PUBLIC_APP_URL not set' })
-    return json(500, { ok: false, error: 'PUBLIC_APP_URL not set' })
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceKey = getServiceRoleKey()
+  if (!supabaseUrl || !serviceKey) {
+    logHook('error', { reason: 'supabase_service_key' })
+    return json(500, {
+      ok: false,
+      error: 'supabase_service_key',
+      hint: 'Set SUPABASE_SERVICE_ROLE_KEY or ensure SUPABASE_SECRET_KEYS is available to Edge Functions.',
+    })
   }
+
+  const supabase = createClient(supabaseUrl, serviceKey)
+
+  let publicUrl = resolvePublicAppUrlFromEnv()
+  let publicSource: 'env' | 'database' | null = publicUrl ? 'env' : null
+  if (!publicUrl) {
+    publicUrl = await resolvePublicAppUrlFromDb(supabase)
+    publicSource = publicUrl ? 'database' : null
+  }
+
+  if (!publicUrl) {
+    logHook('error', {
+      reason: 'public_app_url_missing',
+      hint: 'Set Edge secret PUBLIC_APP_URL, or run migration shop_settings.public_app_url and save “Public site URL” in Admin → Account.',
+    })
+    return json(500, {
+      ok: false,
+      error: 'public_app_url_missing',
+      hint:
+        'Set PUBLIC_APP_URL (or APP_URL) in Edge Function secrets, or add column shop_settings.public_app_url via migration and save your live site URL in Admin → Account.',
+    })
+  }
+
+  logHook('public_url', { source: publicSource })
 
   const vapidSubject = Deno.env.get('VAPID_SUBJECT')?.trim()
   const vapidPublic = Deno.env.get('VAPID_PUBLIC_KEY')?.trim()
@@ -143,19 +210,6 @@ Deno.serve(async (req) => {
 
   const iconUrl = `${publicUrl}/tlepic1.jpeg`
   const payload = JSON.stringify({ title, body: notifBody, url: openUrl, icon: iconUrl, tag })
-
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const serviceKey = getServiceRoleKey()
-  if (!supabaseUrl || !serviceKey) {
-    logHook('error', { reason: 'supabase_service_key' })
-    return json(500, {
-      ok: false,
-      error: 'supabase_service_key',
-      hint: 'Set SUPABASE_SERVICE_ROLE_KEY or ensure SUPABASE_SECRET_KEYS is available to Edge Functions.',
-    })
-  }
-
-  const supabase = createClient(supabaseUrl, serviceKey)
   const { data: admins, error: adminErr } = await supabase.from('admin_users').select('user_id')
   if (adminErr || !admins?.length) {
     logHook('done', { sent: 0, note: adminErr?.message ?? 'no admin_users' })
