@@ -1,15 +1,16 @@
 {
+  "id": "tle-brand-admin",
   "name": "TLE Brand — Admin",
   "short_name": "TLE Admin",
   "description": "Merchant dashboard",
-  "start_url": "./admin",
-  "scope": "./",
+  "start_url": "/admin",
+  "scope": "/admin/",
   "display": "standalone",
   "background_color": "#0c0f0d",
   "theme_color": "#059669",
   "icons": [
     {
-      "src": "tlelogo.PNG",
+      "src": "/tlelogo.PNG",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

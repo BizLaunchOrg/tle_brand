@@ -185,18 +185,53 @@ function AdminLayoutInner() {
     }
   }
 
-  /** PWA “Add to Home Screen” uses manifest start_url — point merchants at /admin while they are in admin. */
+  /**
+   * PWA “Add to Home Screen” uses the linked manifest’s start_url. Static `manifest-admin.webmanifest`
+   * uses absolute `/admin` paths (correct for normal deploys). For a Vite subpath base, inject a blob
+   * manifest so start_url stays under that base.
+   */
   useEffect(() => {
     if (typeof document === 'undefined') return
     const link = document.getElementById('tle-web-manifest') as HTMLLinkElement | null
     if (!link) return
-    const raw = import.meta.env.BASE_URL || '/'
-    const prefix = raw.endsWith('/') ? raw : `${raw}/`
-    const storeManifest = `${prefix}manifest.webmanifest`.replace(/([^:]\/)\/+/g, '$1')
-    const adminManifest = `${prefix}manifest-admin.webmanifest`.replace(/([^:]\/)\/+/g, '$1')
-    link.setAttribute('href', adminManifest)
+    const base = import.meta.env.BASE_URL || '/'
+    const prefix = base.endsWith('/') ? base : `${base}/`
+    const storeManifestHref = `${prefix}manifest.webmanifest`.replace(/([^:]\/)\/+/g, '$1')
+    const adminManifestHref = `${prefix}manifest-admin.webmanifest`.replace(/([^:]\/)\/+/g, '$1')
+
+    const isRootBase = prefix === '/'
+
+    if (isRootBase) {
+      link.setAttribute('href', adminManifestHref)
+      return () => {
+        link.setAttribute('href', storeManifestHref)
+      }
+    }
+
+    const origin = window.location.origin
+    const adminPath = new URL('admin', `${origin}${prefix}`).pathname
+    const startUrl = `${origin}${adminPath}`
+    const scopeUrl = `${origin}${adminPath.endsWith('/') ? adminPath : `${adminPath}/`}`
+    const iconUrl = new URL('tlelogo.PNG', `${origin}${prefix}`).href
+
+    const json = JSON.stringify({
+      id: 'tle-brand-admin',
+      name: 'TLE Brand — Admin',
+      short_name: 'TLE Admin',
+      description: 'Merchant dashboard',
+      start_url: startUrl,
+      scope: scopeUrl,
+      display: 'standalone',
+      background_color: '#0c0f0d',
+      theme_color: '#059669',
+      icons: [{ src: iconUrl, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }],
+    })
+    const blob = new Blob([json], { type: 'application/manifest+json' })
+    const blobUrl = URL.createObjectURL(blob)
+    link.setAttribute('href', blobUrl)
     return () => {
-      link.setAttribute('href', storeManifest)
+      URL.revokeObjectURL(blobUrl)
+      link.setAttribute('href', storeManifestHref)
     }
   }, [])
 
