@@ -16,7 +16,7 @@ export function Footer() {
             />
           </Link>
           <p className="mb-7 max-w-[210px] text-[13px] leading-relaxed text-white/[0.38]">
-            Premium beauty and aesthetics for him and her. Lagos, Nigeria.
+            Intentional fashion, beauty, and glam experiences for him and her 🤍
           </p>
           <div className="flex max-w-[260px] items-center rounded-full border border-white/10 bg-white/[0.06] py-1 pl-[18px] pr-1">
             <input
