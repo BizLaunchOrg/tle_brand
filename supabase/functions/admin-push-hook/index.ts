@@ -87,8 +87,22 @@ async function resolvePublicAppUrlFromDb(supabase: SupabaseClient): Promise<stri
     .select('public_app_url')
     .eq('id', 'default')
     .maybeSingle()
-  if (error || !data) return null
-  return normalizePublicOrigin((data as { public_app_url?: string | null }).public_app_url)
+  if (error) {
+    logHook('public_url_db_error', { message: error.message, code: error.code })
+    return null
+  }
+  if (!data) {
+    logHook('public_url_db_empty', { reason: 'no default row' })
+    return null
+  }
+  const raw = (data as { public_app_url?: string | null }).public_app_url
+  const out = normalizePublicOrigin(raw)
+  if (!out) {
+    logHook('public_url_db_null', {
+      reason: raw == null || String(raw).trim() === '' ? 'column_empty' : 'invalid_url',
+    })
+  }
+  return out
 }
 
 Deno.serve(async (req) => {
