@@ -8,8 +8,8 @@
  *   PUBLIC_APP_URL       — optional override; e.g. https://your-store.vercel.app (same as Admin → Account “Public site URL” in shop_settings.public_app_url)
  *   APP_URL / SITE_URL / STORE_URL / FRONTEND_URL — optional alternates if you prefer those names
  *   VAPID_SUBJECT        — e.g. mailto:you@yourdomain.com
- *   VAPID_PUBLIC_KEY     — same value as VITE_VAPID_PUBLIC_KEY in the frontend
- *   VAPID_PRIVATE_KEY    — keep secret; generate with: npx web-push generate-vapid-keys
+ *   VAPID_PUBLIC_KEY     — same value as VITE_VAPID_PUBLIC_KEY in the frontend (generate: npm run vapid:keys)
+ *   VAPID_PRIVATE_KEY    — from same command; never commit; Edge secret only
  *
  * SUPABASE_URL is provided automatically. Use service role via legacy SUPABASE_SERVICE_ROLE_KEY
  * or default entry in SUPABASE_SECRET_KEYS (JSON); the function supports both.
@@ -26,6 +26,35 @@ type SubRow = {
   endpoint: string
   keys_p256dh: string
   keys_auth: string
+}
+
+function formatNgn(n: unknown): string {
+  const v = typeof n === 'number' ? n : Number(n)
+  if (!Number.isFinite(v) || v < 0) return '—'
+  return `₦${Math.round(v).toLocaleString('en-NG')}`
+}
+
+/** Title: price-first; body: product lines (truncated for OS limits). */
+function buildOrderPushCopy(record: Record<string, unknown>): { title: string; body: string } {
+  const total = formatNgn(record.total_ngn)
+  const title = `New order · ${total}`
+
+  const raw = record.line_items
+  const items: unknown[] = Array.isArray(raw) ? raw : []
+  const parts: string[] = []
+  for (let i = 0; i < items.length && parts.length < 4; i++) {
+    const o = items[i] as Record<string, unknown>
+    const name = String(o.name ?? 'Item').trim() || 'Item'
+    const q = Math.round(Number(o.quantity ?? 1)) || 1
+    const vl = o.variantLabel != null ? String(o.variantLabel).trim() : ''
+    const label = vl ? `${name} (${vl})` : name
+    parts.push(`${label} ×${q}`)
+  }
+  let body = parts.join(' · ')
+  if (items.length > 4) body += ` +${items.length - 4} more`
+  if (!body) body = String(record.email ?? '').trim() || 'Order placed'
+  if (body.length > 200) body = `${body.slice(0, 197)}…`
+  return { title, body }
 }
 
 /** Supabase-hosted functions may expose only `SUPABASE_SECRET_KEYS` (JSON); legacy `SUPABASE_SERVICE_ROLE_KEY` still exists on some projects. */
@@ -51,7 +80,10 @@ function json(status: number, body: Record<string, unknown>) {
 
 /** Visible in Dashboard → Edge Functions → admin-push-hook → Logs (unlike generic “Boot” lines). */
 function logHook(msg: string, extra?: Record<string, unknown>) {
-  console.log(JSON.stringify({ source: 'admin-push-hook', msg, ...extra }))
+  const rest = { ...(extra ?? {}) }
+  delete rest.source
+  delete rest.msg
+  console.log(JSON.stringify({ source: 'admin-push-hook', msg, ...rest }))
 }
 
 /** HTTPS (or http://localhost) origin only — paths are stripped. */
@@ -87,8 +119,22 @@ async function resolvePublicAppUrlFromDb(supabase: SupabaseClient): Promise<stri
     .select('public_app_url')
     .eq('id', 'default')
     .maybeSingle()
-  if (error || !data) return null
-  return normalizePublicOrigin((data as { public_app_url?: string | null }).public_app_url)
+  if (error) {
+    logHook('public_url_db_error', { message: error.message, code: error.code })
+    return null
+  }
+  if (!data) {
+    logHook('public_url_db_empty', { reason: 'no default row' })
+    return null
+  }
+  const raw = (data as { public_app_url?: string | null }).public_app_url
+  const out = normalizePublicOrigin(raw)
+  if (!out) {
+    logHook('public_url_db_null', {
+      reason: raw == null || String(raw).trim() === '' ? 'column_empty' : 'invalid_url',
+    })
+  }
+  return out
 }
 
 Deno.serve(async (req) => {
@@ -165,14 +211,24 @@ Deno.serve(async (req) => {
     })
   }
 
-  logHook('public_url', { source: publicSource })
+  logHook('public_url', { publicUrlSource: publicSource })
 
   const vapidSubject = Deno.env.get('VAPID_SUBJECT')?.trim()
   const vapidPublic = Deno.env.get('VAPID_PUBLIC_KEY')?.trim()
   const vapidPrivate = Deno.env.get('VAPID_PRIVATE_KEY')?.trim()
   if (!vapidSubject || !vapidPublic || !vapidPrivate) {
-    logHook('error', { reason: 'VAPID_* secrets not set' })
-    return json(500, { ok: false, error: 'VAPID_* secrets not set' })
+    const missing: string[] = []
+    if (!vapidSubject) missing.push('VAPID_SUBJECT')
+    if (!vapidPublic) missing.push('VAPID_PUBLIC_KEY')
+    if (!vapidPrivate) missing.push('VAPID_PRIVATE_KEY')
+    logHook('error', { reason: 'VAPID_* secrets not set', missing })
+    return json(500, {
+      ok: false,
+      error: 'vapid_secrets_missing',
+      missing,
+      hint:
+        'Supabase → Project Settings → Edge Functions → Secrets: add VAPID_SUBJECT (e.g. mailto:you@yourdomain.com), VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY. Run `npm run vapid:keys` in the repo, paste keys into Supabase, put the same public key in Vercel as VITE_VAPID_PUBLIC_KEY, redeploy the site, then re-enable Admin → Account notifications.',
+    })
   }
 
   webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate)
@@ -188,8 +244,9 @@ Deno.serve(async (req) => {
       logHook('skipped', { reason: 'no id', table })
       return json(200, { ok: true, skipped: true, reason: 'no id' })
     }
-    title = 'New order'
-    notifBody = String(record.email ?? 'New checkout')
+    const copy = buildOrderPushCopy(record)
+    title = copy.title
+    notifBody = copy.body
     openUrl = `${publicUrl}/admin/orders/${encodeURIComponent(id)}`
     tag = `order-${id}`
   } else if (table === 'makeup_bookings') {
@@ -234,6 +291,7 @@ Deno.serve(async (req) => {
   let sent = 0
   let removed = 0
   const rows = subs as SubRow[]
+  const failures: { statusCode: number; note: string }[] = []
 
   for (const row of rows) {
     const subscription = {
@@ -250,11 +308,26 @@ Deno.serve(async (req) => {
         await supabase.from('push_subscriptions').delete().eq('id', row.id)
         removed += 1
       } else {
-        logHook('push_failed', { statusCode, message: String(e) })
+        const note =
+          statusCode === 400
+            ? 'stale_or_mismatched_subscription'
+            : String(e).slice(0, 100)
+        failures.push({ statusCode, note })
       }
     }
   }
 
-  logHook('done', { sent, removed, targets: rows.length })
-  return json(200, { ok: true, sent, removed, targets: rows.length })
+  if (failures.length > 0) {
+    logHook('push_failures', {
+      failed: failures.length,
+      targets: rows.length,
+      sent,
+      sample: failures.slice(0, 2),
+      hint:
+        'Each saved device/browser gets one send; 400 often means an old subscription (new VAPID keys, cleared site data). Turn notifications off/on on Admin → Account on that device.',
+    })
+  }
+
+  logHook('done', { sent, removed, failed: failures.length, targets: rows.length })
+  return json(200, { ok: true, sent, removed, failed: failures.length, targets: rows.length })
 })
