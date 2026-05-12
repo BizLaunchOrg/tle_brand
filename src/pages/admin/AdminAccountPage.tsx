@@ -46,6 +46,12 @@ export function AdminAccountPage() {
   const [notifBusy, setNotifBusy] = useState(false)
   const [pushSubscribed, setPushSubscribed] = useState(false)
 
+  const rawBase = import.meta.env.BASE_URL || '/'
+  const adminInstallHref = `${rawBase.endsWith('/') ? rawBase : `${rawBase}/`}admin-install.html`.replace(
+    /([^:]\/)\/+/g,
+    '$1',
+  )
+
   useEffect(() => {
     if (user?.email) setEmail(user.email)
   }, [user?.email])
@@ -267,6 +273,23 @@ export function AdminAccountPage() {
         >
           {notifBusy ? 'Please wait…' : notificationsActive ? 'Turn off notifications' : 'Allow notifications'}
         </button>
+        <p className={muted + ' mt-3 text-[12px] leading-relaxed'}>
+          <span className={ad(theme, 'font-semibold text-stone-700', 'font-semibold text-neutral-200')}>
+            iPhone home screen:
+          </span>{' '}
+          if Share → Add to Home Screen keeps opening the shop instead of admin, open{' '}
+          <a
+            href={adminInstallHref}
+            className={ad(
+              theme,
+              'font-semibold text-emerald-700 underline decoration-emerald-700/30 underline-offset-2',
+              'font-semibold text-emerald-400 underline decoration-emerald-400/30 underline-offset-2',
+            )}
+          >
+            admin-install.html
+          </a>{' '}
+          in Safari, stay on that page, then use Add to Home Screen from there.
+        </p>
       </div>
 
       <form onSubmit={onSaveFees} className={surface + ' mt-8 space-y-5'}>

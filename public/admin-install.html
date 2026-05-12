@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#059669" />
+    <meta name="apple-mobile-web-app-title" content="TLE Admin" />
+    <link rel="icon" type="image/png" href="tlelogo.PNG" />
+    <link rel="apple-touch-icon" href="tlelogo.PNG" />
+    <!-- This page is outside the React app so Safari reads only the admin manifest (no SPA race). -->
+    <link rel="manifest" href="manifest-admin.webmanifest?from=install" />
+    <title>TLE Admin — install on home screen</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+        margin: 0;
+        padding: 1.25rem 1.25rem 2rem;
+        max-width: 26rem;
+        margin-inline: auto;
+        line-height: 1.5;
+        color: #1a1a1a;
+        background: #f8faf8;
+      }
+      h1 {
+        font-size: 1.15rem;
+        margin: 0 0 0.75rem;
+      }
+      ol {
+        margin: 0.75rem 0 0;
+        padding-left: 1.2rem;
+      }
+      li {
+        margin-bottom: 0.5rem;
+      }
+      a {
+        color: #059669;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Install the admin app</h1>
+    <p>Use this page only for <strong>Add to Home Screen</strong> on iPhone. Stay here — do not switch tabs.</p>
+    <ol>
+      <li>Tap the <strong>Share</strong> button (square with arrow).</li>
+      <li>Tap <strong>Add to Home Screen</strong>.</li>
+      <li>Save. The icon should open the merchant dashboard (<code>/admin</code>).</li>
+    </ol>
+    <p style="margin-top: 1.25rem">
+      <a href="./admin">Open admin in the main site</a>
+    </p>
+  </body>
+</html>
