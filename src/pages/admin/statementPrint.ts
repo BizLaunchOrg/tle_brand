@@ -1,5 +1,6 @@
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import { isCompletedStatus, isPendingStatus } from '../../lib/adminOrderAnalytics.ts'
+import { openHtmlPrintWindow } from '../../lib/openHtmlPrintWindow.ts'
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -90,21 +91,5 @@ export function buildStatementHtml(rows: AdminOrderRow[], meta: StatementMeta): 
 }
 
 export function printOrdersStatement(rows: AdminOrderRow[], meta: StatementMeta): boolean {
-  const html = buildStatementHtml(rows, meta)
-  const w = window.open('', '_blank', 'noopener,noreferrer')
-  if (!w) return false
-  w.document.open()
-  w.document.write(html)
-  w.document.close()
-  const runPrint = () => {
-    try {
-      w.focus()
-      w.print()
-    } catch {
-      /* ignore */
-    }
-  }
-  w.onload = runPrint
-  setTimeout(runPrint, 250)
-  return true
+  return openHtmlPrintWindow(buildStatementHtml(rows, meta))
 }

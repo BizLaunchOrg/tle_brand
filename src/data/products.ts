@@ -1,4 +1,4 @@
-export type ProductGender = 'her' | 'him'
+export type ProductGender = 'her' | 'him' | 'unisex'
 
 /** Finish / shade / color — drives gallery + optional price on the detail page */
 export type ProductColorOption = {
@@ -18,12 +18,18 @@ export type Product = {
   /** Primary photo (cards, cart default) */
   img: string
   alt: string
-  badge: string
-  /** Shown in orange promo pill on the card when set */
+  /** Optional short label (e.g. material). Prefer category + name for navigation. */
+  badge?: string
+  /** @deprecated Use compareAt + price for sale labels */
   promo?: string
   name: string
   cat: string
+  /** Selling price shown to customers (SP) */
   price: string
+  /** Cost price for margin tracking (CP), admin-only display */
+  cp?: string
+  /** “Was” price — when higher than `price`, storefront shows an automatic sale / % off */
+  compareAt?: string
   /** Extra angles / lifestyle shots (detail gallery); first hero is always `img` */
   gallery?: string[]
   /** When set, buyer picks a finish; each option can have its own photos & price */
@@ -34,8 +40,37 @@ export type Product = {
   tags?: string[]
   /** Admin: hide from shop when false; omitted = visible */
   published?: boolean
-  /** Admin: stock on hand (optional; used on inventory table) */
+  /** Admin: stock on hand (ignored when stockUnlimited) */
   stock?: number
+  /** Admin: treat stock as unlimited on storefront / lists */
+  stockUnlimited?: boolean
+}
+
+/** Parse ₦-style amounts to integer naira (digits only). */
+export function parseProductPriceNgn(price: string | undefined): number {
+  return Number(String(price ?? '').replace(/[^\d]/g, '')) || 0
+}
+
+/** For her / for him lists include unisex pieces; the Unisex tab lists only pieces marked unisex. */
+export function productMatchesGender(p: Product, filter: 'all' | ProductGender): boolean {
+  if (filter === 'all') return true
+  if (filter === 'unisex') return p.gender === 'unisex'
+  if (p.gender === 'unisex') return filter === 'her' || filter === 'him'
+  return p.gender === filter
+}
+
+/**
+ * Orange card / PDP pill: auto % off from compareAt vs price, or legacy `promo` text.
+ */
+export function productSalePill(p: Product): string | null {
+  const sale = parseProductPriceNgn(p.price)
+  const was = parseProductPriceNgn(p.compareAt)
+  if (was > sale && sale > 0) {
+    const pct = Math.round((1 - sale / was) * 100)
+    return pct > 0 ? `${pct}% off` : 'Sale'
+  }
+  const legacy = typeof p.promo === 'string' && p.promo.trim()
+  return legacy ? legacy.trim() : null
 }
 
 /** Normalize stored image URLs for `<img src>` (relative paths, protocol-relative, blob previews). */

@@ -9,7 +9,10 @@ import {
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { MakeupBookingDateTimePick } from "../../components/MakeupBookingDateTimePick.tsx";
 import { ProductCard } from "../../components/ProductCard.tsx";
-import { defaultVariantSelection } from "../../data/products.ts";
+import {
+  defaultVariantSelection,
+  productMatchesGender,
+} from "../../data/products.ts";
 import {
   BOOKABLE_SERVICES,
   MAKEUP_HIGHLIGHT_TAGS,
@@ -142,9 +145,9 @@ export function LandingPage() {
 
   const catalogSearch = (searchParams.get("q") || "").trim().toLowerCase();
 
-  const [filterGender, setFilterGender] = useState<"all" | "her" | "him">(
-    "all",
-  );
+  const [filterGender, setFilterGender] = useState<
+    "all" | "her" | "him" | "unisex"
+  >("all");
   const [formStep, setFormStep] = useState(1);
   const [selectedService, setSelectedService] = useState({
     name: "",
@@ -275,9 +278,10 @@ export function LandingPage() {
 
   const visibleProducts = useMemo(() => {
     return products.filter((p) => {
-      if (filterGender !== "all" && p.gender !== filterGender) return false;
+      if (filterGender !== "all" && !productMatchesGender(p, filterGender))
+        return false;
       if (!catalogSearch) return true;
-      const hay = `${p.name} ${p.cat} ${p.badge} ${p.alt}`.toLowerCase();
+      const hay = `${p.name} ${p.cat} ${p.badge ?? ""} ${p.alt}`.toLowerCase();
       return hay.includes(catalogSearch);
     });
   }, [catalogSearch, filterGender, products]);
@@ -581,6 +585,13 @@ export function LandingPage() {
               >
                 For Him
               </button>
+              <button
+                type="button"
+                className={pillCls(filterGender === "unisex")}
+                onClick={() => setFilterGender("unisex")}
+              >
+                Unisex
+              </button>
             </div>
           </div>
 
@@ -623,7 +634,7 @@ export function LandingPage() {
                       Go to shop
                     </Link>
                   </>
-                ) : (
+                ) : catalogSearch ? (
                   <>
                     <p className="font-sans text-lg font-medium text-tle-ink">
                       No products match your search.
@@ -637,6 +648,46 @@ export function LandingPage() {
                       onClick={() => setSearchParams({}, { replace: true })}
                     >
                       Clear filters
+                    </button>
+                  </>
+                ) : filterGender === "unisex" ? (
+                  <>
+                    <p className="font-sans text-lg font-medium text-tle-ink">
+                      Nothing here under Unisex yet.
+                    </p>
+                    <p className="mt-2 text-sm text-tle-muted">
+                      Try{" "}
+                      <strong className="font-semibold text-tle-ink">
+                        For Her
+                      </strong>
+                      ,{" "}
+                      <strong className="font-semibold text-tle-ink">
+                        For Him
+                      </strong>
+                      , or show everything at once.
+                    </p>
+                    <button
+                      type="button"
+                      className="mt-6 inline-flex rounded-full border border-tle-pink bg-tle-pink px-6 py-2.5 text-xs font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-deep"
+                      onClick={() => setFilterGender("all")}
+                    >
+                      Show all on home
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-sans text-lg font-medium text-tle-ink">
+                      Nothing in this filter right now.
+                    </p>
+                    <p className="mt-2 text-sm text-tle-muted">
+                      Try For Her, For Him, or All products.
+                    </p>
+                    <button
+                      type="button"
+                      className="mt-6 inline-flex rounded-full border border-tle-pink bg-tle-pink px-6 py-2.5 text-xs font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-deep"
+                      onClick={() => setFilterGender("all")}
+                    >
+                      Show all on home
                     </button>
                   </>
                 )}

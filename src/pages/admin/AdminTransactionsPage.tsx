@@ -12,6 +12,7 @@ import {
 import { firstLineItemDisplayableImage } from '../../lib/adminOrderLineSnapshots.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { AdminRangeTabs, AdminStatusBucketTabs, adminStatusPillClass, type AdminOrderBucket } from './adminRangeTabs.tsx'
+import { OrderRelativeTime } from './OrderRelativeTime.tsx'
 import { ad, adminFont } from './adminUi.ts'
 import { printOrdersStatement } from './statementPrint.ts'
 
@@ -163,9 +164,7 @@ export function AdminTransactionsPage() {
             </span>
             <h1 className={heading}>Transactions</h1>
           </div>
-          <p className={muted + ' mt-2 max-w-2xl text-[14px] leading-relaxed'}>
-            One row per checkout. Use <strong className={ad(theme, 'text-stone-700', 'text-neutral-300')}>View</strong> to open the full order page (same as Orders) — contact, address, line items, fees, and status updates.
-          </p>
+          <p className={muted + ' mt-2 max-w-xl text-[13px]'}>One row per order. View opens the order.</p>
         </div>
         <div className="flex w-full shrink-0 flex-col items-stretch gap-2 lg:w-auto lg:items-end">
           <button
@@ -179,9 +178,7 @@ export function AdminTransactionsPage() {
             <span className="material-symbols-outlined text-[22px] font-light">picture_as_pdf</span>
             Download statement
           </button>
-          <p className={muted + ' max-w-[280px] text-center text-[11px] lg:text-right'}>
-            Opens a print-ready page — choose &quot;Save as PDF&quot; to download.
-          </p>
+          <p className={muted + ' max-w-[260px] text-center text-[11px] lg:text-right'}>Print dialog → Save as PDF.</p>
         </div>
       </div>
 
@@ -200,7 +197,7 @@ export function AdminTransactionsPage() {
         <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-[0.14em] text-stone-500', 'text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500')}>
           Date range
         </p>
-        <p className={muted + ' mt-1 text-[12px]'}>Filters the list, summary cards, statement, and detail views.</p>
+        <p className={muted + ' mt-1 text-[12px]'}>Filters this list and the statement.</p>
         <div className="mt-3">
           <AdminRangeTabs value={range} onChange={setRange} theme={theme} compact />
         </div>
@@ -246,9 +243,8 @@ export function AdminTransactionsPage() {
             }}
           />
         </div>
-        <p className={muted + ' mt-4 text-[12px] leading-relaxed'}>
-          <span className="material-symbols-outlined mr-1 align-text-bottom text-[16px] font-light text-emerald-600">info</span>
-          The statement includes <strong className={ad(theme, 'text-stone-700', 'text-neutral-300')}>only rows in this view</strong> (up to 500 loaded). Widen filters for more history.
+        <p className={muted + ' mt-3 text-[12px]'}>
+          Statement uses only rows shown here (up to 500 loaded).
         </p>
       </div>
 
@@ -263,9 +259,9 @@ export function AdminTransactionsPage() {
                 <div className="min-w-0 flex-1">
                   <p className={'font-mono text-[11px] ' + muted}>{o.id.slice(0, 12)}…</p>
                   <p className={'truncate font-semibold ' + ad(theme, 'text-stone-900', 'text-white')}>{o.email}</p>
-                  <p className={muted + ' mt-1 text-[12px]'}>
-                    {new Date(o.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                  </p>
+                  <div className={muted + ' mt-1 text-[12px]'}>
+                    <OrderRelativeTime iso={o.created_at} theme={theme} />
+                  </div>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className={ad(theme, 'text-lg font-bold tabular-nums text-emerald-700', 'text-lg font-bold tabular-nums text-emerald-300')}>{formatNaira(Number(o.total_ngn) || 0)}</p>
@@ -314,13 +310,8 @@ export function AdminTransactionsPage() {
                     <td className={td + ' align-middle'}>
                       <TxLineThumb lineItems={o.line_items} theme={theme} />
                     </td>
-                    <td className={td + ' whitespace-nowrap tabular-nums ' + muted}>
-                      {new Date(o.created_at).toLocaleString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                    <td className={td + ' max-w-[120px] whitespace-normal'}>
+                      <OrderRelativeTime iso={o.created_at} theme={theme} />
                     </td>
                     <td className={td + ' font-mono text-[12px] ' + ad(theme, 'text-stone-700', 'text-neutral-300')}>{o.id.slice(0, 14)}…</td>
                     <td className={td + ' max-w-[200px] truncate font-medium ' + ad(theme, 'text-stone-900', 'text-neutral-100')}>{o.email}</td>

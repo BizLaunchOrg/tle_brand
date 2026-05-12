@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { displayableImageUrl, getDefaultImageUrls, type Product } from '../data/products.ts'
+import { displayableImageUrl, getDefaultImageUrls, productSalePill, type Product } from '../data/products.ts'
 
 /** Screenshot-matched palette */
 const NAVY = '#1A233A'
@@ -23,8 +23,8 @@ export function ProductCard({
   onToggleFavorite,
   className = '',
 }: ProductCardProps) {
-  const { slug, alt, name, cat, price, promo } = product
-  const promoLabel = typeof promo === 'string' && promo.trim() ? promo.trim() : null
+  const { slug, alt, name, cat, price } = product
+  const saleLabel = productSalePill(product)
   const previews = getDefaultImageUrls(product).map(displayableImageUrl)
   const [activeThumb, setActiveThumb] = useState(0)
   const displayImg = previews[activeThumb] ?? displayableImageUrl(product.img)
@@ -53,12 +53,12 @@ export function ProductCard({
         ) : (
           <span className="px-3 text-center text-[11px] font-semibold text-white/70">No photo</span>
         )}
-        {promoLabel ? (
+        {saleLabel ? (
           <span
             className="absolute top-2.5 left-2.5 rounded-md px-2 py-0.5 text-[8px] font-bold tracking-wide text-white uppercase sm:top-3.5 sm:left-3.5 sm:px-2.5 sm:py-1 sm:text-[10px]"
             style={{ backgroundColor: ORANGE }}
           >
-            {promoLabel}
+            {saleLabel}
           </span>
         ) : null}
       </Link>

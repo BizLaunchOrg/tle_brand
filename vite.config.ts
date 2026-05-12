@@ -16,6 +16,15 @@ export default defineConfig(({ mode }) => {
 
   return {
     base,
-    plugins: [react()],
+    plugins: [
+      react(),
+      {
+        name: 'tle-manifest-link-base',
+        transformIndexHtml(html) {
+          const storeManifest = `${base}manifest.webmanifest`.replace(/([^:]\/)\/+/g, '$1')
+          return html.replace(/href="manifest\.webmanifest"/, `href="${storeManifest}"`)
+        },
+      },
+    ],
   }
 })

@@ -7,6 +7,7 @@ import { normalizeOrderLineItems } from '../../lib/adminOrderLineSnapshots.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { adminStatusPillClass } from './adminRangeTabs.tsx'
 import { ad, adminFont } from './adminUi.ts'
+import { OrderRelativeTime } from './OrderRelativeTime.tsx'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
@@ -96,26 +97,19 @@ function shippingPill(status: string, theme: 'light' | 'dark'): { label: string;
   }
 }
 
-function formatOrderWhen(iso: string): string {
-  const d = new Date(iso)
-  const now = new Date()
-  const sameDay =
-    d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
-  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-  if (sameDay) return `Today at ${time}`
-  const yest = new Date(now)
-  yest.setDate(yest.getDate() - 1)
-  if (d.getFullYear() === yest.getFullYear() && d.getMonth() === yest.getMonth() && d.getDate() === yest.getDate()) {
-    return `Yesterday at ${time}`
-  }
-  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-function selectField(theme: 'light' | 'dark') {
+function ordersFilterSelect(theme: 'light' | 'dark') {
   return ad(
     theme,
-    'min-h-[44px] w-full cursor-pointer rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-[14px] font-semibold text-stone-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 sm:min-h-0 sm:py-2 sm:text-[13px]',
-    'min-h-[44px] w-full cursor-pointer rounded-xl border border-neutral-600 bg-neutral-950 px-3 py-2.5 text-[14px] font-semibold text-neutral-100 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25 sm:min-h-0 sm:py-2 sm:text-[13px]',
+    'h-11 w-full cursor-pointer rounded-lg border border-stone-200/90 bg-white px-3 text-[13px] font-semibold text-stone-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 lg:h-9 lg:text-[12px]',
+    'h-11 w-full cursor-pointer rounded-lg border border-neutral-600 bg-neutral-950 px-3 text-[13px] font-semibold text-neutral-100 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 lg:h-9 lg:text-[12px]',
+  )
+}
+
+function ordersSearchInput(theme: 'light' | 'dark') {
+  return ad(
+    theme,
+    'h-11 w-full rounded-lg border border-stone-200/90 bg-white py-0 pr-3 pl-10 text-[13px] font-medium text-stone-900 shadow-sm outline-none placeholder:text-stone-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 lg:h-9 lg:text-[12px]',
+    'h-11 w-full rounded-lg border border-neutral-600 bg-neutral-950 py-0 pr-3 pl-10 text-[13px] font-medium text-neutral-100 shadow-sm outline-none placeholder:text-neutral-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 lg:h-9 lg:text-[12px]',
   )
 }
 
@@ -258,9 +252,7 @@ export function AdminOrdersPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className={heading}>Orders</h1>
-          <p className={muted + ' mt-1 max-w-2xl text-[14px] leading-relaxed'}>
-            Website checkout only. Open a row for delivery details and line items. Status drives payment and shipping labels until you add separate payment fields.
-          </p>
+          <p className={muted + ' mt-1 max-w-2xl text-[13px]'}>Website checkout. Open a row for full details.</p>
         </div>
       </div>
 
@@ -334,89 +326,149 @@ export function AdminOrdersPage() {
         </div>
       </div>
 
-      <div className={'mt-6 min-w-0 ' + cardWrap}>
-        <div className={'flex flex-nowrap gap-2 overflow-x-auto border-b px-3 py-2 [-webkit-overflow-scrolling:touch] sm:px-4 ' + ad(theme, 'border-stone-100', 'border-neutral-800')}>
-          <button
-            type="button"
-            onClick={() => setListTab('all')}
-            className={
-              'shrink-0 rounded-lg px-4 py-2.5 text-[13px] font-bold transition sm:py-2 ' +
-              (listTab === 'all'
-                ? ad(theme, 'bg-emerald-600 text-white', 'bg-emerald-600 text-white')
-                : ad(theme, 'text-stone-600 hover:bg-stone-50', 'text-neutral-400 hover:bg-neutral-800/60'))
-            }
-          >
-            All
-          </button>
-          <button
-            type="button"
-            onClick={() => setListTab('attention')}
-            className={
-              'relative shrink-0 rounded-lg px-4 py-2.5 text-[13px] font-bold transition sm:py-2 ' +
-              (listTab === 'attention'
-                ? ad(theme, 'bg-emerald-600 text-white', 'bg-emerald-600 text-white')
-                : ad(theme, 'text-stone-600 hover:bg-stone-50', 'text-neutral-400 hover:bg-neutral-800/60'))
-            }
-          >
-            Attention
-            {attentionCount > 0 ? (
-              <span
-                className={
-                  'absolute top-1.5 right-1.5 size-2 rounded-full bg-rose-500 ring-2 sm:top-2 sm:right-2 ' +
-                  ad(theme, 'ring-white', 'ring-neutral-900')
-                }
-                aria-hidden
-              />
-            ) : null}
-          </button>
-        </div>
-
-        <div
-          className={
-            'flex flex-col gap-2.5 border-b px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:px-4 ' +
-            ad(theme, 'border-stone-100 bg-stone-50/40', 'border-neutral-800 bg-neutral-950/25')
-          }
-        >
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-1 sm:flex-wrap sm:gap-2">
-            <select className={selectField(theme)} value={range} aria-label="Date range" onChange={(e) => setRange(e.target.value as DateRangeFilter)}>
-              {DATE_OPTIONS.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <select className={selectField(theme)} value={statusFilter} aria-label="Order status" onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="all">Order status · All</option>
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </option>
-              ))}
-            </select>
-            <select
-              className={selectField(theme) + ' col-span-2 w-full sm:max-w-[200px]'}
-              value={paymentFilter}
-              aria-label="Payment status"
-              onChange={(e) => setPaymentFilter(e.target.value as 'all' | 'paid' | 'unpaid')}
+      <div className={'mt-6 min-w-0 overflow-hidden ' + cardWrap}>
+        <div className="flex flex-col">
+          <div className={'flex items-center justify-between gap-2 border-b px-3 py-2.5 sm:px-4 ' + ad(theme, 'border-stone-100 bg-stone-50/60', 'border-neutral-800 bg-neutral-950/40')}>
+            <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-[0.14em] text-stone-500', 'text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500')}>
+              List
+            </p>
+            <div
+              className={
+                'inline-flex shrink-0 rounded-lg p-0.5 ' + ad(theme, 'bg-stone-200/70 ring-1 ring-stone-200/60', 'bg-neutral-800 ring-1 ring-neutral-700/60')
+              }
+              role="tablist"
+              aria-label="Order list scope"
             >
-              <option value="all">Payment · All</option>
-              <option value="paid">Paid</option>
-              <option value="unpaid">Unpaid</option>
-            </select>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={listTab === 'all'}
+                onClick={() => setListTab('all')}
+                className={
+                  'rounded-md px-3 py-1.5 text-[12px] font-bold transition sm:px-4 sm:py-2 sm:text-[13px] ' +
+                  (listTab === 'all'
+                    ? ad(theme, 'bg-emerald-600 text-white shadow-sm', 'bg-emerald-600 text-white shadow-sm')
+                    : ad(theme, 'text-stone-600 hover:bg-white/70', 'text-neutral-400 hover:bg-neutral-700/80'))
+                }
+              >
+                All
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={listTab === 'attention'}
+                onClick={() => setListTab('attention')}
+                className={
+                  'relative rounded-md px-3 py-1.5 text-[12px] font-bold transition sm:px-4 sm:py-2 sm:text-[13px] ' +
+                  (listTab === 'attention'
+                    ? ad(theme, 'bg-emerald-600 text-white shadow-sm', 'bg-emerald-600 text-white shadow-sm')
+                    : ad(theme, 'text-stone-600 hover:bg-white/70', 'text-neutral-400 hover:bg-neutral-700/80'))
+                }
+              >
+                Attention
+                {attentionCount > 0 ? (
+                  <span
+                    className={
+                      'absolute -right-1 -top-1 flex min-w-[1rem] items-center justify-center rounded-full px-0.5 text-[9px] font-bold leading-none text-white ring-2 ' +
+                      (listTab === 'attention'
+                        ? 'bg-rose-500 ring-emerald-600'
+                        : ad(theme, 'bg-rose-500 ring-stone-200', 'bg-rose-500 ring-neutral-800'))
+                    }
+                    aria-hidden
+                  >
+                    {attentionCount > 9 ? '9+' : attentionCount}
+                  </span>
+                ) : null}
+              </button>
+            </div>
           </div>
-          <div className={'relative min-h-[44px] w-full min-w-0 sm:max-w-xs sm:flex-1 ' + ad(theme, '', '')}>
-            <span className={'material-symbols-outlined pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[20px] ' + muted}>search</span>
-            <input
-              type="search"
-              placeholder="Search orders…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className={selectField(theme) + ' h-full min-h-[44px] w-full pl-11'}
-            />
+
+          <div className={'px-3 py-3 sm:px-4 sm:py-3.5 ' + ad(theme, 'bg-white', 'bg-neutral-900/20')}>
+            <p
+              className={
+                'mb-3 text-[10px] font-bold uppercase tracking-[0.14em] ' +
+                ad(theme, 'text-stone-500', 'text-neutral-500')
+              }
+            >
+              Filters
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12 lg:items-end lg:gap-x-3">
+              <div className="sm:col-span-2 lg:col-span-2">
+                <label className={muted + ' mb-1 block text-[10px] font-bold uppercase tracking-[0.12em]'} htmlFor="orders-filter-range">
+                  Date range
+                </label>
+                <select
+                  id="orders-filter-range"
+                  className={ordersFilterSelect(theme)}
+                  value={range}
+                  aria-label="Date range"
+                  onChange={(e) => setRange(e.target.value as DateRangeFilter)}
+                >
+                  {DATE_OPTIONS.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-1 lg:col-span-2">
+                <label className={muted + ' mb-1 block text-[10px] font-bold uppercase tracking-[0.12em]'} htmlFor="orders-filter-status">
+                  Order status
+                </label>
+                <select
+                  id="orders-filter-status"
+                  className={ordersFilterSelect(theme)}
+                  value={statusFilter}
+                  aria-label="Order status"
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="all">All statuses</option>
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-1 lg:col-span-2">
+                <label className={muted + ' mb-1 block text-[10px] font-bold uppercase tracking-[0.12em]'} htmlFor="orders-filter-payment">
+                  Payment
+                </label>
+                <select
+                  id="orders-filter-payment"
+                  className={ordersFilterSelect(theme)}
+                  value={paymentFilter}
+                  aria-label="Payment filter"
+                  onChange={(e) => setPaymentFilter(e.target.value as 'all' | 'paid' | 'unpaid')}
+                >
+                  <option value="all">All</option>
+                  <option value="paid">Paid</option>
+                  <option value="unpaid">Unpaid</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2 lg:col-span-6">
+                <label className={muted + ' mb-1 block text-[10px] font-bold uppercase tracking-[0.12em]'} htmlFor="orders-filter-search">
+                  Search
+                </label>
+                <div className="relative">
+                  <span className={'material-symbols-outlined pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[20px] ' + muted}>
+                    search
+                  </span>
+                  <input
+                    id="orders-filter-search"
+                    type="search"
+                    placeholder="Reference, name, email, product…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className={ordersSearchInput(theme)}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="hidden w-full min-w-0 overflow-hidden md:block">
+        <div className={'hidden w-full min-w-0 overflow-hidden border-t md:block ' + ad(theme, 'border-stone-100', 'border-neutral-800')}>
           <table className="w-full min-w-0 table-fixed border-collapse text-left">
             <colgroup>
               <col style={{ width: '3%' }} />
@@ -484,7 +536,9 @@ export function AdminOrdersPage() {
                       <td className={td + ' min-w-0'}>
                         <span className={'inline-flex max-w-full truncate rounded-full px-1.5 py-0.5 text-[9px] font-bold sm:text-[10px] ' + ship.cls}>{ship.label}</span>
                       </td>
-                      <td className={td + ' min-w-0 break-words text-[11px] leading-snug ' + muted}>{formatOrderWhen(o.created_at)}</td>
+                      <td className={td + ' min-w-0 max-w-[140px] break-words text-[11px] leading-snug'}>
+                        <OrderRelativeTime iso={o.created_at} theme={theme} className="block w-full" />
+                      </td>
                       <td className={td + ' min-w-0'} onClick={(e) => e.stopPropagation()}>
                         <select
                           value={o.status}
@@ -534,7 +588,9 @@ export function AdminOrdersPage() {
                       <span className={'rounded-full px-2 py-0.5 text-[10px] font-bold ' + pay.cls}>{pay.label}</span>
                       <span className={'rounded-full px-2 py-0.5 text-[10px] font-bold ' + ship.cls}>{ship.label}</span>
                     </div>
-                    <p className={muted + ' mt-2 text-[11px]'}>{formatOrderWhen(o.created_at)}</p>
+                    <div className="mt-2">
+                      <OrderRelativeTime iso={o.created_at} theme={theme} />
+                    </div>
                   </button>
                   <div className="px-3 py-3">
                     <label className={'mb-1 block text-[10px] font-bold uppercase ' + muted}>Update status</label>

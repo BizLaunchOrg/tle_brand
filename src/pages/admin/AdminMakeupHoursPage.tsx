@@ -22,13 +22,12 @@ export function AdminMakeupHoursPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className={heading}>Makeup hours</h1>
-          <p className={muted + ' mt-2 max-w-2xl text-[14px] leading-relaxed'}>
-            Use the calendar to open or close specific dates, or pick exact start times for a single day. Optional weekly rules
-            repeat the same hours every Monday, Tuesday, etc.
+          <p className={muted + ' mt-2 max-w-xl text-[13px]'}>
+            Block dates or set start times per day. Weekly hours repeat unless a day is overridden here.
           </p>
         </div>
         <Link to="/admin/makeup-bookings" className={link + ' shrink-0 no-underline'}>
-          ← Back to makeup requests
+          Makeup requests
         </Link>
       </div>
       <AdminMakeupAvailabilityEditor />

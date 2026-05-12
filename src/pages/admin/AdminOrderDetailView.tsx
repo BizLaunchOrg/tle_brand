@@ -11,6 +11,7 @@ import {
   getGalleryUrls,
   type Product,
 } from '../../data/products.ts'
+import { OrderRelativeTime } from './OrderRelativeTime.tsx'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { adminStatusPillClass } from './adminRangeTabs.tsx'
 import { ad, adminFont } from './adminUi.ts'
@@ -430,8 +431,8 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
           <span className={'rounded-full px-2.5 py-1 text-[11px] font-bold uppercase ' + adminStatusPillClass(order.status, theme)}>Order: {order.status}</span>
           <span className={'rounded-full px-2.5 py-1 text-[11px] font-bold ' + pay.cls}>Payment: {pay.label}</span>
           <span className={'rounded-full px-2.5 py-1 text-[11px] font-bold ' + shipPill.cls}>Shipping: {shipPill.label}</span>
-          <span className={muted + ' text-[12px]'}>
-            {new Date(order.created_at).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' })}
+          <span className={muted + ' inline-flex items-center text-[12px]'}>
+            <OrderRelativeTime iso={order.created_at} theme={theme} />
           </span>
         </div>
       </div>
@@ -596,6 +597,12 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
           <div className={'rounded-2xl border p-4 ' + border + ' ' + panel}>
             <h2 className={'text-[11px] font-bold uppercase tracking-[0.12em] ' + muted}>Payment summary</h2>
             <dl className="mt-3 space-y-2 text-[13px]">
+              <div className="flex justify-between gap-2 border-b pb-2">
+                <dt className={muted}>Placed</dt>
+                <dd className="text-right">
+                  <OrderRelativeTime iso={order.created_at} theme={theme} className="inline-block max-w-[min(100%,12rem)] text-right" />
+                </dd>
+              </div>
               <div className="flex justify-between gap-2">
                 <dt className={muted}>Subtotal</dt>
                 <dd className={'font-semibold tabular-nums ' + strong}>{formatNaira(Number(order.subtotal_ngn) || 0)}</dd>
