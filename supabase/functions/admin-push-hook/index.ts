@@ -10,7 +10,8 @@
  *   VAPID_PUBLIC_KEY     — same value as VITE_VAPID_PUBLIC_KEY in the frontend
  *   VAPID_PRIVATE_KEY    — keep secret; generate with: npx web-push generate-vapid-keys
  *
- * SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided automatically.
+ * SUPABASE_URL is provided automatically. Use service role via legacy SUPABASE_SERVICE_ROLE_KEY
+ * or default entry in SUPABASE_SECRET_KEYS (JSON); the function supports both.
  */
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
@@ -21,6 +22,20 @@ type SubRow = {
   endpoint: string
   keys_p256dh: string
   keys_auth: string
+}
+
+/** Supabase-hosted functions may expose only `SUPABASE_SECRET_KEYS` (JSON); legacy `SUPABASE_SERVICE_ROLE_KEY` still exists on some projects. */
+function getServiceRoleKey(): string | undefined {
+  const legacy = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim()
+  if (legacy) return legacy
+  const raw = Deno.env.get('SUPABASE_SECRET_KEYS')?.trim()
+  if (!raw) return undefined
+  try {
+    const o = JSON.parse(raw) as Record<string, string>
+    return o.default ?? o.service_role ?? Object.values(o).find((v) => typeof v === 'string' && v.length > 20)
+  } catch {
+    return undefined
+  }
 }
 
 function json(status: number, body: Record<string, unknown>) {
@@ -34,8 +49,8 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json(405, { ok: false, error: 'method' })
 
   const secret = Deno.env.get('WEBHOOK_SECRET')?.trim()
-  const sent = req.headers.get('x-webhook-secret')?.trim()
-  if (!secret || secret !== sent) return json(401, { ok: false, error: 'unauthorized' })
+  const headerSecret = req.headers.get('x-webhook-secret')?.trim()
+  if (!secret || secret !== headerSecret) return json(401, { ok: false, error: 'unauthorized' })
 
   let body: Record<string, unknown>
   try {
@@ -50,7 +65,12 @@ Deno.serve(async (req) => {
   const record = body.record as Record<string, unknown> | undefined
 
   if (schema !== 'public' || String(type || '').toUpperCase() !== 'INSERT' || !table || !record) {
-    return json(200, { ok: true, skipped: true })
+    return json(200, {
+      ok: true,
+      skipped: true,
+      reason: 'payload_shape',
+      got: { schema, type, table, hasRecord: Boolean(record) },
+    })
   }
 
   const publicUrl = (Deno.env.get('PUBLIC_APP_URL') ?? '').trim().replace(/\/$/, '')
@@ -93,8 +113,14 @@ Deno.serve(async (req) => {
   const payload = JSON.stringify({ title, body: notifBody, url: openUrl, icon: iconUrl, tag })
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!supabaseUrl || !serviceKey) return json(500, { ok: false, error: 'supabase env' })
+  const serviceKey = getServiceRoleKey()
+  if (!supabaseUrl || !serviceKey) {
+    return json(500, {
+      ok: false,
+      error: 'supabase_service_key',
+      hint: 'Set SUPABASE_SERVICE_ROLE_KEY or ensure SUPABASE_SECRET_KEYS is available to Edge Functions.',
+    })
+  }
 
   const supabase = createClient(supabaseUrl, serviceKey)
   const { data: admins, error: adminErr } = await supabase.from('admin_users').select('user_id')
