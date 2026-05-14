@@ -10,7 +10,7 @@ import { NIGERIAN_STATES } from '../../data/nigerianStates.ts'
 import { useAuth } from '../../context/AuthContext'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
 import { computeCheckoutTotalWithFlatFees } from '../../lib/checkoutPricing.ts'
-import { fetchShopFees, type DeliveryZone } from '../../lib/shopSettings.ts'
+import { fetchShopFees, type ShopFees } from '../../lib/shopSettings.ts'
 import { createOrder } from '../../lib/userShopSync.ts'
 
 const formatNaira = (value: number) => `₦${value.toLocaleString()}`
@@ -42,6 +42,7 @@ type OrderReceipt = {
   subtotalNgn: number
   deliveryNgn: number
   processingNgn: number
+  processingVatNgn: number
   totalNgn: number
   deliverySummaryLabel: string
   lines: ReceiptLineItem[]
@@ -125,7 +126,11 @@ function buildReceiptDocumentHtml(receipt: OrderReceipt): string {
     <div class="totals">
       <div><span>Subtotal</span><span>${formatNaira(receipt.subtotalNgn)}</span></div>
       <div><span>${escapeHtml(receipt.deliverySummaryLabel)}</span><span>${formatNaira(receipt.deliveryNgn)}</span></div>
-      <div><span>Processing</span><span>${formatNaira(receipt.processingNgn)}</span></div>
+      <div><span>Processing</span><span>${formatNaira(receipt.processingNgn)}</span></div>${
+        receipt.processingVatNgn > 0
+          ? `<div><span>VAT on processing</span><span>${formatNaira(receipt.processingVatNgn)}</span></div>`
+          : ''
+      }
       <div class="grand"><span>Total</span><span>${formatNaira(receipt.totalNgn)}</span></div>
     </div>
     <hr class="rule"/>
@@ -189,11 +194,7 @@ export function CheckoutPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [orderReceipt, setOrderReceipt] = useState<OrderReceipt | null>(null)
-  const [shopFees, setShopFees] = useState<{
-    deliveryFeeNgn: number
-    processingFeeNgn: number
-    deliveryZones: DeliveryZone[]
-  } | null>(null)
+  const [shopFees, setShopFees] = useState<ShopFees | null>(null)
   const [deliveryZoneId, setDeliveryZoneId] = useState('')
 
   useEffect(() => {
@@ -221,11 +222,14 @@ export function CheckoutPage() {
     return deliveryZones.find((z) => z.id === deliveryZoneId) ?? deliveryZones[0]
   }, [deliveryZones, deliveryZoneId])
 
-  const { deliveryNgn, processingNgn, totalNgn } = useMemo(() => {
+  const { deliveryNgn, processingNgn, processingVatNgn, totalNgn } = useMemo(() => {
     const p = shopFees?.processingFeeNgn ?? 1_200
+    const vatPct = shopFees?.processingVatPercent ?? 0
     const d = selectedZone ? selectedZone.feeNgn : (shopFees?.deliveryFeeNgn ?? 4_000)
-    return computeCheckoutTotalWithFlatFees(cartSubtotal, d, p)
+    return computeCheckoutTotalWithFlatFees(cartSubtotal, d, p, vatPct)
   }, [cartSubtotal, shopFees, selectedZone])
+
+  const processingWithVatNgn = processingNgn + processingVatNgn
 
   useEffect(() => {
     if (!user) return
@@ -339,6 +343,12 @@ export function CheckoutPage() {
                 <span>Processing</span>
                 <span className="tabular-nums font-medium text-tle-ink">{formatNaira(orderReceipt.processingNgn)}</span>
               </div>
+              {orderReceipt.processingVatNgn > 0 ? (
+                <div className="flex justify-between text-tle-muted">
+                  <span>VAT on processing</span>
+                  <span className="tabular-nums font-medium text-tle-ink">{formatNaira(orderReceipt.processingVatNgn)}</span>
+                </div>
+              ) : null}
               <div className="flex justify-between border-t-2 border-tle-ink/90 pt-3 font-sans text-base font-bold text-tle-ink">
                 <span>Total</span>
                 <span className="tabular-nums">{formatNaira(orderReceipt.totalNgn)}</span>
@@ -465,7 +475,7 @@ export function CheckoutPage() {
           : null
       const d = zone ? zone.feeNgn : shopFees.deliveryFeeNgn
       const p = shopFees.processingFeeNgn
-      const fees = computeCheckoutTotalWithFlatFees(subtotal, d, p)
+      const fees = computeCheckoutTotalWithFlatFees(subtotal, d, p, shopFees.processingVatPercent)
 
       const result = await createOrder({
         userId: user.id,
@@ -487,6 +497,7 @@ export function CheckoutPage() {
         subtotalNgn: subtotal,
         deliveryNgn: fees.deliveryNgn,
         processingNgn: fees.processingNgn,
+        processingVatNgn: fees.processingVatNgn,
         totalNgn: fees.totalNgn,
       })
 
@@ -519,6 +530,7 @@ export function CheckoutPage() {
         subtotalNgn: subtotal,
         deliveryNgn: fees.deliveryNgn,
         processingNgn: fees.processingNgn,
+        processingVatNgn: fees.processingVatNgn,
         totalNgn: fees.totalNgn,
         deliverySummaryLabel: zone ? zone.label : 'Delivery',
         lines: receiptLines,
@@ -542,8 +554,8 @@ export function CheckoutPage() {
         <h1 className="font-sans text-[clamp(1.75rem,4vw,2.25rem)] font-semibold text-tle-ink">Delivery in Nigeria</h1>
         <p className="mt-2 max-w-xl text-sm text-tle-muted">
           {deliveryZones.length > 0
-            ? `Pick your delivery or pickup option. Processing ${formatNaira(processingNgn)} applies once per order.`
-            : `Delivery ${formatNaira(deliveryNgn)} plus processing ${formatNaira(processingNgn)} per order.`}
+            ? `Pick your delivery or pickup option. Processing ${formatNaira(processingWithVatNgn)}${processingVatNgn > 0 ? ' (incl. VAT)' : ''} applies once per order.`
+            : `Delivery ${formatNaira(deliveryNgn)} plus processing ${formatNaira(processingWithVatNgn)}${processingVatNgn > 0 ? ' (incl. VAT)' : ''} per order.`}
         </p>
 
         <form
@@ -732,9 +744,15 @@ export function CheckoutPage() {
                 <span className="font-medium text-tle-ink">{formatNaira(deliveryNgn)}</span>
               </div>
               <div className="flex justify-between text-tle-muted">
-                <span>Processing (flat)</span>
+                <span>Processing</span>
                 <span className="font-medium text-tle-ink">{formatNaira(processingNgn)}</span>
               </div>
+              {processingVatNgn > 0 ? (
+                <div className="flex justify-between text-tle-muted">
+                  <span>VAT on processing</span>
+                  <span className="font-medium text-tle-ink">{formatNaira(processingVatNgn)}</span>
+                </div>
+              ) : null}
               <div className="flex justify-between border-t border-black/[0.08] pt-3 font-sans text-lg font-semibold text-tle-ink">
                 <span>Total</span>
                 <span>{formatNaira(totalNgn)}</span>

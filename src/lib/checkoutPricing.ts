@@ -5,16 +5,32 @@ export const CHECKOUT_PROCESSING_FEE_NGN = 1_200
 /** @deprecated Percent-based processing removed; flat fee from shop settings. */
 export const CHECKOUT_PROCESSING_PERCENT = 0
 
+/** VAT on the processing line only; `processingVatPercent` is 0–100. */
+export function computeProcessingVatNgn(processingBaseNgn: number, processingVatPercent: number): number {
+  const base = Math.max(0, Math.round(processingBaseNgn))
+  const rate = Math.max(0, Math.min(100, Number(processingVatPercent)))
+  if (!Number.isFinite(rate) || rate <= 0) return 0
+  return Math.round((base * rate) / 100)
+}
+
 export function computeCheckoutTotalWithFlatFees(
   subtotalNgn: number,
   deliveryNgn: number,
   processingNgn: number,
-): { deliveryNgn: number; processingNgn: number; totalNgn: number } {
+  processingVatPercent = 0,
+): {
+  deliveryNgn: number
+  processingNgn: number
+  processingVatNgn: number
+  totalNgn: number
+} {
   const d = Math.max(0, Math.round(deliveryNgn))
   const p = Math.max(0, Math.round(processingNgn))
+  const v = computeProcessingVatNgn(p, processingVatPercent)
   return {
     deliveryNgn: d,
     processingNgn: p,
-    totalNgn: Math.max(0, Math.round(subtotalNgn)) + d + p,
+    processingVatNgn: v,
+    totalNgn: Math.max(0, Math.round(subtotalNgn)) + d + p + v,
   }
 }

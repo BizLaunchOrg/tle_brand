@@ -47,6 +47,21 @@ export type Product = {
 }
 
 /**
+ * Max units customers can add for this product when inventory is tracked.
+ * `stockUnlimited` or missing `stock` → no client cap (999 per line).
+ */
+export function getProductPurchasableMaxUnits(p: Product): number {
+  if (p.stockUnlimited === true) return 999
+  if (typeof p.stock !== 'number' || !Number.isFinite(p.stock)) return 999
+  return Math.max(0, Math.floor(p.stock))
+}
+
+/** Tracked stock is zero (or negative) — show unavailable; block add to cart. */
+export function isProductOutOfStock(p: Product): boolean {
+  return getProductPurchasableMaxUnits(p) <= 0
+}
+
+/**
  * Parse ₦-style amounts to integer naira.
  * - "6000.00" / "6,000.00" → use Number (do not strip `.` with digits-only).
  * - "6000,00" / "6.000,00" (decimal comma) → treat last `,xx` as decimals, not thousands.

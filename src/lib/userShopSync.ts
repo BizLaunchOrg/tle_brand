@@ -127,6 +127,7 @@ export async function createOrder(params: {
   subtotalNgn: number
   deliveryNgn: number
   processingNgn: number
+  processingVatNgn: number
   totalNgn: number
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) {
@@ -145,8 +146,11 @@ export async function createOrder(params: {
       subtotal_ngn: params.subtotalNgn,
       delivery_ngn: params.deliveryNgn,
       processing_ngn: params.processingNgn,
+      processing_vat_ngn: params.processingVatNgn,
       total_ngn: params.totalNgn,
       status: 'paid',
+      payment_status: 'paid',
+      delivery_status: 'pending',
     })
     .select('id')
     .maybeSingle()

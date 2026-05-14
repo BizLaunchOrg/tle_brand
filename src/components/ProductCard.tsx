@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { displayableImageUrl, getDefaultImageUrls, productSalePill, type Product } from '../data/products.ts'
+import {
+  displayableImageUrl,
+  getDefaultImageUrls,
+  isProductOutOfStock,
+  productSalePill,
+  type Product,
+} from '../data/products.ts'
 
 /** Screenshot-matched palette */
 const NAVY = '#1A233A'
@@ -25,6 +31,7 @@ export function ProductCard({
 }: ProductCardProps) {
   const { slug, alt, name, cat, price } = product
   const saleLabel = productSalePill(product)
+  const outOfStock = isProductOutOfStock(product)
   const previews = getDefaultImageUrls(product).map(displayableImageUrl)
   const [activeThumb, setActiveThumb] = useState(0)
   const displayImg = previews[activeThumb] ?? displayableImageUrl(product.img)
@@ -59,6 +66,11 @@ export function ProductCard({
             style={{ backgroundColor: ORANGE }}
           >
             {saleLabel}
+          </span>
+        ) : null}
+        {outOfStock ? (
+          <span className="absolute right-2.5 bottom-2.5 rounded-md border border-white/25 bg-black/55 px-2 py-0.5 text-[8px] font-bold tracking-wide text-white uppercase backdrop-blur-sm sm:right-3.5 sm:bottom-3.5 sm:px-2.5 sm:py-1 sm:text-[10px]">
+            Unavailable
           </span>
         ) : null}
       </Link>
@@ -100,20 +112,32 @@ export function ProductCard({
       </Link>
 
       <div className="mt-3.5 flex items-stretch gap-2 sm:mt-5">
-        <button
-          type="button"
-          className={`flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-[10px] px-2 text-[9px] font-bold tracking-[0.1em] text-white uppercase transition-colors sm:min-h-[48px] sm:gap-2 sm:px-3 sm:text-[11px] ${
-            inCart ? 'bg-emerald-600 hover:bg-emerald-700' : 'hover:opacity-95'
-          }`}
-          style={inCart ? undefined : { backgroundColor: NAVY }}
-          onClick={(e) => {
-            e.preventDefault()
-            onAddToCart?.()
-          }}
-        >
-          <span className="material-symbols-outlined text-[16px] leading-none sm:text-[20px]">shopping_bag</span>
-          {inCart ? 'IN CART' : 'ADD TO CART'}
-        </button>
+        {outOfStock ? (
+          <button
+            type="button"
+            disabled
+            aria-disabled
+            className="flex min-h-[40px] flex-1 cursor-not-allowed items-center justify-center gap-1.5 rounded-[10px] border border-zinc-200 bg-zinc-100 px-2 text-[9px] font-bold tracking-[0.1em] text-zinc-500 uppercase sm:min-h-[48px] sm:gap-2 sm:px-3 sm:text-[11px]"
+          >
+            <span className="material-symbols-outlined text-[16px] leading-none opacity-60 sm:text-[20px]">block</span>
+            Out of stock
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={`flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-[10px] px-2 text-[9px] font-bold tracking-[0.1em] text-white uppercase transition-colors sm:min-h-[48px] sm:gap-2 sm:px-3 sm:text-[11px] ${
+              inCart ? 'bg-emerald-600 hover:bg-emerald-700' : 'hover:opacity-95'
+            }`}
+            style={inCart ? undefined : { backgroundColor: NAVY }}
+            onClick={(e) => {
+              e.preventDefault()
+              onAddToCart?.()
+            }}
+          >
+            <span className="material-symbols-outlined text-[16px] leading-none sm:text-[20px]">shopping_bag</span>
+            {inCart ? 'IN CART' : 'ADD TO CART'}
+          </button>
+        )}
         <button
           type="button"
           className={`flex size-10 shrink-0 items-center justify-center rounded-[10px] border transition-colors sm:size-12 ${

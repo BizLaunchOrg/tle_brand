@@ -5,6 +5,8 @@ import {
   cartLineKey,
   getDisplayPrice,
   getGalleryUrls,
+  getProductPurchasableMaxUnits,
+  isProductOutOfStock,
   parseProductPriceNgn,
   productDescriptionPlainText,
   productSalePill,
@@ -18,7 +20,7 @@ export function ProductDetailPage() {
   const products = useShopProducts()
   const { slug } = useParams<{ slug: string }>()
   const product = useMemo(() => products.find((p) => p.slug === slug), [products, slug])
-  const { addToCart, toggleFavorite, isFavorite, isLineInCart } = useCartDrawer()
+  const { addToCart, toggleFavorite, isFavorite, isLineInCart, lineQuantityInCart } = useCartDrawer()
 
   const [pickedColorId, setPickedColorId] = useState<string | null>(null)
   const [activeImageIdx, setActiveImageIdx] = useState(0)
@@ -103,6 +105,13 @@ export function ProductDetailPage() {
       ? { id: colorId, label: selectedVariant.label }
       : undefined
 
+  const outOfStock = isProductOutOfStock(product)
+  const maxUnits = getProductPurchasableMaxUnits(product)
+  const lineQty = lineQuantityInCart(lineKey)
+  const atCartMax = maxUnits < 999 && lineQty >= maxUnits
+  const addDisabled = outOfStock || atCartMax
+  const addButtonLabel = outOfStock ? 'Out of stock' : atCartMax ? 'Maximum in cart' : inCart ? 'Added — add another' : 'Add to cart'
+
   return (
     <section className="min-h-0 flex-1 bg-tle-cream/60 px-4 pb-20 pt-28 sm:px-6 md:px-10 md:pt-32 lg:px-16">
       <div className="mx-auto w-full max-w-[1240px]">
@@ -173,6 +182,11 @@ export function ProductDetailPage() {
                   style={{ backgroundColor: ORANGE }}
                 >
                   {saleLabel}
+                </span>
+              ) : null}
+              {outOfStock ? (
+                <span className="pointer-events-none absolute bottom-4 left-4 rounded-lg border border-white/25 bg-black/55 px-3 py-1 text-[10px] font-bold tracking-wide text-white uppercase backdrop-blur-sm sm:text-[11px]">
+                  Unavailable
                 </span>
               ) : null}
               {product.badge?.trim() ? (
@@ -284,17 +298,35 @@ export function ProductDetailPage() {
               </div>
             ) : null}
 
-            <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-stretch">
+            <div className="mt-10 flex flex-col gap-3">
+              {!outOfStock && maxUnits < 5 && maxUnits >= 1 ? (
+                <p className="text-[13px] font-medium text-amber-900/90">Only {maxUnits} left in stock.</p>
+              ) : null}
+              {outOfStock ? (
+                <p className="text-[13px] leading-relaxed text-tle-muted">Unavailable to order right now.</p>
+              ) : null}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
               <button
                 type="button"
-                className={`flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-[14px] px-6 text-[12px] font-bold tracking-[0.12em] text-white uppercase transition-colors sm:max-w-[280px] ${
-                  inCart ? 'bg-emerald-600 hover:bg-emerald-700' : 'hover:opacity-95'
+                disabled={addDisabled}
+                aria-disabled={addDisabled}
+                className={`flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-[14px] px-6 text-[12px] font-bold tracking-[0.12em] uppercase transition-colors sm:max-w-[280px] ${
+                  addDisabled
+                    ? 'cursor-not-allowed border border-black/10 bg-zinc-100 text-zinc-500'
+                    : inCart
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      : 'text-white hover:opacity-95'
                 }`}
-                style={inCart ? undefined : { backgroundColor: NAVY }}
-                onClick={() => addToCart(product, addVariant)}
+                style={addDisabled || inCart ? undefined : { backgroundColor: NAVY }}
+                onClick={() => {
+                  if (addDisabled) return
+                  addToCart(product, addVariant)
+                }}
               >
-                <span className="material-symbols-outlined text-[22px] leading-none">shopping_bag</span>
-                {inCart ? 'Added — add another' : 'Add to cart'}
+                <span className="material-symbols-outlined text-[22px] leading-none">
+                  {outOfStock ? 'block' : 'shopping_bag'}
+                </span>
+                {addButtonLabel}
               </button>
               <button
                 type="button"
@@ -314,6 +346,7 @@ export function ProductDetailPage() {
                 </span>
                 {favorite ? 'Saved' : 'Wishlist'}
               </button>
+              </div>
             </div>
 
             <Link

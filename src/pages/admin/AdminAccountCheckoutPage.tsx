@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   DEFAULT_DELIVERY_FEE_NGN,
   DEFAULT_PROCESSING_FEE_NGN,
+  DEFAULT_PROCESSING_VAT_PERCENT,
   fetchShopFees,
   updateShopFees,
   type DeliveryZone,
@@ -29,6 +30,7 @@ export function AdminAccountCheckoutPage() {
   const { theme } = useAdminTheme()
   const [deliveryFee, setDeliveryFee] = useState(String(DEFAULT_DELIVERY_FEE_NGN))
   const [processingFee, setProcessingFee] = useState(String(DEFAULT_PROCESSING_FEE_NGN))
+  const [processingVatPercent, setProcessingVatPercent] = useState(String(DEFAULT_PROCESSING_VAT_PERCENT))
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([])
   const [busyFees, setBusyFees] = useState(false)
   const [feesLoaded, setFeesLoaded] = useState(false)
@@ -43,6 +45,7 @@ export function AdminAccountCheckoutPage() {
       if (!on) return
       setDeliveryFee(String(s.deliveryFeeNgn))
       setProcessingFee(String(s.processingFeeNgn))
+      setProcessingVatPercent(String(s.processingVatPercent))
       setDeliveryZones(
         s.deliveryZones.length > 0 ? s.deliveryZones.map((z) => ({ ...z })) : [],
       )
@@ -96,12 +99,15 @@ export function AdminAccountCheckoutPage() {
     setNotice(null)
     const d = Math.round(Number(deliveryFee.replace(/[^\d]/g, '')) || 0)
     const p = Math.round(Number(processingFee.replace(/[^\d]/g, '')) || 0)
+    const vatRaw = processingVatPercent.trim().replace(',', '.')
+    const vatNum = Number(vatRaw)
+    const vat = Number.isFinite(vatNum) ? Math.min(100, Math.max(0, vatNum)) : 0
     if (d < 0 || p < 0 || d > 50_000_000 || p > 50_000_000) {
       setError('Enter sensible whole-naira amounts (0–50,000,000).')
       return
     }
     setBusyFees(true)
-    const res = await updateShopFees(d, p, { deliveryZones })
+    const res = await updateShopFees(d, p, { deliveryZones, processingVatPercent: vat })
     setBusyFees(false)
     if (!res.ok) {
       setError(res.message)
@@ -205,9 +211,29 @@ export function AdminAccountCheckoutPage() {
                   autoComplete="off"
                 />
               </div>
+              <div className={'flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 ' + rowHover}>
+                <div className="min-w-0 flex-1">
+                  <p className={rowTitle}>VAT on processing</p>
+                  <p className={rowSub}>Percent of the processing line only (0–100). Leave 0 if not registered for VAT.</p>
+                </div>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  disabled={!feesLoaded}
+                  value={processingVatPercent}
+                  onChange={(e) => setProcessingVatPercent(e.target.value)}
+                  className={
+                    input +
+                    ' w-full shrink-0 text-right font-semibold tabular-nums sm:max-w-[160px] sm:min-w-[140px]'
+                  }
+                  autoComplete="off"
+                  placeholder="0"
+                />
+              </div>
             </div>
             <p className={muted + ' mt-2 px-1 text-[12px]'}>
-              Examples: delivery {formatNaira(DEFAULT_DELIVERY_FEE_NGN)}, processing {formatNaira(DEFAULT_PROCESSING_FEE_NGN)}.
+              Examples: delivery {formatNaira(DEFAULT_DELIVERY_FEE_NGN)}, processing {formatNaira(DEFAULT_PROCESSING_FEE_NGN)}
+              . VAT example: 7.5 means processing × 7.5%, rounded to whole naira, added to the order total.
             </p>
           </section>
 

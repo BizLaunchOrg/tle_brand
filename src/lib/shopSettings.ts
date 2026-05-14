@@ -3,6 +3,7 @@ import { isSupabaseConfigured } from './mapSupabaseAuthError'
 
 export const DEFAULT_DELIVERY_FEE_NGN = 4_000
 export const DEFAULT_PROCESSING_FEE_NGN = 1_200
+export const DEFAULT_PROCESSING_VAT_PERCENT = 0
 
 export type DeliveryZone = {
   id: string
@@ -15,6 +16,8 @@ export type DeliveryZone = {
 export type ShopFees = {
   deliveryFeeNgn: number
   processingFeeNgn: number
+  /** Percent (0–100) of `processingFeeNgn` charged as VAT on that line only. */
+  processingVatPercent: number
   /** When non-empty, checkout uses these options instead of the flat delivery fee. */
   deliveryZones: DeliveryZone[]
 }
@@ -28,6 +31,12 @@ function clampFee(n: unknown, fallback: number): number {
   const v = Math.round(Number(n))
   if (!Number.isFinite(v) || v < 0) return fallback
   return Math.min(v, 50_000_000)
+}
+
+function clampVatPercent(n: unknown): number {
+  const v = Number(n)
+  if (!Number.isFinite(v) || v < 0) return DEFAULT_PROCESSING_VAT_PERCENT
+  return Math.round(Math.min(100, v) * 1000) / 1000
 }
 
 /** Match Edge Function admin-push-hook: origin only, no trailing path. */
@@ -79,6 +88,7 @@ export function normalizeDeliveryZones(raw: unknown): DeliveryZone[] {
 type ShopSettingsRow = {
   delivery_fee_ngn: unknown
   processing_fee_ngn: unknown
+  processing_vat_percent?: unknown
   public_app_url?: string | null
   delivery_zones?: unknown
 }
@@ -87,7 +97,7 @@ async function fetchShopSettingsRow(): Promise<ShopSettingsRow | null> {
   if (!isSupabaseConfigured()) return null
   const { data, error } = await getSupabase()
     .from('shop_settings')
-    .select('delivery_fee_ngn, processing_fee_ngn, public_app_url, delivery_zones')
+    .select('delivery_fee_ngn, processing_fee_ngn, processing_vat_percent, public_app_url, delivery_zones')
     .eq('id', 'default')
     .maybeSingle()
 
@@ -101,12 +111,14 @@ export async function fetchShopFees(): Promise<ShopFees> {
     return {
       deliveryFeeNgn: DEFAULT_DELIVERY_FEE_NGN,
       processingFeeNgn: DEFAULT_PROCESSING_FEE_NGN,
+      processingVatPercent: DEFAULT_PROCESSING_VAT_PERCENT,
       deliveryZones: [],
     }
   }
   return {
     deliveryFeeNgn: clampFee(row.delivery_fee_ngn, DEFAULT_DELIVERY_FEE_NGN),
     processingFeeNgn: clampFee(row.processing_fee_ngn, DEFAULT_PROCESSING_FEE_NGN),
+    processingVatPercent: clampVatPercent(row.processing_vat_percent),
     deliveryZones: normalizeDeliveryZones(row.delivery_zones),
   }
 }
@@ -117,6 +129,7 @@ export async function fetchShopAccountSettings(): Promise<ShopAccountSettings> {
     return {
       deliveryFeeNgn: DEFAULT_DELIVERY_FEE_NGN,
       processingFeeNgn: DEFAULT_PROCESSING_FEE_NGN,
+      processingVatPercent: DEFAULT_PROCESSING_VAT_PERCENT,
       deliveryZones: [],
       publicAppUrl: null,
     }
@@ -124,6 +137,7 @@ export async function fetchShopAccountSettings(): Promise<ShopAccountSettings> {
   const fees = {
     deliveryFeeNgn: clampFee(row.delivery_fee_ngn, DEFAULT_DELIVERY_FEE_NGN),
     processingFeeNgn: clampFee(row.processing_fee_ngn, DEFAULT_PROCESSING_FEE_NGN),
+    processingVatPercent: clampVatPercent(row.processing_vat_percent),
     deliveryZones: normalizeDeliveryZones(row.delivery_zones),
   }
   const raw = row.public_app_url
@@ -136,6 +150,8 @@ export type UpdateShopFeesOptions = {
   publicAppUrlInput?: string | null
   /** When set, replaces `delivery_zones` in the database (can be []). */
   deliveryZones?: DeliveryZone[]
+  /** Percent VAT on processing only (0–100). */
+  processingVatPercent?: number
 }
 
 export async function updateShopFees(
@@ -151,6 +167,10 @@ export async function updateShopFees(
     delivery_fee_ngn: d,
     processing_fee_ngn: p,
     updated_at: new Date().toISOString(),
+  }
+
+  if (options?.processingVatPercent !== undefined) {
+    patch.processing_vat_percent = clampVatPercent(options.processingVatPercent)
   }
 
   const publicAppUrlInput = options?.publicAppUrlInput

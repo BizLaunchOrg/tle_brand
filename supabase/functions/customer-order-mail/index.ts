@@ -177,11 +177,16 @@ function totalsBlock(record: Record<string, unknown>): string {
   const sub = formatNgn(record.subtotal_ngn)
   const del = formatNgn(record.delivery_ngn)
   const proc = formatNgn(record.processing_ngn)
+  const vatN = Math.round(Number(record.processing_vat_ngn ?? 0)) || 0
+  const vatRow =
+    vatN > 0
+      ? `<tr><td style="padding-top:6px;">VAT on processing</td><td align="right" style="padding-top:6px;font-weight:600;color:#181818;">${formatNgn(vatN)}</td></tr>`
+      : ''
   const tot = formatNgn(record.total_ngn)
   return `<table role="presentation" width="100%" style="margin-top:16px;font-size:14px;color:#6b5f58;">
 <tr><td>Subtotal</td><td align="right" style="font-weight:600;color:#181818;">${sub}</td></tr>
 <tr><td style="padding-top:6px;">Delivery / pickup</td><td align="right" style="padding-top:6px;font-weight:600;color:#181818;">${del}</td></tr>
-<tr><td style="padding-top:6px;">Processing</td><td align="right" style="padding-top:6px;font-weight:600;color:#181818;">${proc}</td></tr>
+<tr><td style="padding-top:6px;">Processing</td><td align="right" style="padding-top:6px;font-weight:600;color:#181818;">${proc}</td></tr>${vatRow}
 <tr><td style="border-top:2px solid #181818;padding-top:12px;font-size:16px;font-weight:700;color:#181818;">Total</td><td align="right" style="border-top:2px solid #181818;padding-top:12px;font-size:16px;font-weight:700;color:#181818;">${tot}</td></tr>
 </table>`
 }

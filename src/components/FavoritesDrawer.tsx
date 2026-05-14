@@ -1,5 +1,9 @@
 import { Link } from 'react-router-dom'
-import { defaultVariantSelection, displayableImageUrl } from '../data/products.ts'
+import {
+  defaultVariantSelection,
+  displayableImageUrl,
+  isProductOutOfStock,
+} from '../data/products.ts'
 import { useCartDrawer } from '../context/CartDrawerContext.tsx'
 
 export function FavoritesDrawer() {
@@ -35,7 +39,9 @@ export function FavoritesDrawer() {
               <p className="mt-2 text-sm text-tle-muted">Tap the heart icon on a product to save it here.</p>
             </div>
           ) : (
-            favoriteItems.map((item) => (
+            favoriteItems.map((item) => {
+              const unavailable = isProductOutOfStock(item)
+              return (
               <div key={item.slug} className="flex gap-4 border-b border-black/[0.06] py-4">
                 <Link to={`/product/${item.slug}`} onClick={closeFavorites} className="shrink-0">
                   <img src={displayableImageUrl(item.img)} alt={item.alt} className="size-[70px] h-[90px] rounded-xl object-cover" />
@@ -53,14 +59,20 @@ export function FavoritesDrawer() {
                     {item.badge?.trim() ? ` · ${item.badge.trim()}` : ''}
                   </div>
                   <div className="font-sans text-base font-semibold text-tle-gold">{item.price}</div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="rounded-full bg-tle-charcoal px-4 py-2 text-[10px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink"
-                      onClick={() => addToCart(item, defaultVariantSelection(item))}
-                    >
-                      Add to cart
-                    </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {unavailable ? (
+                      <span className="rounded-full border border-black/10 bg-zinc-50 px-4 py-2 text-[10px] font-semibold tracking-wide text-zinc-500 uppercase">
+                        Out of stock
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="rounded-full bg-tle-charcoal px-4 py-2 text-[10px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink"
+                        onClick={() => addToCart(item, defaultVariantSelection(item))}
+                      >
+                        Add to cart
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="text-[10px] font-semibold tracking-wide text-tle-muted uppercase transition-colors hover:text-tle-pink"
@@ -71,7 +83,8 @@ export function FavoritesDrawer() {
                   </div>
                 </div>
               </div>
-            ))
+              )
+            })
           )}
         </div>
       </aside>
