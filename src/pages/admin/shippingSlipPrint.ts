@@ -63,13 +63,13 @@ export function buildShippingSlipHtml(order: AdminOrderRow): string {
     .join('')
 
   const sub = formatNaira(Number(order.subtotal_ngn) || 0)
+  const salesVatN = Number(order.sales_vat_ngn) || 0
+  const salesVatRow =
+    salesVatN > 0
+      ? `<tr><td colspan="3" class="tot-l">VAT on products</td><td class="num">${esc(formatNaira(salesVatN))}</td></tr>`
+      : ''
   const del = formatNaira(Number(order.delivery_ngn) || 0)
   const proc = formatNaira(Number(order.processing_ngn) || 0)
-  const vatN = Number(order.processing_vat_ngn) || 0
-  const vatRow =
-    vatN > 0
-      ? `<tr><td colspan="3" class="tot-l">VAT on processing</td><td class="num">${esc(formatNaira(vatN))}</td></tr>`
-      : ''
   const tot = formatNaira(Number(order.total_ngn) || 0)
 
   const addrHtml =
@@ -227,9 +227,9 @@ export function buildShippingSlipHtml(order: AdminOrderRow): string {
       <div class="totals">
         <table>
           <tr><td class="tot-l">Subtotal</td><td class="num">${esc(sub)}</td></tr>
+          ${salesVatRow}
           <tr><td class="tot-l">Delivery / pickup</td><td class="num">${esc(del)}</td></tr>
           <tr><td class="tot-l">Processing</td><td class="num">${esc(proc)}</td></tr>
-          ${vatRow}
           <tr class="grand"><td>Order total</td><td class="num">${esc(tot)}</td></tr>
         </table>
       </div>

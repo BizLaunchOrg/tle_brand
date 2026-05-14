@@ -10,6 +10,7 @@ export type AdminOrderRow = {
   subtotal_ngn: number
   delivery_ngn: number | null
   processing_ngn: number | null
+  sales_vat_ngn: number | null
   processing_vat_ngn: number | null
   total_ngn: number | null
   status: string

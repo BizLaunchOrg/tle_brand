@@ -229,6 +229,8 @@ export function AdminProductsPage() {
 
   const mainFileRef = useRef<HTMLInputElement>(null)
   const galleryFilesRef = useRef<HTMLInputElement>(null)
+  const colorOptionFilesRef = useRef<HTMLInputElement>(null)
+  const colorUploadIdxRef = useRef<number | null>(null)
 
   const load = useCallback(async () => {
     const [catalog, ord, catRows] = await Promise.all([
@@ -510,6 +512,50 @@ export function AdminProductsPage() {
     }
     setUploadBusy(false)
     setGalleryText((prev) => [prev.replace(/\s+$/, ''), ...urls].filter(Boolean).join('\n'))
+  }
+
+  const runColorOptionUploads = async (files: FileList | null) => {
+    const idx = colorUploadIdxRef.current
+    colorUploadIdxRef.current = null
+    if (idx === null || !files?.length) return
+    setUploadBusy(true)
+    setMsg(null)
+    const urls: string[] = []
+    for (let i = 0; i < files.length; i++) {
+      const r = await uploadProductImageFile(files[i]!)
+      if (r.ok) urls.push(r.publicUrl)
+      else {
+        setUploadBusy(false)
+        setMsg({ type: 'err', text: r.message })
+        return
+      }
+    }
+    setUploadBusy(false)
+    if (!urls.length) return
+    setColorDrafts((rows) =>
+      rows.map((row, i) => {
+        if (i !== idx) return row
+        const cur = row.imagesText
+          .split('\n')
+          .map((s) => s.trim())
+          .filter(Boolean)
+        return { ...row, imagesText: [...cur, ...urls].join('\n') }
+      }),
+    )
+  }
+
+  const removeColorOptionImageAt = (colorIdx: number, imageIdx: number) => {
+    setColorDrafts((rows) =>
+      rows.map((row, i) => {
+        if (i !== colorIdx) return row
+        const cur = row.imagesText
+          .split('\n')
+          .map((s) => s.trim())
+          .filter(Boolean)
+        cur.splice(imageIdx, 1)
+        return { ...row, imagesText: cur.join('\n') }
+      }),
+    )
   }
 
   const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
@@ -1061,7 +1107,25 @@ export function AdminProductsPage() {
                   <span className="material-symbols-outlined text-[20px] font-light">upload</span>
                   {uploadBusy ? 'Uploading…' : 'Upload main photo'}
                 </button>
-                <input ref={galleryFilesRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => void runGalleryUploads(e.target.files)} />
+                <input
+                  ref={galleryFilesRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => void runGalleryUploads(e.target.files)}
+                />
+                <input
+                  ref={colorOptionFilesRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    void runColorOptionUploads(e.target.files)
+                    e.target.value = ''
+                  }}
+                />
                 <button
                   type="button"
                   disabled={uploadBusy}
@@ -1126,13 +1190,6 @@ export function AdminProductsPage() {
                     <option value="him">For him</option>
                     <option value="unisex">Unisex — for anyone</option>
                   </select>
-                  <p className={muted + ' mt-1 text-[12px] leading-relaxed'}>
-                    <strong className={'font-semibold ' + ad(theme, 'text-stone-700', 'text-neutral-200')}>For her</strong> and{' '}
-                    <strong className={'font-semibold ' + ad(theme, 'text-stone-700', 'text-neutral-200')}>for him</strong> are the
-                    main collections. Pick <strong className={'font-semibold ' + ad(theme, 'text-stone-700', 'text-neutral-200')}>unisex</strong>{' '}
-                    when the piece is meant for everyone: it appears on the Unisex page and still shows when someone opens For her or
-                    For him.
-                  </p>
                 </div>
                 <div>
                   <label className={label}>CP — cost price (optional)</label>
@@ -1264,7 +1321,12 @@ export function AdminProductsPage() {
                 </div>
                 <div className="mt-4 space-y-4">
                   {colorDrafts.length === 0 ? null : (
-                    colorDrafts.map((c, idx) => (
+                    colorDrafts.map((c, idx) => {
+                      const optionUrls = c.imagesText
+                        .split('\n')
+                        .map((s) => s.trim())
+                        .filter(Boolean)
+                      return (
                       <div
                         key={idx}
                         className={'rounded-xl border p-4 ' + ad(theme, 'border-stone-200 bg-white', 'border-neutral-700 bg-neutral-900/60')}
@@ -1313,14 +1375,13 @@ export function AdminProductsPage() {
                             />
                           </div>
                           <div>
-                            <label className={label}>Code</label>
+                            <label className={label}>Variant ID</label>
                             <input
                               className={fieldBox(theme) + ' font-mono text-[12px]'}
                               placeholder="e.g. lady-v-6779009"
                               value={c.id}
                               onChange={(e) => setColorDrafts((a) => a.map((x, i) => (i === idx ? { ...x, id: e.target.value } : x)))}
                             />
-                            <p className={muted + ' mt-1 text-[11px]'}>No spaces. For cart / stock.</p>
                           </div>
                           <div>
                             <label className={label}>Price override (optional)</label>
@@ -1334,12 +1395,58 @@ export function AdminProductsPage() {
                         </div>
                         <div className="mt-3">
                           <label className={label}>Photos for this option (optional)</label>
-                          <textarea
-                            className={fieldBox(theme) + ' min-h-[56px] font-mono text-[11px]'}
-                            placeholder="One URL per line; blank uses main + gallery"
-                            value={c.imagesText}
-                            onChange={(e) => setColorDrafts((a) => a.map((x, i) => (i === idx ? { ...x, imagesText: e.target.value } : x)))}
-                          />
+                          <p className={muted + ' mt-1 text-[12px]'}>
+                            Upload from your computer — stored like main photos. If you add none, the shop uses the main product images.
+                          </p>
+                          {optionUrls.length > 0 ? (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {optionUrls.map((u, imgIdx) => (
+                                  <div key={`${u}-${imgIdx}`} className="relative shrink-0">
+                                    <TableThumb url={u} theme={theme} size="lg" />
+                                    <button
+                                      type="button"
+                                      disabled={uploadBusy}
+                                      onClick={() => removeColorOptionImageAt(idx, imgIdx)}
+                                      className={
+                                        'absolute -right-1 -top-1 flex size-6 items-center justify-center rounded-full border text-[12px] font-bold shadow ' +
+                                        ad(theme, 'border-stone-200 bg-white text-stone-700 hover:bg-rose-50', 'border-neutral-600 bg-neutral-900 text-neutral-200 hover:bg-rose-950/50')
+                                      }
+                                      aria-label="Remove photo"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              disabled={uploadBusy}
+                              onClick={() => {
+                                colorUploadIdxRef.current = idx
+                                colorOptionFilesRef.current?.click()
+                              }}
+                              className={
+                                'inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-[13px] font-semibold disabled:opacity-50 ' +
+                                ad(theme, 'border-emerald-300 bg-emerald-50 text-emerald-900', 'border-emerald-800 bg-emerald-950/40 text-emerald-200')
+                              }
+                            >
+                              <span className="material-symbols-outlined text-[20px] font-light">upload</span>
+                              {uploadBusy ? 'Uploading…' : 'Upload photos'}
+                            </button>
+                          </div>
+                          <details className={'mt-2 rounded-lg border px-3 py-2 ' + ad(theme, 'border-stone-200 bg-stone-50/80', 'border-neutral-700 bg-neutral-950/40')}>
+                            <summary className={'cursor-pointer text-[12px] font-semibold ' + ad(theme, 'text-stone-700', 'text-neutral-300')}>
+                              Paste image URLs instead
+                            </summary>
+                            <textarea
+                              className={fieldBox(theme) + ' mt-2 min-h-[56px] font-mono text-[11px]'}
+                              placeholder="One URL per line"
+                              value={c.imagesText}
+                              onChange={(e) => setColorDrafts((a) => a.map((x, i) => (i === idx ? { ...x, imagesText: e.target.value } : x)))}
+                            />
+                          </details>
                         </div>
                         <div className="mt-3 text-right">
                           <button
@@ -1354,7 +1461,8 @@ export function AdminProductsPage() {
                           </button>
                         </div>
                       </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
               </div>
