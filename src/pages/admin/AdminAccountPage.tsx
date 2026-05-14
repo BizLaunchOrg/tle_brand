@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { getSupabase } from '../../lib/supabaseClient'
 import { isSupabaseConfigured, mapSupabaseAuthError } from '../../lib/mapSupabaseAuthError'
 import { useAuth } from '../../context/AuthContext'
@@ -17,15 +17,6 @@ import {
   syncAdminWebPushLocalFromBrowser,
   unsubscribeAdminPush,
 } from '../../lib/adminPushSubscribe.ts'
-import {
-  DEFAULT_DELIVERY_FEE_NGN,
-  DEFAULT_PROCESSING_FEE_NGN,
-  fetchShopAccountSettings,
-  normalizeStorePublicUrl,
-  updateShopFees,
-} from '../../lib/shopSettings.ts'
-
-const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
 export function AdminAccountPage() {
   const { user } = useAuth()
@@ -38,21 +29,9 @@ export function AdminAccountPage() {
   const [busyPw, setBusyPw] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  const [deliveryFee, setDeliveryFee] = useState(String(DEFAULT_DELIVERY_FEE_NGN))
-  const [processingFee, setProcessingFee] = useState(String(DEFAULT_PROCESSING_FEE_NGN))
-  const [publicAppUrl, setPublicAppUrl] = useState('')
-  const [busyFees, setBusyFees] = useState(false)
-  const [feesLoaded, setFeesLoaded] = useState(false)
   const [notifyEnabled, setNotifyEnabled] = useState(false)
   const [notifBusy, setNotifBusy] = useState(false)
   const [pushSubscribed, setPushSubscribed] = useState(false)
-
-  const rawBase = import.meta.env.BASE_URL || '/'
-  const adminInstallHref = `${rawBase.endsWith('/') ? rawBase : `${rawBase}/`}admin-install.html`.replace(
-    /([^:]\/)\/+/g,
-    '$1',
-  )
 
   useEffect(() => {
     if (user?.email) setEmail(user.email)
@@ -81,48 +60,75 @@ export function AdminAccountPage() {
     }
   }, [])
 
-  useEffect(() => {
-    let on = true
-    void (async () => {
-      const s = await fetchShopAccountSettings()
-      if (!on) return
-      setDeliveryFee(String(s.deliveryFeeNgn))
-      setProcessingFee(String(s.processingFeeNgn))
-      if (s.publicAppUrl) {
-        setPublicAppUrl(s.publicAppUrl)
-      } else if (typeof window !== 'undefined') {
-        const o = normalizeStorePublicUrl(window.location.origin)
-        setPublicAppUrl(o ?? window.location.origin)
-      }
-      setFeesLoaded(true)
-    })()
-    return () => {
-      on = false
-    }
-  }, [])
-
-  const surface = ad(
+  const shell = ad(theme, 'min-h-[calc(100vh-4rem)] bg-stone-100/90', 'min-h-[calc(100vh-4rem)] bg-neutral-950')
+  const listCard = ad(
     theme,
-    'rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6',
-    'rounded-2xl border border-neutral-700/90 bg-neutral-900/40 p-5 shadow-sm sm:p-6',
+    'overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-sm',
+    'overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/80 shadow-sm',
   )
+  const rowHover = ad(theme, 'transition-colors hover:bg-stone-50', 'transition-colors hover:bg-neutral-800/40')
+  const chevron = ad(theme, 'material-symbols-outlined shrink-0 text-[22px] text-stone-300', 'material-symbols-outlined shrink-0 text-[22px] text-neutral-600')
+  const titleSm = ad(theme, 'text-[11px] font-bold uppercase tracking-[0.2em] text-stone-400', 'text-[11px] font-bold uppercase tracking-[0.2em] text-neutral-500')
+  const rowTitle = ad(theme, 'text-[16px] font-semibold leading-snug text-stone-900', 'text-[16px] font-semibold leading-snug text-neutral-100')
+  const rowSub = ad(theme, 'mt-1 text-[13px] leading-snug text-stone-500', 'mt-1 text-[13px] leading-snug text-neutral-400')
+  const label = ad(theme, 'mb-1.5 block text-[11px] font-semibold text-stone-500', 'mb-1.5 block text-[11px] font-semibold text-neutral-400')
   const input = ad(
     theme,
-    'w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-[13px] outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20',
-    'w-full rounded-xl border border-neutral-600 bg-neutral-950 px-3 py-2.5 text-[13px] text-neutral-100 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25',
-  )
-  const label = ad(
-    theme,
-    'mb-1.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-stone-500',
-    'mb-1.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500',
+    'w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-[15px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30',
+    'w-full rounded-xl border border-neutral-700 bg-neutral-950 px-3 py-2.5 text-[15px] text-neutral-100 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30',
   )
   const btn = ad(
     theme,
-    'rounded-xl bg-emerald-600 px-4 py-2.5 text-[13px] font-bold text-white shadow-md shadow-emerald-900/15 transition hover:bg-emerald-700 disabled:opacity-50',
-    'rounded-xl bg-emerald-600 px-4 py-2.5 text-[13px] font-bold text-white shadow-md shadow-emerald-900/25 transition hover:bg-emerald-500 disabled:opacity-50',
+    'inline-flex min-h-[44px] items-center justify-center rounded-xl bg-emerald-600 px-5 text-[13px] font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50',
+    'inline-flex min-h-[44px] items-center justify-center rounded-xl bg-emerald-600 px-5 text-[13px] font-bold text-white transition hover:bg-emerald-500 disabled:opacity-50',
   )
-  const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
-  const heading = ad(theme, 'text-2xl font-bold tracking-tight text-stone-900', 'text-2xl font-bold tracking-tight text-white')
+  const muted = ad(theme, 'text-stone-500', 'text-neutral-400')
+  const pageTitle = ad(theme, 'text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl', 'text-2xl font-bold tracking-tight text-white sm:text-3xl')
+
+  const notificationsActive = pushSubscribed || notifyEnabled
+
+  const onNotifications = async () => {
+    setError(null)
+    setNotice(null)
+    if (notificationsActive) {
+      setNotifBusy(true)
+      await unsubscribeAdminPush()
+      setAdminBrowserNotifyEnabled(false)
+      setNotifyEnabled(false)
+      const sub = await getExistingPushSubscription()
+      setPushSubscribed(!!sub)
+      await syncAdminWebPushLocalFromBrowser()
+      setNotifBusy(false)
+      setNotice('Notifications are off.')
+      return
+    }
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setNotice('This browser does not support notifications.')
+      return
+    }
+    setNotifBusy(true)
+    const perm = await Notification.requestPermission()
+    if (perm !== 'granted') {
+      setNotifBusy(false)
+      setNotice('Notifications stay off until you allow them in your browser or phone settings.')
+      return
+    }
+    const tryPush = Boolean(getVapidPublicKeyForPush()) && isPushApiSupported()
+    if (tryPush) {
+      const res = await subscribeAdminPush()
+      if (res.ok) {
+        setPushSubscribed(true)
+        setNotifBusy(false)
+        setNotice('Notifications are on.')
+        return
+      }
+    }
+    setAdminBrowserNotifyEnabled(true)
+    setNotifyEnabled(true)
+    setPushSubscribed(!!(await getExistingPushSubscription()))
+    setNotifBusy(false)
+    setNotice('Notifications are on while you keep admin open in a tab.')
+  }
 
   const onEmail = async (e: FormEvent) => {
     e.preventDefault()
@@ -175,225 +181,115 @@ export function AdminAccountPage() {
     setNotice('Password updated.')
   }
 
-  const onSaveFees = async (e: FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setNotice(null)
-    const d = Math.round(Number(deliveryFee.replace(/[^\d]/g, '')) || 0)
-    const p = Math.round(Number(processingFee.replace(/[^\d]/g, '')) || 0)
-    if (d < 0 || p < 0 || d > 50_000_000 || p > 50_000_000) {
-      setError('Enter sensible whole-naira amounts (0–50,000,000).')
-      return
-    }
-    setBusyFees(true)
-    const res = await updateShopFees(d, p, publicAppUrl)
-    setBusyFees(false)
-    if (!res.ok) {
-      setError(res.message)
-      return
-    }
-    setNotice('Store settings saved. Checkout fees and push notification links use these values.')
-  }
-
-  const notificationsActive = pushSubscribed || notifyEnabled
-
-  const onNotifications = async () => {
-    setError(null)
-    setNotice(null)
-    if (notificationsActive) {
-      setNotifBusy(true)
-      await unsubscribeAdminPush()
-      setAdminBrowserNotifyEnabled(false)
-      setNotifyEnabled(false)
-      const sub = await getExistingPushSubscription()
-      setPushSubscribed(!!sub)
-      await syncAdminWebPushLocalFromBrowser()
-      setNotifBusy(false)
-      setNotice('Notifications are off.')
-      return
-    }
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setNotice('This browser does not support notifications.')
-      return
-    }
-    setNotifBusy(true)
-    const perm = await Notification.requestPermission()
-    if (perm !== 'granted') {
-      setNotifBusy(false)
-      setNotice('Notifications stay off until you allow them in your browser or phone settings.')
-      return
-    }
-    const tryPush = Boolean(getVapidPublicKeyForPush()) && isPushApiSupported()
-    if (tryPush) {
-      const res = await subscribeAdminPush()
-      if (res.ok) {
-        setPushSubscribed(true)
-        setNotifBusy(false)
-        setNotice('Notifications are on.')
-        return
-      }
-    }
-    setAdminBrowserNotifyEnabled(true)
-    setNotifyEnabled(true)
-    setPushSubscribed(!!(await getExistingPushSubscription()))
-    setNotifBusy(false)
-    setNotice('Notifications are on while you keep admin open in a tab.')
-  }
+  const divide = ad(theme, 'divide-y divide-stone-100', 'divide-y divide-neutral-800/80')
 
   return (
-    <div className={adminFont() + ' mx-auto w-full max-w-lg pb-10'}>
-      <h1 className={heading}>Account</h1>
-      <p className={muted + ' mt-1 text-[14px] leading-relaxed'}>
-        Sign-in, passwords, your live site URL (for admin push links), checkout fees, and alerts.
-      </p>
+    <div className={adminFont() + ' ' + shell}>
+      <div className="mx-auto w-full max-w-lg px-4 py-8 sm:max-w-xl sm:px-6 lg:max-w-2xl lg:py-12">
+        <h1 className={pageTitle}>Settings</h1>
+        <p className={muted + ' mt-2 text-[15px]'}>Store options and your admin sign-in.</p>
 
-      {error ? (
-        <p
-          className={
-            'mt-6 rounded-2xl border px-4 py-3 text-[13px] font-medium ' +
-            ad(theme, 'border-rose-200 bg-rose-50 text-rose-900', 'border-rose-900/40 bg-rose-950/30 text-rose-200')
-          }
-          role="alert"
-        >
-          {error}
-        </p>
-      ) : null}
-      {notice ? (
-        <p
-          className={
-            'mt-6 rounded-2xl border px-4 py-3 text-[13px] font-medium ' +
-            ad(theme, 'border-emerald-200 bg-emerald-50 text-emerald-900', 'border-emerald-800/50 bg-emerald-950/40 text-emerald-200')
-          }
-          role="status"
-        >
-          {notice}
-        </p>
-      ) : null}
-
-      <div id="admin-push" className={surface + ' mt-6 scroll-mt-24 space-y-3'}>
-        <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>
-          Notifications
-        </h2>
-        <p className={muted + ' text-[13px] leading-relaxed'}>New orders and makeup bookings.</p>
-        <button
-          type="button"
-          disabled={notifBusy}
-          onClick={() => void onNotifications()}
-          className={btn + ' w-full py-3.5 text-[15px] sm:w-auto sm:py-2.5 sm:text-[13px]'}
-        >
-          {notifBusy ? 'Please wait…' : notificationsActive ? 'Turn off notifications' : 'Allow notifications'}
-        </button>
-        <p className={muted + ' mt-3 text-[12px] leading-relaxed'}>
-          <span className={ad(theme, 'font-semibold text-stone-700', 'font-semibold text-neutral-200')}>
-            iPhone home screen:
-          </span>{' '}
-          if Share → Add to Home Screen keeps opening the shop instead of admin, open{' '}
-          <a
-            href={adminInstallHref}
-            className={ad(
-              theme,
-              'font-semibold text-emerald-700 underline decoration-emerald-700/30 underline-offset-2',
-              'font-semibold text-emerald-400 underline decoration-emerald-400/30 underline-offset-2',
-            )}
+        {error ? (
+          <p
+            className={
+              'mt-6 rounded-xl border px-4 py-3 text-[13px] font-medium ' +
+              ad(theme, 'border-rose-200 bg-rose-50 text-rose-900', 'border-rose-900/40 bg-rose-950/30 text-rose-200')
+            }
+            role="alert"
           >
-            admin-install.html
-          </a>{' '}
-          in Safari, stay on that page, then use Add to Home Screen from there.
-        </p>
-      </div>
-
-      <form onSubmit={onSaveFees} className={surface + ' mt-8 space-y-5'}>
-        <div>
-          <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>
-            Store settings
-          </h2>
-          <p className={muted + ' mt-1 text-[13px] leading-relaxed'}>
-            Your public site origin is used by server push (new order links). It defaults to this browser’s address; set your production URL (e.g. Vercel) if you manage the store from another device. Checkout fees apply to every website order.
+            {error}
           </p>
-        </div>
-        <label>
-          <span className={label}>Public site URL</span>
-          <input
-            type="url"
-            className={input}
-            value={publicAppUrl}
-            disabled={!feesLoaded}
-            onChange={(e) => setPublicAppUrl(e.target.value)}
-            placeholder="https://your-store.vercel.app"
-            autoComplete="off"
-          />
-          <p className={muted + ' mt-1 text-[11px]'}>No path — origin only. Clear the field and save to unset (then set Edge secret PUBLIC_APP_URL instead).</p>
-        </label>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label>
-            <span className={label}>Delivery (₦)</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              className={input}
-              value={deliveryFee}
-              disabled={!feesLoaded}
-              onChange={(e) => setDeliveryFee(e.target.value)}
-              autoComplete="off"
-            />
-            <p className={muted + ' mt-1 text-[11px]'}>Example: {formatNaira(DEFAULT_DELIVERY_FEE_NGN)}</p>
-          </label>
-          <label>
-            <span className={label}>Processing (₦)</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              className={input}
-              value={processingFee}
-              disabled={!feesLoaded}
-              onChange={(e) => setProcessingFee(e.target.value)}
-              autoComplete="off"
-            />
-            <p className={muted + ' mt-1 text-[11px]'}>Example: {formatNaira(DEFAULT_PROCESSING_FEE_NGN)}</p>
-          </label>
-        </div>
-        <button type="submit" disabled={busyFees || !feesLoaded} className={btn + ' w-full sm:w-auto'}>
-          {busyFees ? 'Saving…' : 'Save store settings'}
-        </button>
-      </form>
+        ) : null}
+        {notice ? (
+          <p
+            className={
+              'mt-6 rounded-xl border px-4 py-3 text-[13px] font-medium ' +
+              ad(theme, 'border-emerald-200 bg-emerald-50 text-emerald-900', 'border-emerald-800/50 bg-emerald-950/40 text-emerald-200')
+            }
+            role="status"
+          >
+            {notice}
+          </p>
+        ) : null}
 
-      <form onSubmit={onEmail} className={surface + ' mt-6 space-y-4'}>
-        <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>Email</h2>
-        <label>
-          <span className={label}>Address</span>
-          <input type="email" className={input} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-        </label>
-        <button type="submit" disabled={busyEmail} className={btn}>
-          {busyEmail ? 'Updating…' : 'Update email'}
-        </button>
-      </form>
+        <p className={titleSm + ' mt-10 mb-2 px-1'}>Store</p>
+        <nav className={listCard + ' ' + divide} aria-label="Store settings">
+          <Link
+            to="/admin/account/checkout"
+            className={'flex min-h-[4.5rem] items-center gap-4 px-5 py-4 no-underline ' + rowHover}
+          >
+            <div className="min-w-0 flex-1">
+              <p className={rowTitle}>Shop checkout</p>
+              <p className={rowSub}>Delivery fees, mainland &amp; island, pickup points</p>
+            </div>
+            <span className={chevron} aria-hidden>
+              chevron_right
+            </span>
+          </Link>
+        </nav>
 
-      <form onSubmit={onPassword} className={surface + ' mt-6 space-y-4'}>
-        <h2 className={ad(theme, 'text-[16px] font-bold text-stone-900', 'text-[16px] font-bold text-neutral-100')}>Password</h2>
-        <label>
-          <span className={label}>New</span>
-          <input
-            type="password"
-            className={input}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            autoComplete="new-password"
-          />
-        </label>
-        <label>
-          <span className={label}>Confirm</span>
-          <input
-            type="password"
-            className={input}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            autoComplete="new-password"
-          />
-        </label>
-        <button type="submit" disabled={busyPw} className={btn}>
-          {busyPw ? 'Saving…' : 'Update password'}
-        </button>
-      </form>
+        <p className={titleSm + ' mt-10 mb-2 px-1'}>Alerts</p>
+        <div id="admin-push" className={listCard + ' scroll-mt-24'}>
+          <div className="flex min-h-[4.5rem] items-center gap-4 px-5 py-4">
+            <div className="min-w-0 flex-1">
+              <p className={rowTitle}>Notifications</p>
+              <p className={rowSub}>New orders and makeup bookings</p>
+            </div>
+            <button
+              type="button"
+              disabled={notifBusy}
+              onClick={() => void onNotifications()}
+              className={
+                btn +
+                ' shrink-0 rounded-full px-4 py-2 text-[12px] ' +
+                (notificationsActive ? ' opacity-90' : '')
+              }
+            >
+              {notifBusy ? '…' : notificationsActive ? 'Off' : 'On'}
+            </button>
+          </div>
+        </div>
+
+        <p className={titleSm + ' mt-10 mb-2 px-1'}>Sign-in</p>
+        <div className={listCard}>
+          <form onSubmit={onEmail} className={'border-b px-5 py-5 ' + ad(theme, 'border-stone-100', 'border-neutral-800/80')}>
+            <label className="block">
+              <span className={label}>Email</span>
+              <input type="email" className={input} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+            </label>
+            <button type="submit" disabled={busyEmail} className={btn + ' mt-4 w-full sm:w-auto'}>
+              {busyEmail ? 'Updating…' : 'Update email'}
+            </button>
+          </form>
+          <form onSubmit={onPassword} className="px-5 py-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block min-w-0">
+                <span className={label}>New password</span>
+                <input
+                  type="password"
+                  className={input}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </label>
+              <label className="block min-w-0">
+                <span className={label}>Confirm</span>
+                <input
+                  type="password"
+                  className={input}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </label>
+            </div>
+            <button type="submit" disabled={busyPw} className={btn + ' mt-4 w-full sm:w-auto'}>
+              {busyPw ? 'Saving…' : 'Update password'}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   )
 }

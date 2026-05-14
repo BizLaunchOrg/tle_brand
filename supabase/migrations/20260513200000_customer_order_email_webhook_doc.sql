@@ -1,0 +1,12 @@
+-- Customer order emails (Resend) are handled by Edge Function `customer-order-mail`.
+-- No schema change here.
+--
+-- 1) Deploy: supabase functions deploy customer-order-mail --no-verify-jwt
+-- 2) Secrets (Dashboard → Edge Functions): RESEND_API_KEY, RESEND_FROM (verified domain),
+--    ORDER_EMAIL_WEBHOOK_SECRET (or reuse WEBHOOK_SECRET), optional RESEND_REPLY_TO,
+--    optional PUBLIC_APP_URL (else shop_settings.public_app_url).
+-- 3) Database → Webhooks: table public.orders, events INSERT and UPDATE,
+--    URL https://<project-ref>.supabase.co/functions/v1/customer-order-mail
+--    HTTP header: x-webhook-secret = same secret as above.
+--
+select 1;
