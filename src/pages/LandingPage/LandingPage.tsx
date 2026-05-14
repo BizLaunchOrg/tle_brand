@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { MakeupBookingDateTimePick } from "../../components/MakeupBookingDateTimePick.tsx";
+import { BookingTransferDetailsCard } from "../../components/BookingTransferDetailsCard.tsx";
 import { ProductCard } from "../../components/ProductCard.tsx";
 import {
   defaultVariantSelection,
@@ -19,6 +20,7 @@ import {
   PHOTOSHOOT_PACKAGES,
   bookableServiceFromPhotoshootLine,
 } from "../../data/bookingServices.ts";
+import { BOOKING_TRANSFER_DEMO } from "../../data/bookingTransferDetails.ts";
 import { formatBookingDateLabel } from "../../lib/makeupBookingDates.ts";
 import { insertMakeupBooking } from "../../lib/makeupBookings.ts";
 import {
@@ -42,7 +44,7 @@ const MARQUEE_ITEMS = [
 const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   {
     style: {
-      left: "6%",
+      left: "8%",
       top: "18%",
       animationDuration: "8s",
       animationDelay: "0s",
@@ -51,7 +53,7 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   },
   {
     style: {
-      left: "17%",
+      left: "84%",
       top: "66%",
       animationDuration: "10s",
       animationDelay: "1.8s",
@@ -60,7 +62,7 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   },
   {
     style: {
-      left: "29%",
+      left: "52%",
       top: "32%",
       animationDuration: "7s",
       animationDelay: "3.2s",
@@ -69,7 +71,7 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   },
   {
     style: {
-      left: "5%",
+      left: "6%",
       top: "78%",
       animationDuration: "12s",
       animationDelay: "0.6s",
@@ -78,7 +80,7 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   },
   {
     style: {
-      left: "35%",
+      left: "72%",
       top: "12%",
       animationDuration: "6s",
       animationDelay: "2.4s",
@@ -87,7 +89,7 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   },
   {
     style: {
-      left: "40%",
+      left: "86%",
       top: "82%",
       animationDuration: "14s",
       animationDelay: "4.5s",
@@ -96,7 +98,7 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   },
   {
     style: {
-      left: "2%",
+      left: "42%",
       top: "43%",
       animationDuration: "11s",
       animationDelay: "1s",
@@ -105,7 +107,7 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   },
   {
     style: {
-      left: "22%",
+      left: "24%",
       top: "8%",
       animationDuration: "9s",
       animationDelay: "5s",
@@ -114,7 +116,7 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   },
   {
     style: {
-      left: "30%",
+      left: "62%",
       top: "56%",
       animationDuration: "9s",
       animationDelay: "2.2s",
@@ -123,7 +125,7 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   },
   {
     style: {
-      left: "12%",
+      left: "34%",
       top: "30%",
       animationDuration: "8.6s",
       animationDelay: "4.1s",
@@ -741,7 +743,7 @@ export function LandingPage() {
             <div className="relative z-[2] grid gap-8 md:grid-cols-2 md:gap-12">
               <div>
                 <div className="mb-4 text-[10px] font-semibold tracking-[0.22em] text-tle-gold uppercase">
-                  Makeup &amp; Aesthetics
+                  Makeup
                 </div>
                 <h2 className="mb-4 font-sans text-[clamp(2.25rem,4vw,3.25rem)] leading-[1.08] font-semibold text-white">
                   Book Your
@@ -808,7 +810,7 @@ export function LandingPage() {
             />
             <img
               src="/Imagereviews1.jpeg"
-              alt="TLE makeup and aesthetics"
+              alt="TLE makeup look"
               className="absolute -right-8 -bottom-11 w-[44%] rounded-full border-[6px] border-tle-cream object-cover shadow-xl max-md:hidden"
             />
             <div className="absolute top-8 -left-8 rounded-[18px] bg-tle-pink px-6 py-5 text-white shadow-[0_20px_44px_rgba(196,105,141,0.32)] max-md:hidden">
@@ -833,12 +835,17 @@ export function LandingPage() {
               <span className="text-tle-ink"> In </span>
               <span className="text-tle-pink">You.</span>
             </h2>
-            <p className="mb-10 text-[15px] font-light leading-[1.9] text-tle-muted">
-              TLE-BRAND was born from one belief — that beauty belongs to
-              everyone. We create and curate premium aesthetic products and
-              professional makeup services for every person ready to own their
-              look, unapologetically.
-            </p>
+            <div className="mb-10 space-y-4 text-[15px] font-light leading-[1.9] text-tle-muted">
+              <p>
+                Everyone deserves to feel at home in their own presence,
+                confident of who they are becoming.
+              </p>
+              <p>
+                At TLE, beauty and fashion are more than appearance. They are
+                expressions of identity, confidence, and the quiet power of
+                showing up fully as yourself.
+              </p>
+            </div>
             <div className="mb-11 grid gap-5 sm:grid-cols-2">
               {[
                 {
@@ -1308,60 +1315,10 @@ export function LandingPage() {
                   </div>
                 </div>
 
-                <p className="mb-3.5 text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
-                  Payment Details
-                </p>
-                <div className="mb-4 flex flex-col gap-2">
-                  <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
-                    Card Number
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm outline-none focus:border-tle-pink"
-                    placeholder="1234 5678 9012 3456"
-                  />
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
-                      Name on Card
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm outline-none focus:border-tle-pink"
-                      placeholder="Full name"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
-                        Expiry
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm outline-none focus:border-tle-pink"
-                        placeholder="MM / YY"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
-                        CVV
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm outline-none focus:border-tle-pink"
-                        placeholder="•••"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="my-2 flex items-center gap-2 text-xs text-tle-muted">
-                  <span className="material-symbols-outlined text-base">
-                    lock
-                  </span>
-                  Secured with 256-bit SSL encryption
-                </div>
+                <BookingTransferDetailsCard
+                  details={BOOKING_TRANSFER_DEMO}
+                  className="mb-10"
+                />
 
                 <div className="mt-10 flex items-center justify-between gap-4">
                   <button
@@ -1377,7 +1334,7 @@ export function LandingPage() {
                     className="inline-flex items-center gap-2.5 rounded-full bg-tle-pink px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-deep disabled:cursor-not-allowed disabled:opacity-60"
                     onClick={() => void confirmBooking()}
                   >
-                    {bookingSubmitting ? "Saving…" : "Pay &amp; Confirm"}
+                    {bookingSubmitting ? "Saving…" : "Confirm booking"}
                     <span className="material-symbols-outlined text-lg">
                       check
                     </span>

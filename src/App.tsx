@@ -19,6 +19,7 @@ import { AdminOrderDetailPage } from './pages/admin/AdminOrderDetailPage.tsx'
 import { AdminTransactionsPage } from './pages/admin/AdminTransactionsPage.tsx'
 import { AdminProductsPage } from './pages/admin/AdminProductsPage.tsx'
 import { AdminAccountPage } from './pages/admin/AdminAccountPage.tsx'
+import { AdminAccountCheckoutPage } from './pages/admin/AdminAccountCheckoutPage.tsx'
 import { AdminCustomersPage } from './pages/admin/AdminCustomersPage.tsx'
 import { AdminMakeupBookingsPage } from './pages/admin/AdminMakeupBookingsPage.tsx'
 import { AdminMakeupHoursPage } from './pages/admin/AdminMakeupHoursPage.tsx'
@@ -53,6 +54,7 @@ function App() {
             <Route path="makeup-hours" element={<AdminMakeupHoursPage />} />
             <Route path="transactions" element={<AdminTransactionsPage />} />
             <Route path="account" element={<AdminAccountPage />} />
+            <Route path="account/checkout" element={<AdminAccountCheckoutPage />} />
           </Route>
         </Route>
       </Routes>

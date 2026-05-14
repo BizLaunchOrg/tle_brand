@@ -97,6 +97,9 @@ export type ShippingPayload = {
   state: string
   postalCode?: string
   country: string
+  /** Set when checkout used a location-based fee */
+  deliveryOptionId?: string
+  deliveryOptionLabel?: string
 }
 
 export type OrderLinePayload = {
