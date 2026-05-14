@@ -42,7 +42,7 @@ type OrderReceipt = {
   subtotalNgn: number
   deliveryNgn: number
   processingNgn: number
-  processingVatNgn: number
+  salesVatNgn: number
   totalNgn: number
   deliverySummaryLabel: string
   lines: ReceiptLineItem[]
@@ -124,13 +124,13 @@ function buildReceiptDocumentHtml(receipt: OrderReceipt): string {
       <tbody>${linesRows}</tbody>
     </table>
     <div class="totals">
-      <div><span>Subtotal</span><span>${formatNaira(receipt.subtotalNgn)}</span></div>
-      <div><span>${escapeHtml(receipt.deliverySummaryLabel)}</span><span>${formatNaira(receipt.deliveryNgn)}</span></div>
-      <div><span>Processing</span><span>${formatNaira(receipt.processingNgn)}</span></div>${
-        receipt.processingVatNgn > 0
-          ? `<div><span>VAT on processing</span><span>${formatNaira(receipt.processingVatNgn)}</span></div>`
+      <div><span>Subtotal</span><span>${formatNaira(receipt.subtotalNgn)}</span></div>${
+        receipt.salesVatNgn > 0
+          ? `<div><span>VAT on products</span><span>${formatNaira(receipt.salesVatNgn)}</span></div>`
           : ''
       }
+      <div><span>${escapeHtml(receipt.deliverySummaryLabel)}</span><span>${formatNaira(receipt.deliveryNgn)}</span></div>
+      <div><span>Processing</span><span>${formatNaira(receipt.processingNgn)}</span></div>
       <div class="grand"><span>Total</span><span>${formatNaira(receipt.totalNgn)}</span></div>
     </div>
     <hr class="rule"/>
@@ -222,14 +222,14 @@ export function CheckoutPage() {
     return deliveryZones.find((z) => z.id === deliveryZoneId) ?? deliveryZones[0]
   }, [deliveryZones, deliveryZoneId])
 
-  const { deliveryNgn, processingNgn, processingVatNgn, totalNgn } = useMemo(() => {
+  const { deliveryNgn, processingNgn, salesVatNgn, totalNgn } = useMemo(() => {
     const p = shopFees?.processingFeeNgn ?? 1_200
-    const vatPct = shopFees?.processingVatPercent ?? 0
+    const flatVat = shopFees?.salesVatFlatNgn ?? 0
     const d = selectedZone ? selectedZone.feeNgn : (shopFees?.deliveryFeeNgn ?? 4_000)
-    return computeCheckoutTotalWithFlatFees(cartSubtotal, d, p, vatPct)
+    return computeCheckoutTotalWithFlatFees(cartSubtotal, d, p, {
+      salesVatFlatNgn: flatVat,
+    })
   }, [cartSubtotal, shopFees, selectedZone])
-
-  const processingWithVatNgn = processingNgn + processingVatNgn
 
   useEffect(() => {
     if (!user) return
@@ -335,6 +335,12 @@ export function CheckoutPage() {
                 <span>Subtotal</span>
                 <span className="tabular-nums font-medium text-tle-ink">{formatNaira(orderReceipt.subtotalNgn)}</span>
               </div>
+              {orderReceipt.salesVatNgn > 0 ? (
+                <div className="flex justify-between text-tle-muted">
+                  <span>VAT on products</span>
+                  <span className="tabular-nums font-medium text-tle-ink">{formatNaira(orderReceipt.salesVatNgn)}</span>
+                </div>
+              ) : null}
               <div className="flex justify-between gap-2 text-tle-muted">
                 <span className="max-w-[70%] leading-snug">{orderReceipt.deliverySummaryLabel}</span>
                 <span className="shrink-0 tabular-nums font-medium text-tle-ink">{formatNaira(orderReceipt.deliveryNgn)}</span>
@@ -343,12 +349,6 @@ export function CheckoutPage() {
                 <span>Processing</span>
                 <span className="tabular-nums font-medium text-tle-ink">{formatNaira(orderReceipt.processingNgn)}</span>
               </div>
-              {orderReceipt.processingVatNgn > 0 ? (
-                <div className="flex justify-between text-tle-muted">
-                  <span>VAT on processing</span>
-                  <span className="tabular-nums font-medium text-tle-ink">{formatNaira(orderReceipt.processingVatNgn)}</span>
-                </div>
-              ) : null}
               <div className="flex justify-between border-t-2 border-tle-ink/90 pt-3 font-sans text-base font-bold text-tle-ink">
                 <span>Total</span>
                 <span className="tabular-nums">{formatNaira(orderReceipt.totalNgn)}</span>
@@ -475,7 +475,9 @@ export function CheckoutPage() {
           : null
       const d = zone ? zone.feeNgn : shopFees.deliveryFeeNgn
       const p = shopFees.processingFeeNgn
-      const fees = computeCheckoutTotalWithFlatFees(subtotal, d, p, shopFees.processingVatPercent)
+      const fees = computeCheckoutTotalWithFlatFees(subtotal, d, p, {
+        salesVatFlatNgn: shopFees.salesVatFlatNgn,
+      })
 
       const result = await createOrder({
         userId: user.id,
@@ -497,7 +499,7 @@ export function CheckoutPage() {
         subtotalNgn: subtotal,
         deliveryNgn: fees.deliveryNgn,
         processingNgn: fees.processingNgn,
-        processingVatNgn: fees.processingVatNgn,
+        salesVatNgn: fees.salesVatNgn,
         totalNgn: fees.totalNgn,
       })
 
@@ -530,7 +532,7 @@ export function CheckoutPage() {
         subtotalNgn: subtotal,
         deliveryNgn: fees.deliveryNgn,
         processingNgn: fees.processingNgn,
-        processingVatNgn: fees.processingVatNgn,
+        salesVatNgn: fees.salesVatNgn,
         totalNgn: fees.totalNgn,
         deliverySummaryLabel: zone ? zone.label : 'Delivery',
         lines: receiptLines,
@@ -554,8 +556,8 @@ export function CheckoutPage() {
         <h1 className="font-sans text-[clamp(1.75rem,4vw,2.25rem)] font-semibold text-tle-ink">Delivery in Nigeria</h1>
         <p className="mt-2 max-w-xl text-sm text-tle-muted">
           {deliveryZones.length > 0
-            ? `Pick your delivery or pickup option. Processing ${formatNaira(processingWithVatNgn)}${processingVatNgn > 0 ? ' (incl. VAT)' : ''} applies once per order.`
-            : `Delivery ${formatNaira(deliveryNgn)} plus processing ${formatNaira(processingWithVatNgn)}${processingVatNgn > 0 ? ' (incl. VAT)' : ''} per order.`}
+            ? `Pick your delivery or pickup option. Processing ${formatNaira(processingNgn)} applies once per order.`
+            : `Delivery ${formatNaira(deliveryNgn)} plus processing ${formatNaira(processingNgn)} per order.`}
         </p>
 
         <form
@@ -739,6 +741,12 @@ export function CheckoutPage() {
                 <span>Subtotal</span>
                 <span className="font-medium text-tle-ink">{formatNaira(cartSubtotal)}</span>
               </div>
+              {salesVatNgn > 0 ? (
+                <div className="flex justify-between text-tle-muted">
+                  <span>VAT on products</span>
+                  <span className="font-medium text-tle-ink">{formatNaira(salesVatNgn)}</span>
+                </div>
+              ) : null}
               <div className="flex justify-between text-tle-muted">
                 <span>{deliveryZones.length > 0 ? 'Delivery / pickup' : 'Delivery'}</span>
                 <span className="font-medium text-tle-ink">{formatNaira(deliveryNgn)}</span>
@@ -747,12 +755,6 @@ export function CheckoutPage() {
                 <span>Processing</span>
                 <span className="font-medium text-tle-ink">{formatNaira(processingNgn)}</span>
               </div>
-              {processingVatNgn > 0 ? (
-                <div className="flex justify-between text-tle-muted">
-                  <span>VAT on processing</span>
-                  <span className="font-medium text-tle-ink">{formatNaira(processingVatNgn)}</span>
-                </div>
-              ) : null}
               <div className="flex justify-between border-t border-black/[0.08] pt-3 font-sans text-lg font-semibold text-tle-ink">
                 <span>Total</span>
                 <span>{formatNaira(totalNgn)}</span>

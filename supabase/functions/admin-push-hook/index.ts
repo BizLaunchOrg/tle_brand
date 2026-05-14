@@ -13,9 +13,6 @@
  *
  * SUPABASE_URL is provided automatically. Use service role via legacy SUPABASE_SERVICE_ROLE_KEY
  * or default entry in SUPABASE_SECRET_KEYS (JSON); the function supports both.
- *
- * Logs: Supabase often shows a generic “Boot” line when an isolate starts; that is not a push.
- * After deploy, look for JSON lines with "source":"admin-push-hook" (insert_event / done / skipped).
  */
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
@@ -78,13 +75,8 @@ function json(status: number, body: Record<string, unknown>) {
   })
 }
 
-/** Visible in Dashboard → Edge Functions → admin-push-hook → Logs (unlike generic “Boot” lines). */
-function logHook(msg: string, extra?: Record<string, unknown>) {
-  const rest = { ...(extra ?? {}) }
-  delete rest.source
-  delete rest.msg
-  console.log(JSON.stringify({ source: 'admin-push-hook', msg, ...rest }))
-}
+/** Logs disabled — avoid recording payloads or upstream error bodies. */
+function logHook(_msg: string, _extra?: Record<string, unknown>) {}
 
 /** HTTPS (or http://localhost) origin only — paths are stripped. */
 function normalizePublicOrigin(raw: string | null | undefined): string | null {
@@ -120,7 +112,7 @@ async function resolvePublicAppUrlFromDb(supabase: SupabaseClient): Promise<stri
     .eq('id', 'default')
     .maybeSingle()
   if (error) {
-    logHook('public_url_db_error', { message: error.message, code: error.code })
+    logHook('public_url_db_error', { code: error.code })
     return null
   }
   if (!data) {

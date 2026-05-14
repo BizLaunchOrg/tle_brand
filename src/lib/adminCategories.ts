@@ -33,7 +33,7 @@ export async function insertCatalogCategory(
 
   if (error) {
     if (error.code === '23505') return { ok: false, message: 'That category already exists.' }
-    return { ok: false, message: 'Could not add category. If the table is missing, run the latest Supabase migration.' }
+    return { ok: false, message: 'Could not add category.' }
   }
   if (!data?.id) return { ok: false, message: 'Could not add category.' }
   return { ok: true, id: data.id as string }

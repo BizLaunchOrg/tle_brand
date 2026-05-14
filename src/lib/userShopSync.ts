@@ -127,7 +127,7 @@ export async function createOrder(params: {
   subtotalNgn: number
   deliveryNgn: number
   processingNgn: number
-  processingVatNgn: number
+  salesVatNgn: number
   totalNgn: number
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) {
@@ -136,24 +136,38 @@ export async function createOrder(params: {
 
   // No online payment gateway yet: treat a successful checkout as paid so admin + stats match reality.
   // When you add Paystack/Stripe, set status from the provider (e.g. pending → paid) instead of forcing here.
-  const { data, error } = await getSupabase()
-    .from('orders')
-    .insert({
-      user_id: params.userId,
-      email: params.email,
-      shipping: params.shipping,
-      line_items: params.lineItems,
-      subtotal_ngn: params.subtotalNgn,
-      delivery_ngn: params.deliveryNgn,
-      processing_ngn: params.processingNgn,
-      processing_vat_ngn: params.processingVatNgn,
-      total_ngn: params.totalNgn,
-      status: 'paid',
-      payment_status: 'paid',
-      delivery_status: 'pending',
-    })
-    .select('id')
-    .maybeSingle()
+  const sb = getSupabase()
+  const baseRow = {
+    user_id: params.userId,
+    email: params.email,
+    shipping: params.shipping,
+    line_items: params.lineItems,
+    subtotal_ngn: params.subtotalNgn,
+    delivery_ngn: params.deliveryNgn,
+    processing_ngn: params.processingNgn,
+    total_ngn: params.totalNgn,
+    status: 'paid' as const,
+    payment_status: 'paid' as const,
+    delivery_status: 'pending' as const,
+  }
+  const withVatRow = {
+    ...baseRow,
+    sales_vat_ngn: params.salesVatNgn,
+    processing_vat_ngn: 0,
+  }
+
+  let { data, error } = await sb.from('orders').insert(withVatRow).select('id').maybeSingle()
+
+  const msg = (error?.message ?? '').toLowerCase()
+  const missingVatColumn =
+    msg.includes('sales_vat_ngn') ||
+    msg.includes('processing_vat_ngn') ||
+    (msg.includes('schema cache') && msg.includes('column'))
+  if (error && missingVatColumn && !msg.includes('row-level security')) {
+    const second = await sb.from('orders').insert(baseRow).select('id').maybeSingle()
+    data = second.data
+    error = second.error
+  }
 
   if (error || !data?.id) {
     return { ok: false, message: 'Could not place order. Please try again.' }

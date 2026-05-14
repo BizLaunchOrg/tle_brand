@@ -655,6 +655,12 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
                 <dt className={muted}>Subtotal</dt>
                 <dd className={'font-semibold tabular-nums ' + strong}>{formatNaira(Number(order.subtotal_ngn) || 0)}</dd>
               </div>
+              {(Number(order.sales_vat_ngn) || 0) > 0 ? (
+                <div className="flex justify-between gap-2">
+                  <dt className={muted}>VAT on products</dt>
+                  <dd className={'font-semibold tabular-nums ' + strong}>{formatNaira(Number(order.sales_vat_ngn) || 0)}</dd>
+                </div>
+              ) : null}
               <div className="flex justify-between gap-2">
                 <dt className={muted}>Delivery</dt>
                 <dd className={'font-semibold tabular-nums ' + strong}>{formatNaira(Number(order.delivery_ngn) || 0)}</dd>
@@ -663,12 +669,6 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
                 <dt className={muted}>Processing</dt>
                 <dd className={'font-semibold tabular-nums ' + strong}>{formatNaira(Number(order.processing_ngn) || 0)}</dd>
               </div>
-              {(Number(order.processing_vat_ngn) || 0) > 0 ? (
-                <div className="flex justify-between gap-2">
-                  <dt className={muted}>VAT on processing</dt>
-                  <dd className={'font-semibold tabular-nums ' + strong}>{formatNaira(Number(order.processing_vat_ngn) || 0)}</dd>
-                </div>
-              ) : null}
               <div className={'mt-2 flex justify-between gap-2 border-t pt-2 ' + border}>
                 <dt className={'text-[12px] font-bold ' + strong}>Total</dt>
                 <dd className={'text-lg font-bold tabular-nums ' + ad(theme, 'text-emerald-700', 'text-emerald-300')}>{formatNaira(Number(order.total_ngn) || 0)}</dd>

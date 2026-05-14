@@ -13,13 +13,13 @@ function safeExt(filename: string): string {
 export async function uploadProductImageFile(
   file: File,
 ): Promise<{ ok: true; publicUrl: string } | { ok: false; message: string }> {
-  if (!isSupabaseConfigured()) return { ok: false, message: 'Supabase is not configured.' }
+  if (!isSupabaseConfigured()) return { ok: false, message: 'Not configured.' }
   const supabase = getSupabase()
   const {
     data: { user },
     error: userErr,
   } = await supabase.auth.getUser()
-  if (userErr || !user) return { ok: false, message: 'Sign in as an admin to upload images.' }
+  if (userErr || !user) return { ok: false, message: 'Upload could not complete.' }
 
   const ext = safeExt(file.name)
   const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`
@@ -31,26 +31,10 @@ export async function uploadProductImageFile(
   })
 
   if (error) {
-    const internal = (error.message || '').toLowerCase()
-    const bucketMissing =
-      internal.includes('bucket not found') ||
-      internal.includes('no such bucket') ||
-      (internal.includes('bucket') &&
-        (internal.includes('not found') || internal.includes('does not exist')))
-    if (bucketMissing) {
-      return {
-        ok: false,
-        message:
-          'Upload could not complete. Create the "product-media" storage bucket in Supabase (or apply the latest migration), then try again.',
-      }
-    }
-    return {
-      ok: false,
-      message: 'Upload could not complete. Sign in as an admin and try again, or check your connection.',
-    }
+    return { ok: false, message: 'Upload could not complete.' }
   }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
-  if (!data?.publicUrl) return { ok: false, message: 'Could not get public URL for upload.' }
+  if (!data?.publicUrl) return { ok: false, message: 'Upload could not complete.' }
   return { ok: true, publicUrl: data.publicUrl }
 }
