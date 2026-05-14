@@ -59,7 +59,21 @@ export function AdminRangeTabs({
   )
 }
 
-/** Tailwind class string for a rounded status pill. */
+export function adminDeliveryPillClass(delivery: string, theme: AdminTheme) {
+  const s = delivery.toLowerCase()
+  if (s === 'delivered')
+    return ad(theme, 'bg-emerald-100 text-emerald-900', 'bg-emerald-950/50 text-emerald-300')
+  if (s === 'processing')
+    return ad(theme, 'bg-sky-100 text-sky-900', 'bg-sky-950/50 text-sky-200')
+  return ad(theme, 'bg-amber-100 text-amber-950', 'bg-amber-950/40 text-amber-200')
+}
+
+export function adminPaymentPillClass(paid: boolean, theme: AdminTheme) {
+  if (paid) return ad(theme, 'bg-emerald-100 text-emerald-900', 'bg-emerald-950/50 text-emerald-300')
+  return ad(theme, 'bg-rose-100 text-rose-900', 'bg-rose-950/40 text-rose-200')
+}
+
+/** Tailwind class string for a rounded status pill (legacy combined status). */
 export function adminStatusPillClass(status: string, theme: AdminTheme) {
   const s = status.toLowerCase()
   if (isCompletedStatus(s))

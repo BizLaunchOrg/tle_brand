@@ -1,17 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { fetchOrdersForAdmin, updateOrderStatus } from '../../lib/adminOrders.ts'
+import { fetchOrdersForAdmin, updateOrderDeliveryStatus } from '../../lib/adminOrders.ts'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
-import { filterOrdersByRange, isCompletedStatus, type DateRangeFilter } from '../../lib/adminOrderAnalytics.ts'
+import {
+  effectiveDeliveryStatus,
+  filterOrdersByRange,
+  orderIsCancelled,
+  orderIsPaidAwaitingDelivery,
+  orderIsPaymentPaid,
+  orderIsSettledComplete,
+  type DateRangeFilter,
+} from '../../lib/adminOrderAnalytics.ts'
 import { normalizeOrderLineItems } from '../../lib/adminOrderLineSnapshots.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { adminStatusPillClass } from './adminRangeTabs.tsx'
+import { adminDeliveryPillClass, adminPaymentPillClass } from './adminRangeTabs.tsx'
 import { ad, adminFont } from './adminUi.ts'
 import { OrderRelativeTime } from './OrderRelativeTime.tsx'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
-const STATUS_OPTIONS = ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'] as const
+const DELIVERY_OPTIONS = ['pending', 'processing', 'delivered'] as const
 
 const DATE_OPTIONS: { id: DateRangeFilter; label: string }[] = [
   { id: 'today', label: 'Today' },
@@ -43,60 +51,6 @@ function orderRefShort(id: string): string {
   return compact.slice(0, 6).toUpperCase()
 }
 
-function isPaidOrderStatus(status: string): boolean {
-  const s = status.toLowerCase()
-  return isCompletedStatus(status) || s === 'paid'
-}
-
-/** Paid (or in paid fulfilment path) but not yet delivered / completed. Excludes unpaid `pending`. */
-function isPaidButNotDelivered(status: string): boolean {
-  const s = status.toLowerCase()
-  if (s === 'cancelled' || s === 'pending' || s === 'awaiting_payment') return false
-  if (s === 'delivered' || s === 'completed' || s === 'fulfilled') return false
-  return s === 'paid' || s === 'processing' || s === 'shipped'
-}
-
-function paymentPill(status: string, theme: 'light' | 'dark'): { label: string; cls: string } {
-  const s = status.toLowerCase()
-  if (s === 'cancelled')
-    return {
-      label: 'N/A',
-      cls: ad(theme, 'bg-stone-100 text-stone-600', 'bg-neutral-800 text-neutral-400'),
-    }
-  if (isPaidOrderStatus(status))
-    return {
-      label: 'Paid',
-      cls: ad(theme, 'bg-emerald-100 text-emerald-900', 'bg-emerald-950/50 text-emerald-300'),
-    }
-  return {
-    label: 'Unpaid',
-    cls: ad(theme, 'bg-rose-100 text-rose-900', 'bg-rose-950/40 text-rose-200'),
-  }
-}
-
-function shippingPill(status: string, theme: 'light' | 'dark'): { label: string; cls: string } {
-  const s = status.toLowerCase()
-  if (s === 'cancelled')
-    return {
-      label: 'Cancelled',
-      cls: ad(theme, 'bg-stone-100 text-stone-600', 'bg-neutral-800 text-neutral-400'),
-    }
-  if (s === 'delivered' || s === 'completed' || s === 'fulfilled')
-    return {
-      label: 'Delivered',
-      cls: ad(theme, 'bg-emerald-100 text-emerald-900', 'bg-emerald-950/50 text-emerald-300'),
-    }
-  if (s === 'processing' || s === 'shipped')
-    return {
-      label: 'Shipped',
-      cls: ad(theme, 'bg-sky-100 text-sky-900', 'bg-sky-950/50 text-sky-200'),
-    }
-  return {
-    label: 'Unfulfilled',
-    cls: ad(theme, 'bg-amber-100 text-amber-950', 'bg-amber-950/40 text-amber-200'),
-  }
-}
-
 function ordersFilterSelect(theme: 'light' | 'dark') {
   return ad(
     theme,
@@ -120,7 +74,7 @@ export function AdminOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState<DateRangeFilter>('today')
   const [listTab, setListTab] = useState<'all' | 'attention'>('all')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [deliveryFilter, setDeliveryFilter] = useState<string>('all')
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
@@ -137,7 +91,7 @@ export function AdminOrdersPage() {
 
   const ranged = useMemo(() => filterOrdersByRange(orders, range), [orders, range])
 
-  const attentionOrders = useMemo(() => ranged.filter((o) => isPaidButNotDelivered(o.status)), [ranged])
+  const attentionOrders = useMemo(() => ranged.filter((o) => orderIsPaidAwaitingDelivery(o)), [ranged])
 
   const stats = useMemo(() => {
     let completedNgn = 0
@@ -145,8 +99,8 @@ export function AdminOrdersPage() {
     let awaitingDeliveryCount = 0
     for (const o of ranged) {
       const t = Number(o.total_ngn) || 0
-      if (isCompletedStatus(o.status)) completedNgn += t
-      if (isPaidButNotDelivered(o.status)) {
+      if (orderIsSettledComplete(o)) completedNgn += t
+      if (orderIsPaidAwaitingDelivery(o)) {
         awaitingDeliveryNgn += t
         awaitingDeliveryCount += 1
       }
@@ -161,10 +115,10 @@ export function AdminOrdersPage() {
 
   const filtered = useMemo(() => {
     let rows = ranged
-    if (listTab === 'attention') rows = rows.filter((o) => isPaidButNotDelivered(o.status))
-    if (statusFilter !== 'all') rows = rows.filter((o) => o.status.toLowerCase() === statusFilter.toLowerCase())
-    if (paymentFilter === 'paid') rows = rows.filter((o) => isPaidOrderStatus(o.status))
-    if (paymentFilter === 'unpaid') rows = rows.filter((o) => o.status.toLowerCase() !== 'cancelled' && !isPaidOrderStatus(o.status))
+    if (listTab === 'attention') rows = rows.filter((o) => orderIsPaidAwaitingDelivery(o))
+    if (deliveryFilter !== 'all') rows = rows.filter((o) => effectiveDeliveryStatus(o) === deliveryFilter)
+    if (paymentFilter === 'paid') rows = rows.filter((o) => orderIsPaymentPaid(o))
+    if (paymentFilter === 'unpaid') rows = rows.filter((o) => !orderIsCancelled(o) && !orderIsPaymentPaid(o))
     const q = search.trim().toLowerCase()
     if (q) {
       rows = rows.filter((o) => {
@@ -179,7 +133,7 @@ export function AdminOrdersPage() {
       })
     }
     return rows
-  }, [ranged, listTab, statusFilter, paymentFilter, search])
+  }, [ranged, listTab, deliveryFilter, paymentFilter, search])
 
   const attentionCount = attentionOrders.length
 
@@ -206,13 +160,13 @@ export function AdminOrdersPage() {
     'w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-neutral-600 bg-neutral-950 px-1.5 py-1 text-[11px] font-semibold text-neutral-100 outline-none focus:border-emerald-500 disabled:opacity-50',
   )
 
-  const onStatusChange = async (orderId: string, status: string) => {
+  const onDeliveryChange = async (orderId: string, delivery: (typeof DELIVERY_OPTIONS)[number]) => {
     setUpdating(orderId)
     setBanner(null)
-    const res = await updateOrderStatus(orderId, status)
+    const res = await updateOrderDeliveryStatus(orderId, delivery)
     setUpdating(null)
     if (res.ok) {
-      setBanner({ type: 'ok', text: 'Order status updated.' })
+      setBanner({ type: 'ok', text: 'Delivery updated.' })
       await load()
       window.setTimeout(() => setBanner(null), 3200)
     } else {
@@ -270,7 +224,7 @@ export function AdminOrdersPage() {
           <div className="flex items-start gap-3">
             <span className="material-symbols-outlined mt-0.5 text-[24px] font-light text-amber-600">warning</span>
             <p className="text-[14px] font-semibold leading-snug">
-              You have {attentionCount} paid order{attentionCount === 1 ? '' : 's'} still waiting to be delivered. Mark shipped or delivered when you send them out.
+              You have {attentionCount} paid order{attentionCount === 1 ? '' : 's'} waiting to be delivered. Mark delivery when the customer receives them.
             </p>
           </div>
           <button
@@ -316,7 +270,7 @@ export function AdminOrdersPage() {
             <span className="material-symbols-outlined text-[22px] font-light text-sky-600">receipt_long</span>
           </div>
           <p className={'mt-2 text-lg font-bold tabular-nums sm:text-xl ' + ad(theme, 'text-stone-900', 'text-white')}>{formatNaira(stats.completedNgn)}</p>
-          <p className={muted + ' mt-1 text-[11px]'}>Delivered / fulfilled totals</p>
+          <p className={muted + ' mt-1 text-[11px]'}>Paid and delivered</p>
         </div>
         <div className={'rounded-2xl border p-4 ' + cardWrap}>
           <div className="flex items-center justify-between gap-2">
@@ -416,18 +370,18 @@ export function AdminOrdersPage() {
                 </select>
               </div>
               <div className="sm:col-span-1 lg:col-span-2">
-                <label className={muted + ' mb-1 block text-[10px] font-bold uppercase tracking-[0.12em]'} htmlFor="orders-filter-status">
-                  Order status
+                <label className={muted + ' mb-1 block text-[10px] font-bold uppercase tracking-[0.12em]'} htmlFor="orders-filter-delivery">
+                  Delivery
                 </label>
                 <select
-                  id="orders-filter-status"
+                  id="orders-filter-delivery"
                   className={ordersFilterSelect(theme)}
-                  value={statusFilter}
-                  aria-label="Order status"
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  value={deliveryFilter}
+                  aria-label="Delivery status"
+                  onChange={(e) => setDeliveryFilter(e.target.value)}
                 >
-                  <option value="all">All statuses</option>
-                  {STATUS_OPTIONS.map((s) => (
+                  <option value="all">All</option>
+                  {DELIVERY_OPTIONS.map((s) => (
                     <option key={s} value={s}>
                       {s.charAt(0).toUpperCase() + s.slice(1)}
                     </option>
@@ -476,13 +430,12 @@ export function AdminOrdersPage() {
           <table className="w-full min-w-0 table-fixed border-collapse text-left">
             <colgroup>
               <col style={{ width: '3%' }} />
-              <col style={{ width: '26%' }} />
+              <col style={{ width: '28%' }} />
               <col style={{ width: '11%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '10%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '11%' }} />
               <col style={{ width: '14%' }} />
-              <col style={{ width: '16%' }} />
+              <col style={{ width: '21%' }} />
             </colgroup>
             <thead>
               <tr>
@@ -491,9 +444,8 @@ export function AdminOrdersPage() {
                 </th>
                 <th className={th}>Order</th>
                 <th className={th + ' text-right'}>Total</th>
-                <th className={th}>Status</th>
+                <th className={th}>Delivery</th>
                 <th className={th}>Payment</th>
-                <th className={th}>Shipping</th>
                 <th className={th}>When</th>
                 <th className={th}> </th>
               </tr>
@@ -501,14 +453,15 @@ export function AdminOrdersPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className={td + ' py-16 text-center ' + muted}>
+                  <td colSpan={7} className={td + ' py-16 text-center ' + muted}>
                     No orders match these filters.
                   </td>
                 </tr>
               ) : (
                 filtered.map((o) => {
-                  const pay = paymentPill(o.status, theme)
-                  const ship = shippingPill(o.status, theme)
+                  const d = effectiveDeliveryStatus(o)
+                  const pPaid = orderIsPaymentPaid(o)
+                  const cancelled = orderIsCancelled(o)
                   const name = customerDisplayName(o)
                   const summary = orderLineSummary(o.line_items)
                   return (
@@ -532,28 +485,29 @@ export function AdminOrdersPage() {
                         {formatNaira(Number(o.total_ngn) || 0)}
                       </td>
                       <td className={td + ' min-w-0'}>
-                        <span className={'inline-flex max-w-full truncate rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase sm:text-[10px] ' + adminStatusPillClass(o.status, theme)}>{o.status}</span>
+                        <span className={'inline-flex max-w-full truncate rounded-full px-1.5 py-0.5 text-[9px] font-bold capitalize sm:text-[10px] ' + adminDeliveryPillClass(d, theme)}>
+                          {cancelled ? '—' : d}
+                        </span>
                       </td>
                       <td className={td + ' min-w-0'}>
-                        <span className={'inline-flex max-w-full truncate rounded-full px-1.5 py-0.5 text-[9px] font-bold sm:text-[10px] ' + pay.cls}>{pay.label}</span>
-                      </td>
-                      <td className={td + ' min-w-0'}>
-                        <span className={'inline-flex max-w-full truncate rounded-full px-1.5 py-0.5 text-[9px] font-bold sm:text-[10px] ' + ship.cls}>{ship.label}</span>
+                        <span className={'inline-flex max-w-full truncate rounded-full px-1.5 py-0.5 text-[9px] font-bold sm:text-[10px] ' + adminPaymentPillClass(pPaid, theme)}>
+                          {cancelled ? '—' : pPaid ? 'Paid' : 'Unpaid'}
+                        </span>
                       </td>
                       <td className={td + ' min-w-0 max-w-[140px] break-words text-[11px] leading-snug'}>
                         <OrderRelativeTime iso={o.created_at} theme={theme} className="block w-full" />
                       </td>
                       <td className={td + ' min-w-0'} onClick={(e) => e.stopPropagation()}>
                         <select
-                          value={o.status}
-                          disabled={updating === o.id}
-                          onChange={(e) => void onStatusChange(o.id, e.target.value)}
+                          value={d}
+                          disabled={updating === o.id || cancelled}
+                          onChange={(e) => void onDeliveryChange(o.id, e.target.value as (typeof DELIVERY_OPTIONS)[number])}
                           className={statusSelect}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {[...new Set([...STATUS_OPTIONS, o.status])].map((s) => (
+                          {DELIVERY_OPTIONS.map((s) => (
                             <option key={s} value={s}>
-                              {s}
+                              {s.charAt(0).toUpperCase() + s.slice(1)}
                             </option>
                           ))}
                         </select>
@@ -571,8 +525,9 @@ export function AdminOrdersPage() {
             <p className={'py-10 text-center text-[14px] ' + muted}>No orders match.</p>
           ) : (
             filtered.map((o) => {
-              const pay = paymentPill(o.status, theme)
-              const ship = shippingPill(o.status, theme)
+              const d = effectiveDeliveryStatus(o)
+              const pPaid = orderIsPaymentPaid(o)
+              const cancelled = orderIsCancelled(o)
               return (
                 <div key={o.id} className={'overflow-hidden rounded-xl border ' + ad(theme, 'border-stone-200 bg-stone-50/60', 'border-neutral-700 bg-neutral-900/40')}>
                   <button
@@ -588,20 +543,24 @@ export function AdminOrdersPage() {
                     <p className={'mt-0.5 line-clamp-2 text-[12px] ' + muted}>{orderLineSummary(o.line_items)}</p>
                     <p className={'mt-2 text-lg font-bold tabular-nums ' + ad(theme, 'text-emerald-700', 'text-emerald-300')}>{formatNaira(Number(o.total_ngn) || 0)}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      <span className={'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ' + adminStatusPillClass(o.status, theme)}>{o.status}</span>
-                      <span className={'rounded-full px-2 py-0.5 text-[10px] font-bold ' + pay.cls}>{pay.label}</span>
-                      <span className={'rounded-full px-2 py-0.5 text-[10px] font-bold ' + ship.cls}>{ship.label}</span>
+                      <span className={'rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ' + adminDeliveryPillClass(d, theme)}>{cancelled ? 'Cancelled' : d}</span>
+                      <span className={'rounded-full px-2 py-0.5 text-[10px] font-bold ' + adminPaymentPillClass(pPaid, theme)}>{cancelled ? '—' : pPaid ? 'Paid' : 'Unpaid'}</span>
                     </div>
                     <div className="mt-2">
                       <OrderRelativeTime iso={o.created_at} theme={theme} />
                     </div>
                   </button>
                   <div className="px-3 py-3">
-                    <label className={'mb-1 block text-[10px] font-bold uppercase ' + muted}>Update status</label>
-                    <select value={o.status} disabled={updating === o.id} onChange={(e) => void onStatusChange(o.id, e.target.value)} className={'w-full ' + statusSelect}>
-                      {[...new Set([...STATUS_OPTIONS, o.status])].map((s) => (
+                    <label className={'mb-1 block text-[10px] font-bold uppercase ' + muted}>Delivery</label>
+                    <select
+                      value={d}
+                      disabled={updating === o.id || cancelled}
+                      onChange={(e) => void onDeliveryChange(o.id, e.target.value as (typeof DELIVERY_OPTIONS)[number])}
+                      className={'w-full ' + statusSelect}
+                    >
+                      {DELIVERY_OPTIONS.map((s) => (
                         <option key={s} value={s}>
-                          {s}
+                          {s.charAt(0).toUpperCase() + s.slice(1)}
                         </option>
                       ))}
                     </select>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   displayableImageUrl,
   getDefaultImageUrls,
+  isProductOutOfStock,
   parseProductPriceNgn,
   type Product,
   type ProductColorOption,
@@ -20,6 +21,7 @@ import {
   computeInventoryValueNgn,
   computeSoldUnitsFromOrders,
   countExplicitOutOfStock,
+  adminStockAdClasses,
 } from '../../lib/adminProductStats.ts'
 import {
   deleteCatalogCategory,
@@ -207,7 +209,9 @@ export function AdminProductsPage() {
   const [presetBusy, setPresetBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [mainTab, setMainTab] = useState<'inventory' | 'collections'>('inventory')
-  const [publishFilter, setPublishFilter] = useState<'all' | 'published' | 'draft'>('all')
+  const [collectionsOpen, setCollectionsOpen] = useState<Set<string>>(() => new Set())
+  const collectionsDefaultedRef = useRef(false)
+  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all')
   const [collectionFilter, setCollectionFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
@@ -261,8 +265,8 @@ export function AdminProductsPage() {
     const q = search.trim().toLowerCase()
     return rows.filter((row) => {
       const p = row.payload
-      if (publishFilter === 'published' && !isPublishedPayload(p)) return false
-      if (publishFilter === 'draft' && isPublishedPayload(p)) return false
+      if (stockFilter === 'out_of_stock' && !isProductOutOfStock(p)) return false
+      if (stockFilter === 'in_stock' && isProductOutOfStock(p)) return false
       if (collectionFilter !== 'all' && (p.cat?.trim() || '') !== collectionFilter) return false
       if (q) {
         const hay = `${p.name} ${row.slug} ${p.cat ?? ''}`.toLowerCase()
@@ -270,7 +274,7 @@ export function AdminProductsPage() {
       }
       return true
     })
-  }, [rows, search, publishFilter, collectionFilter])
+  }, [rows, search, stockFilter, collectionFilter])
 
   const stats = useMemo(() => {
     const inv = computeInventoryValueNgn(rows)
@@ -288,6 +292,23 @@ export function AdminProductsPage() {
     }
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [rows])
+
+  useEffect(() => {
+    if (collectionsGrouped.length === 0) {
+      collectionsDefaultedRef.current = false
+      setCollectionsOpen(new Set())
+      return
+    }
+    setCollectionsOpen((prev) => {
+      const valid = new Set(collectionsGrouped.map(([cat]) => cat))
+      const next = new Set([...prev].filter((c) => valid.has(c)))
+      if (!collectionsDefaultedRef.current) {
+        collectionsDefaultedRef.current = true
+        if (next.size === 0) next.add(collectionsGrouped[0]![0])
+      }
+      return next
+    })
+  }, [collectionsGrouped])
 
   const openNew = () => {
     setEditingId(null)
@@ -554,7 +575,7 @@ export function AdminProductsPage() {
         <div className={'rounded-2xl border p-4 ' + ad(theme, 'border-stone-200 bg-white', 'border-neutral-700 bg-neutral-900/40')}>
           <p className={label}>Out of stock</p>
           <p className={'mt-2 text-xl font-bold tabular-nums ' + ad(theme, 'text-stone-900', 'text-white')}>{stats.oos}</p>
-          <p className={muted + ' mt-1 text-[12px]'}>Products with stock set to 0.</p>
+          <p className={muted + ' mt-1 text-[12px]'}>Tracked quantity at 0 — sold out or not released yet.</p>
         </div>
       </div>
 
@@ -606,7 +627,7 @@ export function AdminProductsPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setPublishFilter('all')
+                    setStockFilter('all')
                     setCollectionFilter('all')
                     setSearch('')
                   }}
@@ -616,27 +637,39 @@ export function AdminProductsPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPublishFilter('draft')}
+                  onClick={() => setStockFilter('all')}
                   className={
                     'rounded-lg px-3 py-1.5 text-[12px] font-semibold ' +
-                    (publishFilter === 'draft'
+                    (stockFilter === 'all'
                       ? ad(theme, 'bg-stone-800 text-white', 'bg-neutral-200 text-neutral-900')
                       : ad(theme, 'text-stone-600 hover:bg-stone-100', 'text-neutral-400 hover:bg-neutral-800'))
                   }
                 >
-                  Unpublished
+                  All
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPublishFilter('published')}
+                  onClick={() => setStockFilter('in_stock')}
                   className={
                     'rounded-lg px-3 py-1.5 text-[12px] font-semibold ' +
-                    (publishFilter === 'published'
+                    (stockFilter === 'in_stock'
                       ? ad(theme, 'bg-emerald-100 text-emerald-900', 'bg-emerald-950/50 text-emerald-200')
                       : ad(theme, 'text-stone-600 hover:bg-stone-100', 'text-neutral-400 hover:bg-neutral-800'))
                   }
                 >
-                  Published
+                  In stock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStockFilter('out_of_stock')}
+                  className={
+                    'rounded-lg px-3 py-1.5 text-[12px] font-semibold ' +
+                    (stockFilter === 'out_of_stock'
+                      ? ad(theme, 'bg-rose-100 text-rose-900', 'bg-rose-950/40 text-rose-200')
+                      : ad(theme, 'text-stone-600 hover:bg-stone-100', 'text-neutral-400 hover:bg-neutral-800'))
+                  }
+                >
+                  Out of stock
                 </button>
               </div>
               <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -679,13 +712,13 @@ export function AdminProductsPage() {
                 filteredRows.map((row) => {
                   const p = row.payload
                   const thumb = getDefaultImageUrls(p)[0]
-                  const vars = p.colorOptions?.length ?? 0
                   const stockLabel =
                     p.stockUnlimited === true
                       ? 'Unlimited'
                       : typeof p.stock === 'number'
                         ? String(p.stock)
                         : '—'
+                  const stockCls = ad(theme, ...adminStockAdClasses(p))
                   const pub = isPublishedPayload(p)
                   const genderLabel = p.gender === 'unisex' ? 'unisex' : p.gender
                   const cpShort = p.cp?.trim() ? (p.cp.length > 14 ? `${p.cp.slice(0, 12)}…` : p.cp) : '—'
@@ -713,12 +746,8 @@ export function AdminProductsPage() {
                             <span className="font-semibold">Who for</span> {genderLabel}
                           </span>
                           <span>
-                          <span title="Colour/finish options on the product page">
-                            <span className="font-semibold">Options</span> {vars}
-                          </span>
-                          </span>
-                          <span>
-                            <span className="font-semibold">Stock</span> {stockLabel}
+                            <span className="font-semibold">Stock</span>{' '}
+                            <span className={stockCls}>{stockLabel}</span>
                           </span>
                         </div>
                         <div className={'mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[12px]'}>
@@ -788,12 +817,6 @@ export function AdminProductsPage() {
                     <th className="w-[28%] min-w-0 px-1 py-2.5 sm:px-2 sm:py-3">Product</th>
                     <th className="w-[13%] min-w-0 px-1 py-2.5 sm:px-2 sm:py-3">Category</th>
                     <th className="hidden w-12 px-1 py-2.5 text-center sm:table-cell sm:px-2 sm:py-3">Who for</th>
-                    <th
-                      className="hidden w-[52px] px-0.5 py-2.5 text-center text-[10px] font-bold leading-tight lg:table-cell lg:px-2 lg:py-3 lg:text-[11px]"
-                      title="How many colour/finish options this product has on the shop (optional)."
-                    >
-                      Options
-                    </th>
                     <th className="w-11 px-1 py-2.5 text-center sm:w-14 sm:px-2 sm:py-3">Stock</th>
                     <th className="hidden w-[72px] px-1 py-2.5 lg:table-cell lg:px-2 lg:py-3">CP</th>
                     <th className="min-w-0 px-1 py-2.5 sm:px-2 sm:py-3">SP</th>
@@ -804,7 +827,7 @@ export function AdminProductsPage() {
                 <tbody>
                   {filteredRows.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className={'px-4 py-12 text-center text-[14px] ' + muted}>
+                      <td colSpan={10} className={'px-4 py-12 text-center text-[14px] ' + muted}>
                         No products match these filters. Try clearing filters or add a new product.
                       </td>
                     </tr>
@@ -812,13 +835,13 @@ export function AdminProductsPage() {
                     filteredRows.map((row) => {
                       const p = row.payload
                       const thumb = getDefaultImageUrls(p)[0]
-                      const vars = p.colorOptions?.length ?? 0
                       const stockLabel =
                         p.stockUnlimited === true
                           ? '∞'
                           : typeof p.stock === 'number'
                             ? String(p.stock)
                             : '—'
+                      const stockCls = ad(theme, ...adminStockAdClasses(p))
                       const pub = isPublishedPayload(p)
                       const genderLabel = p.gender === 'unisex' ? 'unisex' : p.gender
                       const cpCell = p.cp?.trim() ? p.cp.trim() : '—'
@@ -836,8 +859,12 @@ export function AdminProductsPage() {
                           </td>
                           <td className={'min-w-0 max-w-0 truncate px-1 py-2 align-middle sm:px-2 ' + tableCell}>{p.cat || '—'}</td>
                           <td className={'hidden px-1 py-2 text-center align-middle text-[11px] capitalize sm:table-cell sm:px-2 ' + tableCell}>{genderLabel}</td>
-                          <td className={'hidden px-1 py-2 text-center align-middle tabular-nums lg:table-cell lg:px-2 ' + tableCell}>{vars}</td>
-                          <td className={'px-1 py-2 text-center align-middle tabular-nums sm:px-2 ' + tableCell} title={p.stockUnlimited === true ? 'Unlimited' : stockLabel}>
+                          <td
+                            className={
+                              'px-1 py-2 text-center align-middle tabular-nums sm:px-2 ' + tableCell + ' ' + stockCls
+                            }
+                            title={p.stockUnlimited === true ? 'Unlimited' : stockLabel}
+                          >
                             {p.stockUnlimited === true ? '∞' : stockLabel}
                           </td>
                           <td className={'hidden min-w-0 max-w-[5.5rem] truncate px-1 py-2 align-middle font-mono text-[11px] tabular-nums lg:table-cell lg:max-w-[7rem] lg:px-2 ' + tableCell}>
@@ -883,30 +910,67 @@ export function AdminProductsPage() {
             </div>
           </>
         ) : (
-          <div className="divide-y px-4 py-2">
-            {collectionsGrouped.map(([cat, list]) => (
-              <div key={cat} className="py-4 first:pt-3">
-                <h3 className={'text-[15px] font-bold ' + ad(theme, 'text-stone-900', 'text-white')}>
-                  {cat} <span className={muted + ' text-[13px] font-normal'}>({list.length})</span>
-                </h3>
-                <ul className="mt-2 space-y-1">
-                  {list.map((row) => (
-                    <li key={row.id}>
-                      <button
-                        type="button"
-                        onClick={() => openEdit(row)}
-                        className={'flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-[13px] ' + ad(theme, 'hover:bg-stone-50', 'hover:bg-neutral-800/50')}
-                      >
-                        <TableThumb url={getDefaultImageUrls(row.payload)[0]} theme={theme} />
-                        <span className={'min-w-0 flex-1 truncate font-medium ' + ad(theme, 'text-stone-800', 'text-neutral-100')}>{row.payload.name || row.slug}</span>
-                        <span className={muted + ' shrink-0 text-[12px]'}>{row.payload.price || '—'}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-            {collectionsGrouped.length === 0 ? <p className={'p-8 text-center ' + muted}>No products yet.</p> : null}
+          <div className="px-2 py-1 sm:px-4">
+            {collectionsGrouped.length === 0 ? (
+              <p className={'p-8 text-center ' + muted}>No products yet.</p>
+            ) : (
+              collectionsGrouped.map(([cat, list]) => {
+                const isOpen = collectionsOpen.has(cat)
+                return (
+                  <div
+                    key={cat}
+                    className={'border-b last:border-b-0 ' + ad(theme, 'border-stone-100', 'border-neutral-800')}
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCollectionsOpen((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(cat)) next.delete(cat)
+                          else next.add(cat)
+                          return next
+                        })
+                      }
+                      className={
+                        'flex w-full items-center justify-between gap-3 py-3 text-left transition-colors ' +
+                        ad(theme, 'hover:bg-stone-50/80', 'hover:bg-neutral-800/40')
+                      }
+                      aria-expanded={isOpen}
+                    >
+                      <span className={'min-w-0 text-[15px] font-bold ' + ad(theme, 'text-stone-900', 'text-white')}>
+                        {cat}{' '}
+                        <span className={muted + ' text-[13px] font-normal'}>({list.length})</span>
+                      </span>
+                      <span className={'material-symbols-outlined shrink-0 text-[22px] ' + muted} aria-hidden>
+                        {isOpen ? 'expand_less' : 'expand_more'}
+                      </span>
+                    </button>
+                    {isOpen ? (
+                      <ul className="space-y-1 pb-3">
+                        {list.map((row) => (
+                          <li key={row.id}>
+                            <button
+                              type="button"
+                              onClick={() => openEdit(row)}
+                              className={
+                                'flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-[13px] ' +
+                                ad(theme, 'hover:bg-stone-50', 'hover:bg-neutral-800/50')
+                              }
+                            >
+                              <TableThumb url={getDefaultImageUrls(row.payload)[0]} theme={theme} />
+                              <span className={'min-w-0 flex-1 truncate font-medium ' + ad(theme, 'text-stone-800', 'text-neutral-100')}>
+                                {row.payload.name || row.slug}
+                              </span>
+                              <span className={muted + ' shrink-0 text-[12px]'}>{row.payload.price || '—'}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                )
+              })
+            )}
           </div>
         )}
       </div>
@@ -1118,6 +1182,7 @@ export function AdminProductsPage() {
                       else setDraft((d) => ({ ...d, stock: Math.max(0, Math.floor(Number(v)) || 0) }))
                     }}
                   />
+                  <p className={muted + ' mt-1 text-[12px]'}>0 = sold out on the shop. Leave empty if you are not counting units.</p>
                 </div>
                 <div className="flex flex-col justify-end gap-2">
                   <label className={'flex cursor-pointer items-center gap-2 text-[13px] font-medium ' + ad(theme, 'text-stone-800', 'text-neutral-100')}>

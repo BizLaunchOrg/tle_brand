@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { buildWhatsappUrl } from '../lib/siteContact.ts'
+import { WhatsAppIcon } from './icons/WhatsAppIcon.tsx'
 
-const WHATSAPP_LINK = 'https://wa.me/2347062818542'
+const WHATSAPP_HREF = buildWhatsappUrl()
 
 export function FloatingActions() {
   const [showScrollTop, setShowScrollTop] = useState(false)
@@ -30,13 +32,13 @@ export function FloatingActions() {
       ) : null}
 
       <a
-        href={WHATSAPP_LINK}
+        href={WHATSAPP_HREF}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex size-11 items-center justify-center rounded-full bg-[#25D366] text-white shadow-[0_10px_24px_rgba(0,0,0,0.26)] transition-colors hover:bg-[#1fb85a]"
+        className="flex size-12 items-center justify-center rounded-full bg-[#25D366] text-white shadow-[0_10px_24px_rgba(0,0,0,0.26)] transition-transform hover:scale-[1.04] hover:bg-[#1fb85a]"
         aria-label="Chat on WhatsApp"
       >
-        <span className="material-symbols-outlined text-[21px] leading-none">chat</span>
+        <WhatsAppIcon className="size-7" />
       </a>
     </div>
   )

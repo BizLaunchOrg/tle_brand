@@ -68,7 +68,7 @@ export function Footer() {
           <ul className="flex flex-col gap-2.5">
             {[
               ['About Us', '/about'],
-              ['Contact', '/#booking-form'],
+              ['Contact', '/contact'],
               ['FAQ', '/'],
               ['Privacy Policy', '/'],
               ['Returns', '/'],

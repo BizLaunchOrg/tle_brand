@@ -157,7 +157,7 @@ export function Navbar() {
             </span>
           </button>
         </div>
-        <ul className="hidden items-center gap-7 md:flex">
+        <ul className="hidden items-center gap-5 xl:gap-7 md:flex">
           <li>
             <NavLink to="/" end className={navLinkClass(showSolidNav)}>
               Home
@@ -171,6 +171,11 @@ export function Navbar() {
           <li>
             <NavLink to="/makeup" className={navLinkClass(showSolidNav)}>
               Makeup
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/contact" className={navLinkClass(showSolidNav)} title="Contact us — visit or message">
+              Contact
             </NavLink>
           </li>
         </ul>
@@ -341,6 +346,11 @@ export function Navbar() {
               <li>
                 <NavLink to="/makeup" className={mobileSheetLink} onClick={() => setMenuOpen(false)}>
                   Makeup
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to="/contact" className={mobileSheetLink} onClick={() => setMenuOpen(false)}>
+                  Contact us
                 </NavLink>
               </li>
               {user ? (

@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext'
 import { ShopProductsProvider } from './context/ShopProductsContext.tsx'
 import { MainLayout } from './components/MainLayout.tsx'
 import { LandingPage } from './pages/LandingPage/LandingPage.tsx'
+import { ContactPage } from './pages/ContactPage/ContactPage.tsx'
 import { MakeupPage } from './pages/MakeupPage/MakeupPage.tsx'
 import { NotFoundPage } from './pages/NotFoundPage/NotFoundPage.tsx'
 import { ProductDetailPage } from './pages/ProductDetailPage/ProductDetailPage.tsx'
@@ -38,6 +39,7 @@ function App() {
           <Route path="auth/confirm" element={<AuthConfirmPage />} />
           <Route path="product/:slug" element={<ProductDetailPage />} />
           <Route path="makeup" element={<MakeupPage />} />
+          <Route path="contact" element={<ContactPage />} />
           <Route path="book" element={<NotFoundPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

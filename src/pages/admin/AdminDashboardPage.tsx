@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import {
   countAndRevenue,
+  effectiveDeliveryStatus,
   filterOrdersByRange,
-  isCompletedStatus,
-  isPendingStatus,
+  orderIsOpenPipeline,
+  orderIsSettledComplete,
   topStatesByRevenue,
   uniqueBuyerCount,
   type DateRangeFilter,
@@ -13,7 +14,7 @@ import {
 import { fetchOrdersForAdmin } from '../../lib/adminOrders.ts'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { AdminRangeTabs, adminStatusPillClass } from './adminRangeTabs.tsx'
+import { AdminRangeTabs, adminDeliveryPillClass } from './adminRangeTabs.tsx'
 import { ad, adminFont } from './adminUi.ts'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
@@ -23,15 +24,15 @@ function filterOrdersByYear(orders: AdminOrderRow[], year: number) {
 }
 
 function revenueCompleted(orders: AdminOrderRow[]) {
-  return orders.filter((o) => isCompletedStatus(o.status)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0)
+  return orders.filter((o) => orderIsSettledComplete(o)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0)
 }
 
 function revenuePending(orders: AdminOrderRow[]) {
-  return orders.filter((o) => isPendingStatus(o.status)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0)
+  return orders.filter((o) => orderIsOpenPipeline(o)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0)
 }
 
 function completedCount(orders: AdminOrderRow[]) {
-  return orders.filter((o) => isCompletedStatus(o.status)).length
+  return orders.filter((o) => orderIsSettledComplete(o)).length
 }
 
 type OverviewTint = 'emerald' | 'sky' | 'amber' | 'rose'
@@ -108,8 +109,8 @@ export function AdminDashboardPage() {
   const rangeStats = useMemo(() => countAndRevenue(inRange), [inRange])
   const buyersInRange = useMemo(() => uniqueBuyerCount(inRange), [inRange])
   const completedInRange = useMemo(() => completedCount(inRange), [inRange])
-  const pendingAll = useMemo(() => orders.filter((o) => isPendingStatus(o.status)), [orders])
-  const completedAll = useMemo(() => orders.filter((o) => isCompletedStatus(o.status)), [orders])
+  const pendingAll = useMemo(() => orders.filter((o) => orderIsOpenPipeline(o)), [orders])
+  const completedAll = useMemo(() => orders.filter((o) => orderIsSettledComplete(o)), [orders])
   const topStates = useMemo(() => topStatesByRevenue(orders, 10), [orders])
   const recent = orders.slice(0, 12)
   const allTime = useMemo(() => countAndRevenue(orders), [orders])
@@ -515,8 +516,8 @@ export function AdminDashboardPage() {
                           {formatNaira(Number(o.total_ngn) || 0)}
                         </td>
                         <td className={td}>
-                          <span className={'inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ' + adminStatusPillClass(o.status, theme)}>
-                            {o.status}
+                          <span className={'inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold capitalize tracking-wide ' + adminDeliveryPillClass(effectiveDeliveryStatus(o), theme)}>
+                            {effectiveDeliveryStatus(o)}
                           </span>
                         </td>
                       </tr>

@@ -2,6 +2,64 @@ import type { AdminOrderRow } from './adminOrders'
 
 export type DateRangeFilter = 'today' | '7d' | '30d' | 'all'
 
+export type DeliveryStatus = 'pending' | 'processing' | 'delivered'
+
+export function orderIsCancelled(o: Pick<AdminOrderRow, 'status'>): boolean {
+  return String(o.status ?? '').toLowerCase() === 'cancelled'
+}
+
+/** Payment recorded (independent of delivery). */
+export function orderIsPaymentPaid(o: Pick<AdminOrderRow, 'payment_status' | 'status'>): boolean {
+  const p = String(o.payment_status ?? '').toLowerCase()
+  if (p === 'paid') return true
+  if (p === 'unpaid') return false
+  const s = String(o.status ?? '').toLowerCase()
+  if (s === 'cancelled') return false
+  return (
+    s === 'paid' ||
+    s === 'processing' ||
+    s === 'shipped' ||
+    s === 'delivered' ||
+    s === 'completed' ||
+    s === 'fulfilled'
+  )
+}
+
+/** Customer has received the order (delivery column or legacy status). */
+export function orderIsDeliveryDone(o: Pick<AdminOrderRow, 'delivery_status' | 'status'>): boolean {
+  const d = String(o.delivery_status ?? '').toLowerCase()
+  if (d === 'delivered') return true
+  if (d === 'pending' || d === 'processing') return false
+  const s = String(o.status ?? '').toLowerCase()
+  return s === 'delivered' || s === 'completed' || s === 'fulfilled'
+}
+
+export function effectiveDeliveryStatus(o: AdminOrderRow): DeliveryStatus {
+  const d = String(o.delivery_status ?? '').toLowerCase()
+  if (d === 'delivered' || d === 'processing' || d === 'pending') return d
+  const s = String(o.status ?? '').toLowerCase()
+  if (s === 'delivered' || s === 'completed' || s === 'fulfilled') return 'delivered'
+  if (s === 'processing' || s === 'shipped') return 'processing'
+  return 'pending'
+}
+
+/** Paid and still in fulfilment queue (not cancelled, not delivered). */
+export function orderIsPaidAwaitingDelivery(o: AdminOrderRow): boolean {
+  if (orderIsCancelled(o)) return false
+  return orderIsPaymentPaid(o) && !orderIsDeliveryDone(o)
+}
+
+/** Settled for reporting: paid and delivered. */
+export function orderIsSettledComplete(o: AdminOrderRow): boolean {
+  return orderIsPaymentPaid(o) && orderIsDeliveryDone(o)
+}
+
+/** Not cancelled and not fully settled (open work / pipeline). */
+export function orderIsOpenPipeline(o: AdminOrderRow): boolean {
+  if (orderIsCancelled(o)) return false
+  return !orderIsSettledComplete(o)
+}
+
 const startOfLocalDay = (d: Date) => {
   const x = new Date(d)
   x.setHours(0, 0, 0, 0)

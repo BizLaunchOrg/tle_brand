@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { AdminTheme } from './AdminThemeContext.tsx'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
-import { updateOrderStatus } from '../../lib/adminOrders.ts'
+import { updateOrderDeliveryStatus, updateOrderPaymentStatus, updateOrderStatus, markShippingSlipPrinted } from '../../lib/adminOrders.ts'
 import { fetchCatalogPayloadsBySlugs } from '../../lib/adminCatalog.ts'
 import {
   displayableImageUrl,
@@ -14,16 +14,17 @@ import {
 } from '../../data/products.ts'
 import { OrderRelativeTime } from './OrderRelativeTime.tsx'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { adminStatusPillClass } from './adminRangeTabs.tsx'
+import { adminDeliveryPillClass, adminPaymentPillClass } from './adminRangeTabs.tsx'
 import { ad, adminFont } from './adminUi.ts'
-import { isCompletedStatus } from '../../lib/adminOrderAnalytics.ts'
+import { effectiveDeliveryStatus, orderIsPaymentPaid } from '../../lib/adminOrderAnalytics.ts'
 import { normalizeOrderLineItems, pickLineImageFromItem } from '../../lib/adminOrderLineSnapshots.ts'
+import { printShippingSlip } from './shippingSlipPrint.ts'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
-const STATUS_OPTIONS = ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'] as const
+const DELIVERY_OPTIONS = ['pending', 'processing', 'delivered'] as const
 
-const QUICK_STATUSES = ['processing', 'shipped', 'delivered', 'completed'] as const
+const PAYMENT_OPTIONS = ['paid', 'unpaid'] as const
 
 const SHIPPING_KEY_ORDER = ['fullName', 'phone', 'email', 'line1', 'line2', 'city', 'state', 'postalCode', 'country'] as const
 const SHIPPING_ORDER_SET = new Set<string>(SHIPPING_KEY_ORDER as unknown as string[])
@@ -234,52 +235,6 @@ function orderRefShort(id: string): string {
   return compact.slice(0, 6).toUpperCase()
 }
 
-function isPaidOrderStatus(status: string): boolean {
-  const s = status.toLowerCase()
-  return isCompletedStatus(status) || s === 'paid'
-}
-
-function paymentPill(status: string, theme: 'light' | 'dark'): { label: string; cls: string } {
-  const s = status.toLowerCase()
-  if (s === 'cancelled')
-    return {
-      label: 'N/A',
-      cls: ad(theme, 'bg-stone-100 text-stone-600', 'bg-neutral-800 text-neutral-400'),
-    }
-  if (isPaidOrderStatus(status))
-    return {
-      label: 'Paid',
-      cls: ad(theme, 'bg-emerald-100 text-emerald-900', 'bg-emerald-950/50 text-emerald-300'),
-    }
-  return {
-    label: 'Unpaid',
-    cls: ad(theme, 'bg-rose-100 text-rose-900', 'bg-rose-950/40 text-rose-200'),
-  }
-}
-
-function shippingPill(status: string, theme: 'light' | 'dark'): { label: string; cls: string } {
-  const s = status.toLowerCase()
-  if (s === 'cancelled')
-    return {
-      label: 'Cancelled',
-      cls: ad(theme, 'bg-stone-100 text-stone-600', 'bg-neutral-800 text-neutral-400'),
-    }
-  if (s === 'delivered' || s === 'completed' || s === 'fulfilled')
-    return {
-      label: 'Delivered',
-      cls: ad(theme, 'bg-emerald-100 text-emerald-900', 'bg-emerald-950/50 text-emerald-300'),
-    }
-  if (s === 'processing' || s === 'shipped')
-    return {
-      label: 'Shipped',
-      cls: ad(theme, 'bg-sky-100 text-sky-900', 'bg-sky-950/50 text-sky-200'),
-    }
-  return {
-    label: 'Unfulfilled',
-    cls: ad(theme, 'bg-amber-100 text-amber-950', 'bg-amber-950/40 text-amber-200'),
-  }
-}
-
 function deliverBlock(ship: Record<string, unknown>): string {
   const lines: string[] = []
   const name = typeof ship.fullName === 'string' ? ship.fullName.trim() : ''
@@ -303,6 +258,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
   const { theme } = useAdminTheme()
   const [catalog, setCatalog] = useState<Map<string, Product>>(() => new Map())
   const [saving, setSaving] = useState(false)
+  const [slipBusy, setSlipBusy] = useState(false)
   const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   useEffect(() => {
@@ -325,8 +281,10 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
   const ship = order.shipping && typeof order.shipping === 'object' ? (order.shipping as Record<string, unknown>) : {}
   const contactRows = shippingRows(ship)
   const deliverText = deliverBlock(ship)
-  const pay = paymentPill(order.status, theme)
-  const shipPill = shippingPill(order.status, theme)
+  const delivery = effectiveDeliveryStatus(order)
+  const paid = orderIsPaymentPaid(order)
+  const payCls = adminPaymentPillClass(paid, theme)
+  const delCls = adminDeliveryPillClass(delivery, theme)
 
   const border = ad(theme, 'border-stone-200', 'border-neutral-800')
   const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
@@ -362,14 +320,66 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
     }
   }
 
-  const applyStatus = async (next: string) => {
-    if (next === order.status) return
+  const applyDelivery = async (next: (typeof DELIVERY_OPTIONS)[number]) => {
+    if (next === delivery) return
     setSaving(true)
     setBanner(null)
-    const res = await updateOrderStatus(order.id, next)
+    const res = await updateOrderDeliveryStatus(order.id, next)
     setSaving(false)
     if (res.ok) {
-      setBanner({ type: 'ok', text: 'Order status updated.' })
+      setBanner({ type: 'ok', text: 'Delivery updated.' })
+      await onRefresh()
+      window.setTimeout(() => setBanner(null), 2800)
+    } else {
+      setBanner({ type: 'err', text: res.message })
+    }
+  }
+
+  const applyPayment = async (next: (typeof PAYMENT_OPTIONS)[number]) => {
+    const cur = (order.payment_status || '').toLowerCase() === 'unpaid' ? 'unpaid' : 'paid'
+    if (next === cur) return
+    setSaving(true)
+    setBanner(null)
+    const res = await updateOrderPaymentStatus(order.id, next)
+    setSaving(false)
+    if (res.ok) {
+      setBanner({ type: 'ok', text: 'Payment updated.' })
+      await onRefresh()
+      window.setTimeout(() => setBanner(null), 2800)
+    } else {
+      setBanner({ type: 'err', text: res.message })
+    }
+  }
+
+  const cancelOrder = async () => {
+    setSaving(true)
+    setBanner(null)
+    const res = await updateOrderStatus(order.id, 'cancelled')
+    setSaving(false)
+    if (res.ok) {
+      setBanner({ type: 'ok', text: 'Order cancelled.' })
+      await onRefresh()
+      window.setTimeout(() => setBanner(null), 2800)
+    } else {
+      setBanner({ type: 'err', text: res.message })
+    }
+  }
+
+  const onPrintShippingSlip = () => {
+    setBanner(null)
+    const ok = printShippingSlip(order)
+    if (!ok) {
+      setBanner({ type: 'err', text: 'Pop-up blocked — allow pop-ups for this site, then try Print again.' })
+    }
+  }
+
+  const onConfirmSlipPrinted = async () => {
+    setSlipBusy(true)
+    setBanner(null)
+    const res = await markShippingSlipPrinted(order.id)
+    setSlipBusy(false)
+    if (res.ok) {
+      setBanner({ type: 'ok', text: 'Packing slip marked as printed.' })
       await onRefresh()
       window.setTimeout(() => setBanner(null), 2800)
     } else {
@@ -379,6 +389,11 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
 
   const statusLower = order.status.toLowerCase()
   const cancelled = statusLower === 'cancelled'
+
+  const slipPrintedAt = order.shipping_slip_printed_at
+  const slipPrintedLabel = slipPrintedAt
+    ? new Date(slipPrintedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+    : null
 
   return (
     <div className={adminFont() + ' mx-auto w-full min-w-0 max-w-[88rem] pb-12'}>
@@ -425,9 +440,25 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
           </div>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
-          <span className={'rounded-full px-2.5 py-1 text-[11px] font-bold uppercase ' + adminStatusPillClass(order.status, theme)}>Order: {order.status}</span>
-          <span className={'rounded-full px-2.5 py-1 text-[11px] font-bold ' + pay.cls}>Payment: {pay.label}</span>
-          <span className={'rounded-full px-2.5 py-1 text-[11px] font-bold ' + shipPill.cls}>Shipping: {shipPill.label}</span>
+          {cancelled ? (
+            <span className={'rounded-full px-2.5 py-1 text-[11px] font-bold uppercase ' + muted}>Cancelled</span>
+          ) : (
+            <>
+              <span className={'rounded-full px-2.5 py-1 text-[11px] font-bold ' + payCls}>Payment: {paid ? 'Paid' : 'Unpaid'}</span>
+              <span className={'rounded-full px-2.5 py-1 text-[11px] font-bold capitalize ' + delCls}>Delivery: {delivery}</span>
+            </>
+          )}
+          {slipPrintedLabel ? (
+            <span
+              className={
+                'rounded-full px-2.5 py-1 text-[11px] font-bold ' +
+                ad(theme, 'bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200/80', 'bg-emerald-950/40 text-emerald-200 ring-1 ring-emerald-800/50')
+              }
+              title={`Packing slip last confirmed: ${slipPrintedLabel}`}
+            >
+              Slip printed
+            </span>
+          ) : null}
           <span className={muted + ' inline-flex items-center text-[12px]'}>
             <OrderRelativeTime iso={order.created_at} theme={theme} />
           </span>
@@ -550,36 +581,49 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
           </section>
 
           <section className={'rounded-2xl border p-4 sm:p-5 ' + border + ' ' + panel}>
-            <h2 className={'text-[11px] font-bold uppercase tracking-[0.12em] ' + muted}>Update order status</h2>
-            <p className={muted + ' mt-1 text-[12px] leading-relaxed'}>
-              Pick a status below or use a shortcut. Payment and shipping labels on the list follow this field until you add separate payment tables.
-            </p>
+            <h2 className={'text-[11px] font-bold uppercase tracking-[0.12em] ' + muted}>Delivery</h2>
+            <p className={muted + ' mt-1 text-[12px]'}>Pending → preparing → delivered to the customer.</p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
               <label className="block min-w-0 flex-1">
-                <span className={'sr-only'}>Order status</span>
+                <span className={'mb-1 block text-[10px] font-bold uppercase tracking-wide ' + muted}>Status</span>
                 <select
                   className={selectCls}
-                  value={order.status}
+                  value={delivery}
                   disabled={saving || cancelled}
-                  onChange={(e) => void applyStatus(e.target.value)}
+                  onChange={(e) => void applyDelivery(e.target.value as (typeof DELIVERY_OPTIONS)[number])}
                 >
-                  {[...new Set([...STATUS_OPTIONS, order.status])].map((s) => (
+                  {DELIVERY_OPTIONS.map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block min-w-0 flex-1">
+                <span className={'mb-1 block text-[10px] font-bold uppercase tracking-wide ' + muted}>Payment</span>
+                <select
+                  className={selectCls}
+                  value={(order.payment_status || '').toLowerCase() === 'unpaid' ? 'unpaid' : 'paid'}
+                  disabled={saving || cancelled}
+                  onChange={(e) => void applyPayment(e.target.value as (typeof PAYMENT_OPTIONS)[number])}
+                >
+                  {PAYMENT_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
                     </option>
                   ))}
                 </select>
               </label>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              {QUICK_STATUSES.map((st) => {
-                const active = order.status.toLowerCase() === st
+              {DELIVERY_OPTIONS.map((st) => {
+                const active = delivery === st
                 return (
                   <button
                     key={st}
                     type="button"
                     disabled={saving || cancelled || active}
-                    onClick={() => void applyStatus(st)}
+                    onClick={() => void applyDelivery(st)}
                     className={quickBtn}
                   >
                     {st.charAt(0).toUpperCase() + st.slice(1)}
@@ -587,6 +631,13 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
                 )
               })}
             </div>
+            {!cancelled ? (
+              <div className="mt-6 border-t pt-4">
+                <button type="button" disabled={saving} onClick={() => void cancelOrder()} className={ghostBtn + ' text-rose-700 ring-1 ring-rose-200'}>
+                  Cancel this order
+                </button>
+              </div>
+            ) : null}
           </section>
         </div>
 
@@ -612,6 +663,12 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
                 <dt className={muted}>Processing</dt>
                 <dd className={'font-semibold tabular-nums ' + strong}>{formatNaira(Number(order.processing_ngn) || 0)}</dd>
               </div>
+              {(Number(order.processing_vat_ngn) || 0) > 0 ? (
+                <div className="flex justify-between gap-2">
+                  <dt className={muted}>VAT on processing</dt>
+                  <dd className={'font-semibold tabular-nums ' + strong}>{formatNaira(Number(order.processing_vat_ngn) || 0)}</dd>
+                </div>
+              ) : null}
               <div className={'mt-2 flex justify-between gap-2 border-t pt-2 ' + border}>
                 <dt className={'text-[12px] font-bold ' + strong}>Total</dt>
                 <dd className={'text-lg font-bold tabular-nums ' + ad(theme, 'text-emerald-700', 'text-emerald-300')}>{formatNaira(Number(order.total_ngn) || 0)}</dd>
@@ -622,7 +679,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
           <div className={'rounded-2xl border p-4 ' + border + ' ' + subpanel}>
             <div className="flex items-center justify-between gap-2">
               <p className={'text-[11px] font-bold uppercase tracking-[0.12em] ' + muted}>Payment status</p>
-              <span className={'rounded-full px-2.5 py-1 text-[11px] font-bold ' + pay.cls}>{pay.label}</span>
+              <span className={'rounded-full px-2.5 py-1 text-[11px] font-bold ' + payCls}>{paid ? 'Paid' : 'Unpaid'}</span>
             </div>
           </div>
 
@@ -640,6 +697,36 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
               </button>
             </div>
             <p className={'mt-3 whitespace-pre-line break-words text-[13px] leading-relaxed ' + strong}>{deliverText || '—'}</p>
+          </div>
+
+          <div className={'rounded-2xl border p-4 ' + border + ' ' + panel}>
+            <h2 className={'text-[11px] font-bold uppercase tracking-[0.12em] ' + muted}>Packing slip</h2>
+            <p className={muted + ' mt-1 text-[12px]'}>Print for the box. Mark printed when it is on the parcel.</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <button type="button" onClick={onPrintShippingSlip} className={ghostBtn + ' justify-center py-2.5'}>
+                <span className="material-symbols-outlined text-[18px] font-light">print</span>
+                Print shipping slip
+              </button>
+              <button
+                type="button"
+                disabled={cancelled || slipBusy}
+                onClick={() => void onConfirmSlipPrinted()}
+                className={quickBtn + ' justify-center py-2.5'}
+              >
+                <span className="material-symbols-outlined text-[18px] font-light">check_circle</span>
+                {slipBusy ? 'Saving…' : 'Confirm slip printed'}
+              </button>
+            </div>
+            <p className={'mt-3 text-[12px] leading-relaxed ' + (slipPrintedLabel ? strong : muted)}>
+              {slipPrintedLabel ? (
+                <>
+                  <span className={muted + ' font-bold uppercase tracking-wide'}>Printed · </span>
+                  {slipPrintedLabel}
+                </>
+              ) : (
+                <>Not marked printed yet.</>
+              )}
+            </p>
           </div>
         </aside>
       </div>

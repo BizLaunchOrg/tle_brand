@@ -13,6 +13,8 @@ import {
   getDefaultImageUrls,
   getDisplayPrice,
   getGalleryUrls,
+  getProductPurchasableMaxUnits,
+  isProductOutOfStock,
   parseProductPriceNgn,
   PRODUCTS,
   type Product,
@@ -59,6 +61,7 @@ type CartDrawerContextValue = {
   isFavorite: (slug: string) => boolean
   isLineInCart: (lineKey: string) => boolean
   hasProductInCart: (slug: string) => boolean
+  lineQuantityInCart: (lineKey: string) => number
 }
 
 const CartDrawerContext = createContext<CartDrawerContextValue | null>(null)
@@ -91,7 +94,9 @@ function hydrateCart(lines: PersistedCartLine[], products: Product[]): CartItem[
   for (const line of lines) {
     const p = productBySlug(products, line.slug)
     if (!p) continue
-    const qty = Math.min(999, Math.max(1, Math.floor(Number(line.quantity)) || 1))
+    const max = getProductPurchasableMaxUnits(p)
+    if (max < 1) continue
+    const qty = Math.min(max, Math.min(999, Math.max(1, Math.floor(Number(line.quantity)) || 1)))
     let variant: CartVariant | undefined
     if (line.variantId) {
       const opt = p.colorOptions?.find((c) => c.id === line.variantId)
@@ -226,27 +231,41 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
   const openFavorites = useCallback(() => setFavoritesOpen(true), [])
   const closeFavorites = useCallback(() => setFavoritesOpen(false), [])
 
-  const addToCart = useCallback((product: Product, variant?: CartVariant) => {
-    const lineKey = cartLineKey(product.slug, variant?.id)
-    setCartItems((prev) => {
-      const existing = prev.find((item) => cartLineKey(item.slug, item.variantId) === lineKey)
-      if (!existing) return [...prev, buildCartLine(product, variant)]
-      return prev.map((item) =>
-        cartLineKey(item.slug, item.variantId) === lineKey
-          ? { ...item, quantity: item.quantity + 1 }
-          : item,
-      )
-    })
-    setCartOpen(true)
-  }, [])
+  const addToCart = useCallback(
+    (product: Product, variant?: CartVariant) => {
+      const live = productBySlug(shopProducts, product.slug) ?? product
+      if (isProductOutOfStock(live)) return
+      const max = getProductPurchasableMaxUnits(live)
+      const lineKey = cartLineKey(live.slug, variant?.id)
+      setCartItems((prev) => {
+        const existing = prev.find((item) => cartLineKey(item.slug, item.variantId) === lineKey)
+        if (!existing) return [...prev, buildCartLine(live, variant)]
+        if (existing.quantity >= max) return prev
+        return prev.map((item) =>
+          cartLineKey(item.slug, item.variantId) === lineKey
+            ? { ...item, quantity: item.quantity + 1 }
+            : item,
+        )
+      })
+      setCartOpen(true)
+    },
+    [shopProducts],
+  )
 
-  const incrementCartItem = useCallback((lineKey: string) => {
-    setCartItems((prev) =>
-      prev.map((item) =>
-        cartLineKey(item.slug, item.variantId) === lineKey ? { ...item, quantity: item.quantity + 1 } : item,
-      ),
-    )
-  }, [])
+  const incrementCartItem = useCallback(
+    (lineKey: string) => {
+      setCartItems((prev) =>
+        prev.map((item) => {
+          if (cartLineKey(item.slug, item.variantId) !== lineKey) return item
+          const live = productBySlug(shopProducts, item.slug)
+          const max = getProductPurchasableMaxUnits(live ?? item)
+          if (item.quantity >= max) return item
+          return { ...item, quantity: item.quantity + 1 }
+        }),
+      )
+    },
+    [shopProducts],
+  )
 
   const decrementCartItem = useCallback((lineKey: string) => {
     setCartItems((prev) =>
@@ -292,6 +311,11 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
     [cartItems],
   )
 
+  const lineQuantityInCart = useCallback(
+    (lineKey: string) => cartItems.find((item) => cartLineKey(item.slug, item.variantId) === lineKey)?.quantity ?? 0,
+    [cartItems],
+  )
+
   const cartCount = useMemo(() => cartItems.reduce((sum, item) => sum + item.quantity, 0), [cartItems])
   const favoriteCount = useMemo(() => favoriteItems.length, [favoriteItems])
   const cartSubtotal = useMemo(
@@ -321,6 +345,7 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
       isFavorite,
       isLineInCart,
       hasProductInCart,
+      lineQuantityInCart,
     }),
     [
       cartOpen,
@@ -343,6 +368,7 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
       isFavorite,
       isLineInCart,
       hasProductInCart,
+      lineQuantityInCart,
     ],
   )
 

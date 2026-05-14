@@ -1,5 +1,5 @@
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
-import { isCompletedStatus, isPendingStatus } from '../../lib/adminOrderAnalytics.ts'
+import { effectiveDeliveryStatus, orderIsOpenPipeline, orderIsSettledComplete } from '../../lib/adminOrderAnalytics.ts'
 import { openHtmlPrintWindow } from '../../lib/openHtmlPrintWindow.ts'
 
 function esc(s: string): string {
@@ -20,8 +20,8 @@ export type StatementMeta = {
 export function buildStatementHtml(rows: AdminOrderRow[], meta: StatementMeta): string {
   const sorted = [...rows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   const totalNgn = sorted.reduce((a, o) => a + (Number(o.total_ngn) || 0), 0)
-  const settled = sorted.filter((o) => isCompletedStatus(o.status)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0)
-  const pipeline = sorted.filter((o) => isPendingStatus(o.status)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0)
+  const settled = sorted.filter((o) => orderIsSettledComplete(o)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0)
+  const pipeline = sorted.filter((o) => orderIsOpenPipeline(o)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0)
   const generated = new Date().toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
   const tableRows = sorted
@@ -30,7 +30,7 @@ export function buildStatementHtml(rows: AdminOrderRow[], meta: StatementMeta): 
       const ref = esc(o.id)
       const email = esc(o.email || '—')
       const amt = esc(formatNaira(Number(o.total_ngn) || 0))
-      const st = esc(o.status || '—')
+      const st = esc(effectiveDeliveryStatus(o))
       return `<tr><td>${when}</td><td class="mono">${ref}</td><td>${email}</td><td class="num">${amt}</td><td><span class="pill">${st}</span></td></tr>`
     })
     .join('')
@@ -82,7 +82,7 @@ export function buildStatementHtml(rows: AdminOrderRow[], meta: StatementMeta): 
     <div class="stat"><label>Pipeline (pending)</label><b>${esc(formatNaira(pipeline))}</b></div>
   </div>
   <table>
-    <thead><tr><th>Date &amp; time</th><th>Reference</th><th>Customer</th><th>Amount</th><th>Status</th></tr></thead>
+    <thead><tr><th>Date &amp; time</th><th>Reference</th><th>Customer</th><th>Amount</th><th>Delivery</th></tr></thead>
     <tbody>${tableRows || '<tr><td colspan="5">No transactions in this selection.</td></tr>'}</tbody>
   </table>
   ${note}

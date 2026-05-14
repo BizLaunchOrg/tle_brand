@@ -4,14 +4,15 @@ import { fetchOrdersForAdmin } from '../../lib/adminOrders.ts'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import {
   countAndRevenue,
+  effectiveDeliveryStatus,
   filterOrdersByRange,
-  isCompletedStatus,
-  isPendingStatus,
+  orderIsOpenPipeline,
+  orderIsSettledComplete,
   type DateRangeFilter,
 } from '../../lib/adminOrderAnalytics.ts'
 import { firstLineItemDisplayableImage } from '../../lib/adminOrderLineSnapshots.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { AdminRangeTabs, AdminStatusBucketTabs, adminStatusPillClass, type AdminOrderBucket } from './adminRangeTabs.tsx'
+import { AdminRangeTabs, AdminStatusBucketTabs, adminDeliveryPillClass, type AdminOrderBucket } from './adminRangeTabs.tsx'
 import { OrderRelativeTime } from './OrderRelativeTime.tsx'
 import { ad, adminFont } from './adminUi.ts'
 import { printOrdersStatement } from './statementPrint.ts'
@@ -101,19 +102,19 @@ export function AdminTransactionsPage() {
 
   const ranged = useMemo(() => filterOrdersByRange(orders, range), [orders, range])
   const filtered = useMemo(() => {
-    if (bucket === 'pending') return ranged.filter((o) => isPendingStatus(o.status))
-    if (bucket === 'completed') return ranged.filter((o) => isCompletedStatus(o.status))
+    if (bucket === 'pending') return ranged.filter((o) => orderIsOpenPipeline(o))
+    if (bucket === 'completed') return ranged.filter((o) => orderIsSettledComplete(o))
     return ranged
   }, [ranged, bucket])
 
   const stats = useMemo(() => countAndRevenue(filtered), [filtered])
   const settled = useMemo(
-    () => filtered.filter((o) => isCompletedStatus(o.status)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0),
+    () => filtered.filter((o) => orderIsSettledComplete(o)).reduce((a, o) => a + (Number(o.total_ngn) || 0), 0),
     [filtered],
   )
 
-  const pendingInRange = useMemo(() => ranged.filter((o) => isPendingStatus(o.status)).length, [ranged])
-  const completedInRange = useMemo(() => ranged.filter((o) => isCompletedStatus(o.status)).length, [ranged])
+  const pendingInRange = useMemo(() => ranged.filter((o) => orderIsOpenPipeline(o)).length, [ranged])
+  const completedInRange = useMemo(() => ranged.filter((o) => orderIsSettledComplete(o)).length, [ranged])
 
   const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
   const heading = ad(theme, 'text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl', 'text-2xl font-bold tracking-tight text-white sm:text-3xl')
@@ -265,8 +266,8 @@ export function AdminTransactionsPage() {
                 </div>
                 <div className="shrink-0 text-right">
                   <p className={ad(theme, 'text-lg font-bold tabular-nums text-emerald-700', 'text-lg font-bold tabular-nums text-emerald-300')}>{formatNaira(Number(o.total_ngn) || 0)}</p>
-                  <span className={'mt-1 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ' + adminStatusPillClass(o.status, theme)}>
-                    {o.status}
+                  <span className={'mt-1 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ' + adminDeliveryPillClass(effectiveDeliveryStatus(o), theme)}>
+                    {effectiveDeliveryStatus(o)}
                   </span>
                 </div>
               </div>
@@ -319,8 +320,8 @@ export function AdminTransactionsPage() {
                       {formatNaira(Number(o.total_ngn) || 0)}
                     </td>
                     <td className={td}>
-                      <span className={'inline-block rounded-full px-2.5 py-1 text-[11px] font-bold uppercase ' + adminStatusPillClass(o.status, theme)}>
-                        {o.status}
+                      <span className={'inline-block rounded-full px-2.5 py-1 text-[11px] font-bold capitalize ' + adminDeliveryPillClass(effectiveDeliveryStatus(o), theme)}>
+                        {effectiveDeliveryStatus(o)}
                       </span>
                     </td>
                     <td className={td}>

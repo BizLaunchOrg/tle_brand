@@ -1,5 +1,10 @@
 import { Link } from 'react-router-dom'
-import { cartLineKey, displayableImageUrl, parseProductPriceNgn } from '../data/products.ts'
+import {
+  cartLineKey,
+  displayableImageUrl,
+  getProductPurchasableMaxUnits,
+  parseProductPriceNgn,
+} from '../data/products.ts'
 import { useCartDrawer } from '../context/CartDrawerContext.tsx'
 
 const formatNaira = (value: number) => `₦${value.toLocaleString()}`
@@ -39,6 +44,8 @@ export function CartDrawer() {
           ) : (
             cartItems.map((item) => {
               const lineKey = cartLineKey(item.slug, item.variantId)
+              const maxUnits = getProductPurchasableMaxUnits(item)
+              const atMax = item.quantity >= maxUnits
               const lineTotalNgn = parseProductPriceNgn(item.price) * item.quantity
               return (
                 <div key={lineKey} className="flex gap-4 border-b border-black/[0.06] py-4">
@@ -69,7 +76,9 @@ export function CartDrawer() {
                       <span className="min-w-4 text-center text-sm font-semibold">{item.quantity}</span>
                       <button
                         type="button"
-                        className="flex size-7 items-center justify-center rounded-full border border-black/10 text-sm transition-colors hover:border-tle-pink hover:text-tle-pink"
+                        disabled={atMax}
+                        title={atMax ? 'Maximum quantity for this item' : undefined}
+                        className="flex size-7 items-center justify-center rounded-full border border-black/10 text-sm transition-colors hover:border-tle-pink hover:text-tle-pink disabled:cursor-not-allowed disabled:opacity-35"
                         onClick={() => incrementCartItem(lineKey)}
                       >
                         +

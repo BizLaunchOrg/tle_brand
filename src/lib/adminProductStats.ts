@@ -32,11 +32,21 @@ export function computeSoldUnitsFromOrders(orders: AdminOrderRow[]): number {
   return n
 }
 
-/** Rows with explicit stock ≤ 0 (does not count rows with no stock field). Unlimited stock is never OOS. */
+/** Rows with tracked stock at 0 (sold through or entered as 0). Omits unlimited and products with no stock field. */
 export function countExplicitOutOfStock(rows: CatalogProductRow[]): number {
   return rows.filter((r) => {
     const p = r.payload as Product
     if (p.stockUnlimited === true) return false
     return typeof p.stock === 'number' && p.stock <= 0
   }).length
+}
+
+/** Stock column / label colouring: 0 red, 1–4 amber, 5+ green; unlimited / untracked neutral. Pair for `ad(theme, light, dark)`. */
+export function adminStockAdClasses(p: Product): [string, string] {
+  if (p.stockUnlimited === true) return ['text-stone-600', 'text-neutral-400']
+  if (typeof p.stock !== 'number' || !Number.isFinite(p.stock)) return ['text-stone-500', 'text-neutral-500']
+  const n = Math.floor(p.stock)
+  if (n <= 0) return ['font-semibold text-red-600', 'font-semibold text-red-400']
+  if (n < 5) return ['font-semibold text-amber-600', 'font-semibold text-amber-300']
+  return ['font-semibold text-emerald-600', 'font-semibold text-emerald-400']
 }
