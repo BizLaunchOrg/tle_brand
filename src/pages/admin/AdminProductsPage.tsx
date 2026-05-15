@@ -621,19 +621,6 @@ export function AdminProductsPage() {
         </div>
       </div>
 
-      {msg && !editorOpen ? (
-        <div
-          className={
-            'mt-4 rounded-2xl border px-4 py-3 text-[13px] font-medium ' +
-            (msg.type === 'ok'
-              ? ad(theme, 'border-emerald-200 bg-emerald-50 text-emerald-900', 'border-emerald-800/50 bg-emerald-950/40 text-emerald-200')
-              : ad(theme, 'border-rose-200 bg-rose-50 text-rose-900', 'border-rose-900/40 bg-rose-950/30 text-rose-200'))
-          }
-        >
-          {msg.text}
-        </div>
-      ) : null}
-
       <div className={'mt-6 min-w-0 ' + card}>
         <div className={'flex flex-wrap gap-2 border-b px-3 py-2 sm:px-4 ' + ad(theme, 'border-stone-100', 'border-neutral-800')}>
           <button
@@ -1043,19 +1030,6 @@ export function AdminProductsPage() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-              {msg ? (
-                <div
-                  className={
-                    'mb-4 rounded-xl border px-3 py-2 text-[13px] font-medium ' +
-                    (msg.type === 'ok'
-                      ? ad(theme, 'border-emerald-200 bg-emerald-50 text-emerald-900', 'border-emerald-800/50 bg-emerald-950/40 text-emerald-200')
-                      : ad(theme, 'border-rose-200 bg-rose-50 text-rose-900', 'border-rose-900/40 bg-rose-950/30 text-rose-200'))
-                  }
-                >
-                  {msg.text}
-                </div>
-              ) : null}
-
               <div
                 className={
                   'mb-4 overflow-hidden rounded-xl border ' +
