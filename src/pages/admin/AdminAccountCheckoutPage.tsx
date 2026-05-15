@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from 'react-hot-toast'
 import {
   DEFAULT_DELIVERY_FEE_NGN,
   DEFAULT_PROCESSING_FEE_NGN,
@@ -34,8 +35,6 @@ export function AdminAccountCheckoutPage() {
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([])
   const [busyFees, setBusyFees] = useState(false)
   const [feesLoaded, setFeesLoaded] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -95,27 +94,25 @@ export function AdminAccountCheckoutPage() {
 
   const onSaveFees = async (e: FormEvent) => {
     e.preventDefault()
-    setError(null)
-    setNotice(null)
     const d = Math.round(Number(deliveryFee.replace(/[^\d]/g, '')) || 0)
     const p = Math.round(Number(processingFee.replace(/[^\d]/g, '')) || 0)
     const salesVatN = Number(salesVatPercent.replace(/[^\d.]/g, '')) || 0
     if (salesVatN < 0 || salesVatN > 100) {
-      setError('VAT percent must be 0–100.')
+      toast.error('VAT percent must be 0–100.')
       return
     }
     if (d < 0 || p < 0 || d > 50_000_000 || p > 50_000_000) {
-      setError('Enter sensible whole-naira amounts (0–50,000,000).')
+      toast.error('Enter sensible whole-naira amounts (0–50,000,000).')
       return
     }
     setBusyFees(true)
     const res = await updateShopFees(d, p, { deliveryZones, salesVatPercent: salesVatN })
     setBusyFees(false)
     if (!res.ok) {
-      setError(res.message)
+      toast.error(res.message)
       return
     }
-    setNotice('Saved.')
+    toast.success('Saved.')
     setExpandedId(null)
   }
 
@@ -147,29 +144,6 @@ export function AdminAccountCheckoutPage() {
         <p className={muted + ' mt-2 text-[15px] leading-relaxed'}>
           Same style your customers see: clear rows, then tap a row to edit.
         </p>
-
-        {error ? (
-          <p
-            className={
-              'mt-6 rounded-xl border px-4 py-3 text-[13px] font-medium ' +
-              ad(theme, 'border-rose-200 bg-rose-50 text-rose-900', 'border-rose-900/40 bg-rose-950/30 text-rose-200')
-            }
-            role="alert"
-          >
-            {error}
-          </p>
-        ) : null}
-        {notice ? (
-          <p
-            className={
-              'mt-6 rounded-xl border px-4 py-3 text-[13px] font-medium ' +
-              ad(theme, 'border-emerald-200 bg-emerald-50 text-emerald-900', 'border-emerald-800/50 bg-emerald-950/40 text-emerald-200')
-            }
-            role="status"
-          >
-            {notice}
-          </p>
-        ) : null}
 
         <form onSubmit={onSaveFees} className="mt-8 space-y-8">
           <section>

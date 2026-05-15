@@ -152,3 +152,38 @@ export async function markShippingSlipPrinted(
   if (error) return { ok: false, message: 'Could not save confirmation.' }
   return { ok: true }
 }
+
+export async function insertOfflineOrder(order: Partial<AdminOrderRow>): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  if (!isSupabaseConfigured()) return { ok: false, message: 'Not configured.' }
+  
+  // Ensure we have a user_id for RLS "orders_insert_own" policy
+  let row = { ...order }
+  if (!row.user_id) {
+    const { data: { session } } = await getSupabase().auth.getSession()
+    if (session?.user?.id) {
+      row.user_id = session.user.id
+    }
+  }
+
+  const { data, error } = await getSupabase()
+    .from('orders')
+    .insert({
+      ...row,
+      created_at: new Date().toISOString(),
+      status: row.status || 'paid',
+      payment_status: row.payment_status || 'paid',
+      delivery_status: row.delivery_status || 'pending',
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    console.error('Offline order insert error:', error)
+    if (error.message.includes('row-level security')) {
+      return { ok: false, message: 'Permission denied. Make sure you are logged in as an admin.' }
+    }
+    return { ok: false, message: error.message }
+  }
+  if (!data) return { ok: false, message: 'Failed to create order.' }
+  return { ok: true, id: data.id }
+}

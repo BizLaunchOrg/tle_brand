@@ -1,5 +1,6 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from 'react-hot-toast'
 import type { AdminTheme } from './AdminThemeContext.tsx'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import { updateOrderDeliveryStatus, updateOrderPaymentStatus, updateOrderStatus, markShippingSlipPrinted } from '../../lib/adminOrders.ts'
@@ -21,7 +22,7 @@ import { normalizeOrderLineItems, pickLineImageFromItem } from '../../lib/adminO
 import { getOrderPaymentProofSignedUrl } from '../../lib/orderPaymentProof.ts'
 import { printShippingSlip, downloadShippingSlip, downloadSellerReceipt } from './shippingSlipPrint.ts'
 
-const formatNaira = (n: number) => `â‚¦${Math.round(n).toLocaleString()}`
+const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
 const DELIVERY_OPTIONS = ['pending', 'processing', 'delivered'] as const
 
@@ -116,7 +117,7 @@ function buildLineDisplaysExt(raw: unknown): LineDisplayExt[] {
     const slug = typeof o.slug === 'string' ? o.slug.trim() : ''
     const name = typeof o.name === 'string' ? o.name : slug || 'Item'
     const qty = Math.min(999, Math.max(1, Math.floor(Number(o.quantity)) || 1))
-    const priceStr = typeof o.price === 'string' ? o.price : typeof o.price === 'number' ? formatNaira(o.price) : 'â‚¦0'
+    const priceStr = typeof o.price === 'string' ? o.price : typeof o.price === 'number' ? formatNaira(o.price) : '₦0'
     const unit = parseProductPriceNgn(priceStr)
     const variantId = typeof o.variantId === 'string' && o.variantId.trim() ? o.variantId.trim() : undefined
     const variantLabel =
@@ -260,7 +261,6 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
   const [catalog, setCatalog] = useState<Map<string, Product>>(() => new Map())
   const [saving, setSaving] = useState(false)
   const [slipBusy, setSlipBusy] = useState(false)
-  const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [proofSignedUrl, setProofSignedUrl] = useState<string | null>(null)
   const [proofBusy, setProofBusy] = useState(false)
 
@@ -336,25 +336,22 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
   const copyText = async (label: string, text: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      setBanner({ type: 'ok', text: `${label} copied.` })
-      window.setTimeout(() => setBanner(null), 2200)
+      toast.success(`${label} copied`)
     } catch {
-      setBanner({ type: 'err', text: 'Copy blocked â€” select and copy manually.' })
+      toast.error('Copy blocked — select and copy manually')
     }
   }
 
   const applyDelivery = async (next: (typeof DELIVERY_OPTIONS)[number]) => {
     if (next === delivery) return
     setSaving(true)
-    setBanner(null)
     const res = await updateOrderDeliveryStatus(order.id, next)
     setSaving(false)
     if (res.ok) {
-      setBanner({ type: 'ok', text: 'Delivery updated.' })
+      toast.success('Delivery updated')
       await onRefresh()
-      window.setTimeout(() => setBanner(null), 2800)
     } else {
-      setBanner({ type: 'err', text: res.message })
+      toast.error(res.message)
     }
   }
 
@@ -362,69 +359,60 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
     const cur = (order.payment_status || '').toLowerCase() === 'unpaid' ? 'unpaid' : 'paid'
     if (next === cur) return
     setSaving(true)
-    setBanner(null)
     const res = await updateOrderPaymentStatus(order.id, next)
     setSaving(false)
     if (res.ok) {
-      setBanner({ type: 'ok', text: 'Payment updated.' })
+      toast.success('Payment updated')
       await onRefresh()
-      window.setTimeout(() => setBanner(null), 2800)
     } else {
-      setBanner({ type: 'err', text: res.message })
+      toast.error(res.message)
     }
   }
 
   const cancelOrder = async () => {
     setSaving(true)
-    setBanner(null)
     const res = await updateOrderStatus(order.id, 'cancelled')
     setSaving(false)
     if (res.ok) {
-      setBanner({ type: 'ok', text: 'Order cancelled.' })
+      toast.success('Order cancelled')
       await onRefresh()
-      window.setTimeout(() => setBanner(null), 2800)
     } else {
-      setBanner({ type: 'err', text: res.message })
+      toast.error(res.message)
     }
   }
 
   const onPrintShippingSlip = () => {
-    setBanner(null)
     const ok = printShippingSlip(order)
     if (!ok) {
-      setBanner({ type: 'err', text: 'Pop-up blocked â€” allow pop-ups for this site, then try Print again.' })
+      toast.error('Pop-up blocked — allow pop-ups for this site, then try Print again')
     }
   }
 
   const onDownloadShippingSlip = () => {
-    setBanner(null)
     try {
       downloadShippingSlip(order)
     } catch {
-      setBanner({ type: 'err', text: 'Could not download shipping slip.' })
+      toast.error('Could not download shipping slip')
     }
   }
 
   const onDownloadSellerReceipt = () => {
-    setBanner(null)
     try {
       downloadSellerReceipt(order)
     } catch {
-      setBanner({ type: 'err', text: 'Could not download receipt.' })
+      toast.error('Could not download receipt')
     }
   }
 
   const onConfirmSlipPrinted = async () => {
     setSlipBusy(true)
-    setBanner(null)
     const res = await markShippingSlipPrinted(order.id)
     setSlipBusy(false)
     if (res.ok) {
-      setBanner({ type: 'ok', text: 'Packing slip marked as printed.' })
+      toast.success('Packing slip marked as printed')
       await onRefresh()
-      window.setTimeout(() => setBanner(null), 2800)
     } else {
-      setBanner({ type: 'err', text: res.message })
+      toast.error(res.message)
     }
   }
 
@@ -465,21 +453,8 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
           </div>
         </div>
         <p className={muted + ' text-[12px]'}>
-          {contextTitle} Â· Transaction reference <span className={'font-mono font-semibold ' + strong}>{order.id}</span>
+          {contextTitle} · Transaction reference <span className={'font-mono font-semibold ' + strong}>{order.id}</span>
         </p>
-        {banner ? (
-          <div
-            role="status"
-            className={
-              'rounded-2xl border px-4 py-3 text-[13px] font-medium ' +
-              (banner.type === 'ok'
-                ? ad(theme, 'border-emerald-200 bg-emerald-50 text-emerald-900', 'border-emerald-800/50 bg-emerald-950/40 text-emerald-200')
-                : ad(theme, 'border-rose-200 bg-rose-50 text-rose-900', 'border-rose-900/40 bg-rose-950/30 text-rose-200'))
-            }
-          >
-            {banner.text}
-          </div>
-        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           {cancelled ? (
             <span className={'rounded-full px-2.5 py-1 text-[11px] font-bold uppercase ' + muted}>Cancelled</span>
@@ -519,10 +494,36 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
               </div>
               <div>
                 <p className={'text-[10px] font-bold uppercase tracking-wider ' + muted}>Channel</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[22px] font-light text-emerald-600">language</span>
-                  <span className={'text-[14px] font-semibold ' + strong}>Website checkout</span>
-                </div>
+                {(() => {
+                  const isOffline = ship.isOffline === true
+                  const source = String(ship.source || 'other')
+                  const icon = source === 'whatsapp' ? 'https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg' :
+                              source === 'instagram' ? 'https://upload.wikimedia.org/wikipedia/commons/e/e7/Instagram_logo_2016.svg' :
+                              source === 'facebook' ? 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg' :
+                              source === 'tiktok' ? 'https://upload.wikimedia.org/wikipedia/en/a/a9/TikTok_logo.svg' : null
+                  
+                  if (isOffline) {
+                    return (
+                      <div className="mt-2 flex items-center gap-2">
+                        {icon ? (
+                          <img src={icon} alt={source} className="size-5" />
+                        ) : (
+                          <span className="material-symbols-outlined text-[22px] font-light text-emerald-600">share</span>
+                        )}
+                        <span className={'text-[14px] font-semibold ' + strong}>
+                          Offline Order ({source.charAt(0).toUpperCase() + source.slice(1)})
+                        </span>
+                      </div>
+                    )
+                  }
+                  
+                  return (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[22px] font-light text-emerald-600">language</span>
+                      <span className={'text-[14px] font-semibold ' + strong}>Website checkout</span>
+                    </div>
+                  )
+                })()}
                 <p className={'mt-3 text-[10px] font-bold uppercase tracking-wider ' + muted}>Account user id</p>
                 <p className={'mt-1 font-mono text-[12px] break-all ' + strong}>{order.user_id}</p>
               </div>
@@ -678,9 +679,24 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
             </div>
             {!cancelled ? (
               <div className="mt-6 border-t pt-4">
-                <button type="button" disabled={saving} onClick={() => void cancelOrder()} className={ghostBtn + ' text-rose-700 ring-1 ring-rose-200'}>
-                  Cancel this order
-                </button>
+                {(() => {
+                  const isOffline = ship.isOffline === true
+                  const isPaid = (order.payment_status || '').toLowerCase() === 'paid'
+                  // Disable cancel if order is offline OR if it's already paid (both offline/online)
+                  const canCancel = !isOffline && !isPaid
+                  
+                  return (
+                    <button 
+                      type="button" 
+                      disabled={saving || !canCancel} 
+                      onClick={() => void cancelOrder()} 
+                      className={ghostBtn + ' text-rose-700 ring-1 ring-rose-200 disabled:opacity-50 disabled:cursor-not-allowed'}
+                      title={!canCancel ? "Paid or Offline orders cannot be cancelled" : ""}
+                    >
+                      Cancel this order
+                    </button>
+                  )
+                })()}
               </div>
             ) : null}
           </section>

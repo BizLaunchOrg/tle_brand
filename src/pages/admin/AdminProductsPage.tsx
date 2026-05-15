@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'react-hot-toast'
 import {
   displayableImageUrl,
   getDefaultImageUrls,
@@ -223,7 +224,6 @@ export function AdminProductsPage() {
   const [tagsText, setTagsText] = useState('')
   const [colorDrafts, setColorDrafts] = useState<ColorDraft[]>([])
   const [jsonExtra, setJsonExtra] = useState('')
-  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploadBusy, setUploadBusy] = useState(false)
 
@@ -319,7 +319,6 @@ export function AdminProductsPage() {
     setTagsText('')
     setColorDrafts([])
     setJsonExtra('')
-    setMsg(null)
     setEditorOpen(true)
   }
 
@@ -339,13 +338,11 @@ export function AdminProductsPage() {
     setTagsText((p.tags ?? []).join(', '))
     setColorDrafts(colorsFromProduct(p))
     setJsonExtra('')
-    setMsg(null)
     setEditorOpen(true)
   }
 
   const closeEditor = () => {
     setEditorOpen(false)
-    setMsg(null)
     setCategoryPickerOpen(false)
     setNewPresetName('')
   }
@@ -358,34 +355,33 @@ export function AdminProductsPage() {
   const onAddPresetCategory = async () => {
     const added = newPresetName.trim()
     if (!added) {
-      setMsg({ type: 'err', text: 'Enter a category name.' })
+      toast.error('Enter a category name.')
       return
     }
-    setMsg(null)
     setPresetBusy(true)
     const res = await insertCatalogCategory(added)
     setPresetBusy(false)
     if (!res.ok) {
-      setMsg({ type: 'err', text: res.message })
+      toast.error(res.message)
       return
     }
     setNewPresetName('')
     await refreshCategoryPresets()
     setDraft((d) => ({ ...d, cat: added }))
-    setMsg({ type: 'ok', text: 'Saved to list and applied to this product.' })
+    toast.success('Saved to list and applied to this product.')
   }
 
   const onRemovePresetCategory = async (row: CatalogCategoryRow) => {
     if (!adminConfirmDelete(row.name)) return
     setPresetBusy(true)
-    setMsg(null)
     const ok = await deleteCatalogCategory(row.id)
     setPresetBusy(false)
     if (!ok) {
-      setMsg({ type: 'err', text: 'Could not remove.' })
+      toast.error('Could not remove.')
       return
     }
     await refreshCategoryPresets()
+    toast.success('Removed.')
   }
 
   const mergedProduct = useMemo(() => {
@@ -404,24 +400,23 @@ export function AdminProductsPage() {
   const mergedPreviewUrls = useMemo(() => getDefaultImageUrls(mergedProduct).map(displayableImageUrl), [mergedProduct])
 
   const onSave = async () => {
-    setMsg(null)
     let p = productFromDraft(draft, galleryText, tagsText, colorDrafts)
     if (jsonExtra.trim()) {
       try {
         const parsed = JSON.parse(jsonExtra) as Record<string, unknown>
         p = { ...p, ...parsed } as Product
       } catch {
-        setMsg({ type: 'err', text: 'That extra data is not valid JSON. Remove it or fix the format.' })
+        toast.error('That extra data is not valid JSON. Remove it or fix the format.')
         return
       }
     }
     const imageUrls = getDefaultImageUrls(p)
     if (!p.slug.trim() || !p.name.trim() || !p.price.trim()) {
-      setMsg({ type: 'err', text: 'Please add the URL slug, product name, and selling price (SP).' })
+      toast.error('Please add the URL slug, product name, and selling price (SP).')
       return
     }
     if (!imageUrls.length) {
-      setMsg({ type: 'err', text: 'Add at least one photo: upload, paste a URL, gallery lines, or colour photos.' })
+      toast.error('Add at least one photo: upload, paste a URL, gallery lines, or colour photos.')
       return
     }
     if (!p.img.trim() && imageUrls[0]) {
@@ -432,18 +427,18 @@ export function AdminProductsPage() {
     if (editingId) {
       const res = await updateCatalogProduct(editingId, p)
       setSaving(false)
-      if (!res.ok) setMsg({ type: 'err', text: res.message })
+      if (!res.ok) toast.error(res.message)
       else {
-        setMsg({ type: 'ok', text: 'Product updated.' })
+        toast.success('Product updated.')
         await load()
         closeEditor()
       }
     } else {
       const res = await insertCatalogProduct(p)
       setSaving(false)
-      if (!res.ok) setMsg({ type: 'err', text: res.message })
+      if (!res.ok) toast.error(res.message)
       else {
-        setMsg({ type: 'ok', text: 'Product created.' })
+        toast.success('Product created.')
         await load()
         closeEditor()
       }
@@ -453,9 +448,9 @@ export function AdminProductsPage() {
   const onDelete = async (row: CatalogProductRow) => {
     if (!adminConfirmDelete(row.payload.name || row.slug)) return
     const ok = await deleteCatalogProduct(row.id)
-    if (!ok) setMsg({ type: 'err', text: 'Could not delete.' })
+    if (!ok) toast.error('Could not delete.')
     else {
-      setMsg({ type: 'ok', text: 'Deleted.' })
+      toast.success('Deleted.')
       if (editingId === row.id) closeEditor()
       setSelected((s) => {
         const n = new Set(s)
@@ -489,29 +484,30 @@ export function AdminProductsPage() {
   const runMainUpload = async (file: File | undefined) => {
     if (!file) return
     setUploadBusy(true)
-    setMsg(null)
     const r = await uploadProductImageFile(file)
     setUploadBusy(false)
-    if (r.ok) setDraft((d) => ({ ...d, img: r.publicUrl }))
-    else setMsg({ type: 'err', text: r.message })
+    if (r.ok) {
+      setDraft((d) => ({ ...d, img: r.publicUrl }))
+      toast.success('Image uploaded.')
+    } else toast.error(r.message)
   }
 
   const runGalleryUploads = async (files: FileList | null) => {
     if (!files?.length) return
     setUploadBusy(true)
-    setMsg(null)
     const urls: string[] = []
     for (let i = 0; i < files.length; i++) {
       const r = await uploadProductImageFile(files[i]!)
       if (r.ok) urls.push(r.publicUrl)
       else {
         setUploadBusy(false)
-        setMsg({ type: 'err', text: r.message })
+        toast.error(r.message)
         return
       }
     }
     setUploadBusy(false)
     setGalleryText((prev) => [prev.replace(/\s+$/, ''), ...urls].filter(Boolean).join('\n'))
+    toast.success(`${urls.length} images uploaded.`)
   }
 
   const runColorOptionUploads = async (files: FileList | null) => {
@@ -519,14 +515,13 @@ export function AdminProductsPage() {
     colorUploadIdxRef.current = null
     if (idx === null || !files?.length) return
     setUploadBusy(true)
-    setMsg(null)
     const urls: string[] = []
     for (let i = 0; i < files.length; i++) {
       const r = await uploadProductImageFile(files[i]!)
       if (r.ok) urls.push(r.publicUrl)
       else {
         setUploadBusy(false)
-        setMsg({ type: 'err', text: r.message })
+        toast.error(r.message)
         return
       }
     }
@@ -542,6 +537,7 @@ export function AdminProductsPage() {
         return { ...row, imagesText: [...cur, ...urls].join('\n') }
       }),
     )
+    toast.success(`${urls.length} variant images uploaded.`)
   }
 
   const removeColorOptionImageAt = (colorIdx: number, imageIdx: number) => {
@@ -624,19 +620,6 @@ export function AdminProductsPage() {
           <p className={muted + ' mt-1 text-[12px]'}>Tracked quantity at 0 — sold out or not released yet.</p>
         </div>
       </div>
-
-      {msg && !editorOpen ? (
-        <div
-          className={
-            'mt-4 rounded-2xl border px-4 py-3 text-[13px] font-medium ' +
-            (msg.type === 'ok'
-              ? ad(theme, 'border-emerald-200 bg-emerald-50 text-emerald-900', 'border-emerald-800/50 bg-emerald-950/40 text-emerald-200')
-              : ad(theme, 'border-rose-200 bg-rose-50 text-rose-900', 'border-rose-900/40 bg-rose-950/30 text-rose-200'))
-          }
-        >
-          {msg.text}
-        </div>
-      ) : null}
 
       <div className={'mt-6 min-w-0 ' + card}>
         <div className={'flex flex-wrap gap-2 border-b px-3 py-2 sm:px-4 ' + ad(theme, 'border-stone-100', 'border-neutral-800')}>
@@ -1047,19 +1030,6 @@ export function AdminProductsPage() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-              {msg ? (
-                <div
-                  className={
-                    'mb-4 rounded-xl border px-3 py-2 text-[13px] font-medium ' +
-                    (msg.type === 'ok'
-                      ? ad(theme, 'border-emerald-200 bg-emerald-50 text-emerald-900', 'border-emerald-800/50 bg-emerald-950/40 text-emerald-200')
-                      : ad(theme, 'border-rose-200 bg-rose-50 text-rose-900', 'border-rose-900/40 bg-rose-950/30 text-rose-200'))
-                  }
-                >
-                  {msg.text}
-                </div>
-              ) : null}
-
               <div
                 className={
                   'mb-4 overflow-hidden rounded-xl border ' +

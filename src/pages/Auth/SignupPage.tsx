@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { toast } from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 
 export function SignupPage() {
@@ -13,24 +14,23 @@ export function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError(null)
     if (password !== confirm) {
-      setError('Passwords do not match.')
+      toast.error('Passwords do not match.')
       return
     }
     setBusy(true)
     try {
       const result = await signup(name, email, password)
       if (!result.ok) {
-        setError(result.message)
+        toast.error(result.message)
         return
       }
       if (result.requiresEmailConfirmation) {
+        toast.success(result.message ?? 'Account created. Check your email to confirm.')
         navigate('/login', {
           replace: true,
           state: {
@@ -40,9 +40,10 @@ export function SignupPage() {
         })
         return
       }
+      toast.success('Account created successfully')
       navigate(safeFrom, { replace: true })
     } catch {
-      setError('Unable to create account right now. Please try again.')
+      toast.error('Unable to create account right now. Please try again.')
     } finally {
       setBusy(false)
     }
@@ -62,12 +63,6 @@ export function SignupPage() {
           onSubmit={onSubmit}
           className="mt-10 rounded-[28px] border border-black/8 bg-white p-6 shadow-[0_10px_40px_rgba(0,0,0,0.04)] sm:p-8"
         >
-          {error ? (
-            <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
-              {error}
-            </p>
-          ) : null}
-
           <label className="block">
             <span className="mb-2 block text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">
               Full name

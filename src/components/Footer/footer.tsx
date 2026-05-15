@@ -88,25 +88,13 @@ export function Footer() {
         </span>
         <div className="flex gap-2.5">
           <a
-            href="#"
+            href="https://www.instagram.com/tlebeautybrand/"
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex size-[38px] items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/40 no-underline transition-all hover:border-tle-pink hover:bg-tle-pink/10 hover:text-tle-light"
             aria-label="Instagram"
           >
             <span className="material-symbols-outlined text-[20px] leading-none">photo_camera</span>
-          </a>
-          <a
-            href="#"
-            className="flex size-[38px] items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/40 no-underline transition-all hover:border-tle-pink hover:bg-tle-pink/10 hover:text-tle-light"
-            aria-label="TikTok"
-          >
-            <span className="material-symbols-outlined text-[20px] leading-none">music_note</span>
-          </a>
-          <a
-            href="#"
-            className="flex size-[38px] items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/40 no-underline transition-all hover:border-tle-pink hover:bg-tle-pink/10 hover:text-tle-light"
-            aria-label="Pinterest"
-          >
-            <span className="material-symbols-outlined text-[20px] leading-none">push_pin</span>
           </a>
         </div>
       </div>
