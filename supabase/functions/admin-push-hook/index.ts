@@ -236,6 +236,14 @@ Deno.serve(async (req) => {
       logHook('skipped', { reason: 'no id', table })
       return json(200, { ok: true, skipped: true, reason: 'no id' })
     }
+
+    // Skip notifications for offline sales
+    const ship = record.shipping && typeof record.shipping === 'object' ? (record.shipping as Record<string, unknown>) : {}
+    if (ship.isOffline === true) {
+      logHook('skipped', { reason: 'offline_order', table, id })
+      return json(200, { ok: true, skipped: true, reason: 'offline_order' })
+    }
+
     const copy = buildOrderPushCopy(record)
     title = copy.title
     notifBody = copy.body
