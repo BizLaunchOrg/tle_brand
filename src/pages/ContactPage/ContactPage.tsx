@@ -25,7 +25,7 @@ export function ContactPage() {
         </nav>
 
         <header className="mb-12 text-center sm:mb-14 sm:text-left">
-          <p className="text-[10px] font-semibold tracking-[0.22em] text-tle-muted uppercase">TLE-BRAND</p>
+          <p className="text-[10px] font-semibold tracking-[0.22em] text-tle-muted uppercase">TOBILICIOUS BY LADY EMMA</p>
           <h1 className="mt-2 font-sans text-3xl font-semibold tracking-tight text-tle-ink sm:text-4xl">
             Visit us &amp; get in touch
           </h1>

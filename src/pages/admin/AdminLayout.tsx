@@ -286,9 +286,9 @@ function AdminLayoutInner() {
               </span>
               <span>
                 <span className={ad(theme, 'block text-[15px] font-bold tracking-tight text-stone-900', 'block text-[15px] font-bold tracking-tight text-neutral-100')}>
-                  TLE Brand
+                  TOBILICIOUS
                 </span>
-                <span className={ad(theme, 'block text-[11px] text-emerald-700/90', 'block text-[11px] text-emerald-400/90')}>Admin</span>
+                <span className={ad(theme, 'block text-[11px] text-emerald-700/90', 'block text-[11px] text-emerald-400/90')}>Admin Panel</span>
               </span>
             </Link>
           </div>

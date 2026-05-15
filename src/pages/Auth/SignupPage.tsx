@@ -57,7 +57,7 @@ export function SignupPage() {
           <span className="text-[10px] font-semibold tracking-[0.22em] text-tle-gold uppercase">Account</span>
         </div>
         <h1 className="font-sans text-[clamp(1.75rem,4vw,2.25rem)] font-semibold text-tle-ink">Create account</h1>
-        <p className="mt-2 text-sm text-tle-muted">Join TLE-BRAND to save favorites and checkout with ease.</p>
+        <p className="mt-2 text-sm text-tle-muted">Join TOBILICIOUS BY LADY EMMA to save favorites and checkout with ease.</p>
 
         <form
           onSubmit={onSubmit}

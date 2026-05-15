@@ -20,6 +20,7 @@ import {
   MAKEUP_HIGHLIGHT_TAGS,
   PHOTOSHOOT_PACKAGES,
   bookableServiceFromPhotoshootLine,
+  isLocationRequiredForService,
 } from "../../data/bookingServices.ts";
 import { BOOKING_TRANSFER_DEMO } from "../../data/bookingTransferDetails.ts";
 import { validateLandingBookingDetails } from "../../lib/bookingFormValidation.ts";
@@ -169,10 +170,7 @@ export function LandingPage() {
   });
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
   const [customerLocation, setCustomerLocation] = useState("");
-  const [skinType, setSkinType] = useState("");
-  const [allergies, setAllergies] = useState("");
   const [bookingNotes, setBookingNotes] = useState("");
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
@@ -317,14 +315,13 @@ export function LandingPage() {
     }
     const name = customerName.trim();
     const phone = customerPhone.trim();
-    const email = customerEmail.trim();
+    const isLocationRequired = isLocationRequiredForService(selectedService.name);
+
     const detailErr = validateLandingBookingDetails({
       name: customerName,
       phone: customerPhone,
-      email: customerEmail,
       location: customerLocation,
-      skinType,
-      allergies,
+      isLocationRequired,
     });
     if (detailErr) {
       setBookingError(detailErr);
@@ -357,10 +354,10 @@ export function LandingPage() {
       preferred_time: selectedTime,
       customer_name: name,
       customer_phone: phone,
-      customer_email: email,
-      location_venue: customerLocation.trim(),
-      skin_type: skinType.trim(),
-      allergies: allergies.trim(),
+      customer_email: "",
+      location_venue: isLocationRequired ? customerLocation.trim() : "",
+      skin_type: "",
+      allergies: "",
       notes: bookingNotes.trim(),
       payment_proof_storage_path: up.path,
     });
@@ -451,7 +448,7 @@ export function LandingPage() {
             </h1>
 
             <p className="mb-11 max-w-[min(100%,42rem)] text-[13px] font-normal leading-[1.65] text-black sm:text-[15px] sm:leading-[1.7] lg:text-[17px] lg:leading-[1.72] max-lg:mx-auto max-lg:text-center lg:mx-0 lg:text-left dark:text-black">
-              From curated fashion pieces to flawless glam, TLE is designed for
+              From curated fashion pieces to flawless glam, TOBILICIOUS BY LADY EMMA is designed for
               people who love beauty, confidence, and intentional style.
             </p>
 
@@ -527,7 +524,7 @@ export function LandingPage() {
           >
             <img
               src="/promo-hero.png"
-              alt="TLE-BRAND studio portrait"
+              alt="TOBILICIOUS BY LADY EMMA studio portrait"
               className="absolute inset-0 size-full object-cover object-[center_22%] max-lg:object-[center_15%]"
             />
             <div className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-t from-black/55 via-black/15 to-transparent lg:bg-gradient-to-r lg:from-white/[0.12] lg:via-transparent lg:to-transparent" />
@@ -1218,63 +1215,20 @@ export function LandingPage() {
                       autoComplete="tel"
                     />
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      value={customerEmail}
-                      onChange={(e) => setCustomerEmail(e.target.value)}
-                      className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
-                      placeholder="hello@example.com"
-                      autoComplete="email"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
-                      Location / Venue
-                    </label>
-                    <input
-                      type="text"
-                      value={customerLocation}
-                      onChange={(e) => setCustomerLocation(e.target.value)}
-                      className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
-                      placeholder="Your address or venue name"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
-                      Skin Type
-                    </label>
-                    <select
-                      value={skinType}
-                      onChange={(e) => setSkinType(e.target.value)}
-                      className="w-full cursor-pointer appearance-none rounded-xl border-[1.5px] border-black/10 bg-white bg-[length:12px] bg-[right_16px_center] bg-no-repeat px-[18px] py-3.5 pr-11 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
-                      style={{
-                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A7E78' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
-                      }}
-                    >
-                      <option value="">Select skin type</option>
-                      <option value="Oily">Oily</option>
-                      <option value="Dry">Dry</option>
-                      <option value="Combination">Combination</option>
-                      <option value="Normal">Normal</option>
-                      <option value="Sensitive">Sensitive</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
-                      Any Allergies or Skin Concerns?
-                    </label>
-                    <input
-                      type="text"
-                      value={allergies}
-                      onChange={(e) => setAllergies(e.target.value)}
-                      className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
-                      placeholder="e.g. fragrance-free, no latex"
-                    />
-                  </div>
+                  {isLocationRequiredForService(selectedService.name) ? (
+                      <div className="flex flex-col gap-2 md:col-span-2">
+                        <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
+                          Location / Venue
+                        </label>
+                        <input
+                          type="text"
+                          value={customerLocation}
+                          onChange={(e) => setCustomerLocation(e.target.value)}
+                          className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
+                          placeholder="Your address or venue name"
+                        />
+                      </div>
+                  ) : null}
                 </div>
                 <div className="mt-4 flex flex-col gap-2">
                   <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
@@ -1299,13 +1253,14 @@ export function LandingPage() {
                     type="button"
                     className="inline-flex items-center gap-2.5 rounded-full bg-tle-charcoal px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-pink"
                     onClick={() => {
+                      const isLocationRequired = isLocationRequiredForService(
+                        selectedService.name,
+                      );
                       const err = validateLandingBookingDetails({
                         name: customerName,
                         phone: customerPhone,
-                        email: customerEmail,
                         location: customerLocation,
-                        skinType,
-                        allergies,
+                        isLocationRequired,
                       });
                       if (err) {
                         setBookingError(err);
@@ -1419,8 +1374,8 @@ export function LandingPage() {
             You&apos;re All Booked! 🎉
           </h2>
           <p className="mb-10 max-w-[440px] text-center text-[15px] leading-relaxed text-tle-muted">
-            Your session is confirmed. Check your email for a full summary and
-            reminder. We can&apos;t wait to see you!
+            Your session is confirmed. We&apos;ll reach out on the phone number you
+            provided. We can&apos;t wait to see you!
           </p>
           <div className="mb-9 w-full max-w-[480px] rounded-[20px] border border-tle-gold/20 bg-white px-8 py-8">
             {[

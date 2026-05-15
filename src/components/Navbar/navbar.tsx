@@ -133,7 +133,7 @@ export function Navbar() {
           <Link to="/" className="min-w-0 shrink leading-none no-underline" onClick={() => setMenuOpen(false)}>
             <img
               src="/tlelogo.PNG"
-              alt="TLE-BRAND"
+              alt="TOBILICIOUS BY LADY EMMA"
               className="h-8 w-auto max-w-[min(160px,38vw)] object-contain object-left sm:max-w-[min(200px,42vw)] md:h-9"
               width={180}
               height={48}
