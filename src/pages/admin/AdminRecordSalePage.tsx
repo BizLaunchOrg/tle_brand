@@ -14,10 +14,6 @@ const SOURCES = [
   { id: 'whatsapp', label: 'WhatsApp', icon: 'https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg' },
   { id: 'facebook', label: 'Facebook', icon: 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg' },
   { id: 'tiktok', label: 'TikTok', icon: 'https://upload.wikimedia.org/wikipedia/en/a/a9/TikTok_logo.svg' },
-  { id: 'jumia', label: 'Jumia', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Jumia_Logo.png/640px-Jumia_Logo.png' },
-  { id: 'jiji', label: 'Jiji', icon: 'https://upload.wikimedia.org/wikipedia/commons/2/23/Jiji_logo.png' },
-  { id: 'konga', label: 'Konga', icon: 'https://upload.wikimedia.org/wikipedia/commons/d/de/Konga_Logo.svg' },
-  { id: 'other', label: 'Other', icon: 'material:share' },
 ]
 
 interface SelectedProduct {
@@ -290,7 +286,7 @@ export function AdminRecordSalePage() {
 
           <div>
             <label className={labelCls}>Select Sales Channel</label>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               {SOURCES.map(s => (
                 <button
                   key={s.id}
