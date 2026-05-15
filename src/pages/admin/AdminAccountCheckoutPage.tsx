@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   DEFAULT_DELIVERY_FEE_NGN,
   DEFAULT_PROCESSING_FEE_NGN,
-  DEFAULT_SALES_VAT_FLAT_NGN,
+  DEFAULT_SALES_VAT_PERCENT,
   fetchShopFees,
   updateShopFees,
   type DeliveryZone,
@@ -30,7 +30,7 @@ export function AdminAccountCheckoutPage() {
   const { theme } = useAdminTheme()
   const [deliveryFee, setDeliveryFee] = useState(String(DEFAULT_DELIVERY_FEE_NGN))
   const [processingFee, setProcessingFee] = useState(String(DEFAULT_PROCESSING_FEE_NGN))
-  const [salesVatFlat, setSalesVatFlat] = useState(String(DEFAULT_SALES_VAT_FLAT_NGN))
+  const [salesVatPercent, setSalesVatPercent] = useState(String(DEFAULT_SALES_VAT_PERCENT))
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([])
   const [busyFees, setBusyFees] = useState(false)
   const [feesLoaded, setFeesLoaded] = useState(false)
@@ -45,7 +45,7 @@ export function AdminAccountCheckoutPage() {
       if (!on) return
       setDeliveryFee(String(s.deliveryFeeNgn))
       setProcessingFee(String(s.processingFeeNgn))
-      setSalesVatFlat(String(s.salesVatFlatNgn))
+      setSalesVatPercent(String(s.salesVatPercent))
       setDeliveryZones(
         s.deliveryZones.length > 0 ? s.deliveryZones.map((z) => ({ ...z })) : [],
       )
@@ -99,9 +99,9 @@ export function AdminAccountCheckoutPage() {
     setNotice(null)
     const d = Math.round(Number(deliveryFee.replace(/[^\d]/g, '')) || 0)
     const p = Math.round(Number(processingFee.replace(/[^\d]/g, '')) || 0)
-    const salesVatN = Math.round(Number(salesVatFlat.replace(/[^\d]/g, '')) || 0)
-    if (salesVatN < 0 || salesVatN > 50_000_000) {
-      setError('Enter sensible whole-naira amounts (0–50,000,000).')
+    const salesVatN = Number(salesVatPercent.replace(/[^\d.]/g, '')) || 0
+    if (salesVatN < 0 || salesVatN > 100) {
+      setError('VAT percent must be 0–100.')
       return
     }
     if (d < 0 || p < 0 || d > 50_000_000 || p > 50_000_000) {
@@ -109,7 +109,7 @@ export function AdminAccountCheckoutPage() {
       return
     }
     setBusyFees(true)
-    const res = await updateShopFees(d, p, { deliveryZones, salesVatFlatNgn: salesVatN })
+    const res = await updateShopFees(d, p, { deliveryZones, salesVatPercent: salesVatN })
     setBusyFees(false)
     if (!res.ok) {
       setError(res.message)
@@ -215,17 +215,17 @@ export function AdminAccountCheckoutPage() {
               </div>
               <div className={'flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 ' + rowHover}>
                 <div className="min-w-0 flex-1">
-                  <p className={rowTitle}>VAT on products (₦)</p>
+                  <p className={rowTitle}>VAT on products (%)</p>
                   <p className={rowSub}>
-                    Fixed whole-naira amount added once per checkout (goods subtotal only). Use 0 if prices already include VAT or you do not charge it.
+                    Percent VAT on cart subtotal (goods only), 0–100. Amount stored per order.
                   </p>
                 </div>
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   disabled={!feesLoaded}
-                  value={salesVatFlat}
-                  onChange={(e) => setSalesVatFlat(e.target.value)}
+                  value={salesVatPercent}
+                  onChange={(e) => setSalesVatPercent(e.target.value)}
                   className={
                     input +
                     ' w-full shrink-0 text-right font-semibold tabular-nums sm:max-w-[160px] sm:min-w-[140px]'

@@ -120,6 +120,8 @@ export type OrderLinePayload = {
 }
 
 export async function createOrder(params: {
+  /** Client-generated UUID — payment screenshot is uploaded under this id first. */
+  id: string
   userId: string
   email: string
   shipping: ShippingPayload
@@ -129,15 +131,21 @@ export async function createOrder(params: {
   processingNgn: number
   salesVatNgn: number
   totalNgn: number
+  payment_proof_storage_path: string
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) {
     return { ok: false, message: 'Checkout is not configured.' }
   }
 
-  // No online payment gateway yet: treat a successful checkout as paid so admin + stats match reality.
-  // When you add Paystack/Stripe, set status from the provider (e.g. pending → paid) instead of forcing here.
+  const orderId = params.id.trim()
+  const proofPath = params.payment_proof_storage_path.trim()
+  if (!orderId || !proofPath) {
+    return { ok: false, message: 'Could not place order. Please refresh and try again.' }
+  }
+
   const sb = getSupabase()
   const baseRow = {
+    id: orderId,
     user_id: params.userId,
     email: params.email,
     shipping: params.shipping,
@@ -149,6 +157,7 @@ export async function createOrder(params: {
     status: 'paid' as const,
     payment_status: 'paid' as const,
     delivery_status: 'pending' as const,
+    payment_proof_storage_path: proofPath,
   }
   const withVatRow = {
     ...baseRow,
@@ -156,17 +165,39 @@ export async function createOrder(params: {
     processing_vat_ngn: 0,
   }
 
-  let { data, error } = await sb.from('orders').insert(withVatRow).select('id').maybeSingle()
+  let row: Record<string, unknown> = withVatRow
+  let { data, error } = await sb.from('orders').insert(row).select('id').maybeSingle()
 
-  const msg = (error?.message ?? '').toLowerCase()
-  const missingVatColumn =
-    msg.includes('sales_vat_ngn') ||
-    msg.includes('processing_vat_ngn') ||
-    (msg.includes('schema cache') && msg.includes('column'))
-  if (error && missingVatColumn && !msg.includes('row-level security')) {
-    const second = await sb.from('orders').insert(baseRow).select('id').maybeSingle()
-    data = second.data
-    error = second.error
+  let msg = (error?.message ?? '').toLowerCase()
+  if (error && !msg.includes('row-level security')) {
+    const missingVatColumn =
+      msg.includes('sales_vat_ngn') ||
+      msg.includes('processing_vat_ngn') ||
+      (msg.includes('schema cache') && msg.includes('column') && !msg.includes('payment_proof'))
+    if (missingVatColumn) {
+      row = baseRow
+      const second = await sb.from('orders').insert(row).select('id').maybeSingle()
+      data = second.data
+      error = second.error
+      msg = (error?.message ?? '').toLowerCase()
+    }
+  }
+
+  if (error && !msg.includes('row-level security')) {
+    const missingProofColumn =
+      msg.includes('payment_proof_storage_path') ||
+      (msg.includes('schema cache') && msg.includes('payment_proof'))
+    if (missingProofColumn) {
+      const { payment_proof_storage_path: _drop, ...withoutProof } = row
+      const fallbackRow = {
+        ...withoutProof,
+        status: 'paid',
+        payment_status: 'paid',
+      }
+      const third = await sb.from('orders').insert(fallbackRow).select('id').maybeSingle()
+      data = third.data
+      error = third.error
+    }
   }
 
   if (error || !data?.id) {

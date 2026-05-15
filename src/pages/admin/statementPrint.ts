@@ -1,6 +1,8 @@
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import { effectiveDeliveryStatus, orderIsOpenPipeline, orderIsSettledComplete } from '../../lib/adminOrderAnalytics.ts'
 import { openHtmlPrintWindow } from '../../lib/openHtmlPrintWindow.ts'
+import { PRINT_LOGO_CSS, printLogoImgHtml } from '../../lib/printBrandAssets.ts'
+import { STORE_RECEIPT_NAME } from '../../lib/storeBrand.ts'
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -42,11 +44,12 @@ export function buildStatementHtml(rows: AdminOrderRow[], meta: StatementMeta): 
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TLE Brand — Transaction statement</title>
+  <title>${esc(STORE_RECEIPT_NAME)} — Transaction statement</title>
   <style>
     * { box-sizing: border-box; }
     @page { margin: 14mm; }
     body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1c1917; margin: 0; padding: 24px 20px 40px; font-size: 13px; line-height: 1.45; }
+    ${PRINT_LOGO_CSS}
     .bar { height: 4px; border-radius: 999px; background: linear-gradient(90deg, #059669, #34d399); margin-bottom: 20px; }
     h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 6px; }
     .sub { color: #57534e; font-size: 12px; margin: 0 0 18px; max-width: 640px; }
@@ -71,8 +74,9 @@ export function buildStatementHtml(rows: AdminOrderRow[], meta: StatementMeta): 
   </style>
 </head>
 <body>
+  ${printLogoImgHtml(esc)}
   <div class="bar"></div>
-  <h1>TLE Brand — Transaction statement</h1>
+  <h1>${esc(STORE_RECEIPT_NAME)} — Transaction statement</h1>
   <p class="sub">${esc(meta.subtitle)}</p>
   <p class="gen">Generated: ${esc(generated)}</p>
   <div class="stats">

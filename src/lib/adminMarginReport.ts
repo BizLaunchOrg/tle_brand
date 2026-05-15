@@ -1,4 +1,6 @@
 import { openHtmlPrintWindow } from './openHtmlPrintWindow.ts'
+import { PRINT_LOGO_CSS, printLogoImgHtml } from './printBrandAssets.ts'
+import { STORE_RECEIPT_NAME } from './storeBrand.ts'
 import type { CatalogProductRow } from './adminCatalog'
 import type { AdminOrderRow } from './adminOrders'
 import { normalizeOrderLineItems } from './adminOrderLineSnapshots.ts'
@@ -49,6 +51,7 @@ export function openProductMarginPrintReport(rows: CatalogProductRow[], orders: 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>TLE product margin report</title>
 <style>
 body{font-family:system-ui,sans-serif;padding:24px;color:#111}
+${PRINT_LOGO_CSS}
 h1{font-size:18px}
 p{color:#555;font-size:13px}
 table{border-collapse:collapse;width:100%;margin-top:16px;font-size:12px}
@@ -57,7 +60,8 @@ th{background:#f4f4f4}
 td.n{text-align:right;font-variant-numeric:tabular-nums}
 @media print{body{padding:0}}
 </style></head><body>
-<h1>TLE-BRAND — product list &amp; margin (sold × (SP − CP))</h1>
+${printLogoImgHtml(esc)}
+<h1>${esc(STORE_RECEIPT_NAME)} — product list &amp; margin (sold × (SP − CP))</h1>
 <p>Printed ${new Date().toLocaleString()}. Totals exclude cancelled orders. Cost (CP) and sale (SP) use digits from stored amounts.</p>
 <table><thead><tr><th>Product</th><th>Slug</th><th>Sold (units)</th><th>CP</th><th>SP</th><th>Stock left</th><th>Est. gain (sold)</th></tr></thead><tbody>
 ${lines.join('')}

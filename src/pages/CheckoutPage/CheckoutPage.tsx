@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { BookingPaymentProofFields } from '../../components/BookingPaymentProofFields.tsx'
+import { BookingTransferDetailsCard } from '../../components/BookingTransferDetailsCard.tsx'
+import { BOOKING_TRANSFER_DEMO } from '../../data/bookingTransferDetails.ts'
 import {
   cartLineKey,
   displayableImageUrl,
@@ -9,13 +12,17 @@ import {
 import { NIGERIAN_STATES } from '../../data/nigerianStates.ts'
 import { useAuth } from '../../context/AuthContext'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
-import { computeCheckoutTotalWithFlatFees } from '../../lib/checkoutPricing.ts'
+import { computeCheckoutTotalWithFees } from '../../lib/checkoutPricing.ts'
+import { uploadOrderPaymentProof } from '../../lib/orderPaymentProof.ts'
+import { PRINT_LOGO_CSS, printLogoImgHtml, siteLogoPath } from '../../lib/printBrandAssets.ts'
+import { formatReceiptDate, formatReceiptTime } from '../../lib/receiptDateTime.ts'
 import { fetchShopFees, type ShopFees } from '../../lib/shopSettings.ts'
+import { STORE_RECEIPT_NAME } from '../../lib/storeBrand.ts'
 import { createOrder } from '../../lib/userShopSync.ts'
 
 const formatNaira = (value: number) => `₦${value.toLocaleString()}`
 
-const STORE_RECEIPT_NAME = 'TLE-BRAND'
+type CheckoutPhase = 'shipping' | 'payment'
 
 type ReceiptLineItem = {
   name: string
@@ -58,10 +65,8 @@ function escapeHtml(s: string): string {
 }
 
 function buildReceiptDocumentHtml(receipt: OrderReceipt): string {
-  const placed = new Date(receipt.placedAt)
-  const placedStr = escapeHtml(
-    placed.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
-  )
+  const dateStr = escapeHtml(formatReceiptDate(receipt.placedAt))
+  const timeStr = escapeHtml(formatReceiptTime(receipt.placedAt))
   const linesRows = receipt.lines
     .map(
       (line) => `
@@ -91,6 +96,7 @@ function buildReceiptDocumentHtml(receipt: OrderReceipt): string {
   <style>
     * { box-sizing: border-box; }
     body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; margin: 0; padding: 24px; background: #f5f2ed; color: #181818; }
+    ${PRINT_LOGO_CSS}
     .paper { max-width: 420px; margin: 0 auto; background: #fff; border: 1px solid #18181818; padding: 28px 24px 32px; box-shadow: 0 12px 40px rgba(0,0,0,0.06); }
     h1 { font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase; margin: 0 0 4px; color: #bf8f48; }
     .store { font-size: 22px; font-weight: 700; margin: 0 0 16px; }
@@ -112,11 +118,13 @@ function buildReceiptDocumentHtml(receipt: OrderReceipt): string {
 </head>
 <body>
   <div class="paper">
+    ${printLogoImgHtml(escapeHtml)}
     <h1>Sales receipt</h1>
     <p class="store">${escapeHtml(STORE_RECEIPT_NAME)}</p>
     <div class="meta">
       <div><strong>Order ref</strong> · ${escapeHtml(receipt.id)}</div>
-      <div><strong>Date</strong> · ${placedStr}</div>
+      <div><strong>Date</strong> · ${dateStr}</div>
+      <div><strong>Time</strong> · ${timeStr}</div>
     </div>
     <hr class="rule"/>
     <table>
@@ -124,13 +132,9 @@ function buildReceiptDocumentHtml(receipt: OrderReceipt): string {
       <tbody>${linesRows}</tbody>
     </table>
     <div class="totals">
-      <div><span>Subtotal</span><span>${formatNaira(receipt.subtotalNgn)}</span></div>${
-        receipt.salesVatNgn > 0
-          ? `<div><span>VAT on products</span><span>${formatNaira(receipt.salesVatNgn)}</span></div>`
-          : ''
-      }
+      <div><span>Subtotal</span><span>${formatNaira(receipt.subtotalNgn)}</span></div>
       <div><span>${escapeHtml(receipt.deliverySummaryLabel)}</span><span>${formatNaira(receipt.deliveryNgn)}</span></div>
-      <div><span>Processing</span><span>${formatNaira(receipt.processingNgn)}</span></div>
+      <div><span>Processing & tax</span><span>${formatNaira(receipt.processingNgn + receipt.salesVatNgn)}</span></div>
       <div class="grand"><span>Total</span><span>${formatNaira(receipt.totalNgn)}</span></div>
     </div>
     <hr class="rule"/>
@@ -154,7 +158,7 @@ function downloadReceiptFile(receipt: OrderReceipt) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `tle-receipt-${receipt.id.slice(0, 8)}.html`
+  a.download = `tobilicious-receipt-${receipt.id.slice(0, 8)}.html`
   a.rel = 'noopener'
   document.body.appendChild(a)
   a.click()
@@ -170,10 +174,28 @@ function printReceiptInNewWindow(receipt: OrderReceipt) {
   w.document.close()
   w.focus()
   const runPrint = () => {
-    w.addEventListener('afterprint', () => {
-      w.close()
-    })
-    w.print()
+    const imgs = [...w.document.images]
+    const done = () => {
+      w.addEventListener('afterprint', () => w.close(), { once: true })
+      w.print()
+    }
+    if (imgs.length === 0) {
+      done()
+      return
+    }
+    void Promise.all(
+      imgs.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            if (img.complete) {
+              resolve()
+              return
+            }
+            img.addEventListener('load', () => resolve(), { once: true })
+            img.addEventListener('error', () => resolve(), { once: true })
+          }),
+      ),
+    ).then(done)
   }
   if (w.document.readyState === 'complete') runPrint()
   else w.onload = runPrint
@@ -193,6 +215,10 @@ export function CheckoutPage() {
 
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [phase, setPhase] = useState<CheckoutPhase>('shipping')
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null)
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false)
+  const [paymentProofVerified, setPaymentProofVerified] = useState(false)
   const [orderReceipt, setOrderReceipt] = useState<OrderReceipt | null>(null)
   const [shopFees, setShopFees] = useState<ShopFees | null>(null)
   const [deliveryZoneId, setDeliveryZoneId] = useState('')
@@ -224,10 +250,10 @@ export function CheckoutPage() {
 
   const { deliveryNgn, processingNgn, salesVatNgn, totalNgn } = useMemo(() => {
     const p = shopFees?.processingFeeNgn ?? 1_200
-    const flatVat = shopFees?.salesVatFlatNgn ?? 0
+    const vatPercent = shopFees?.salesVatPercent ?? 0
     const d = selectedZone ? selectedZone.feeNgn : (shopFees?.deliveryFeeNgn ?? 4_000)
-    return computeCheckoutTotalWithFlatFees(cartSubtotal, d, p, {
-      salesVatFlatNgn: flatVat,
+    return computeCheckoutTotalWithFees(cartSubtotal, d, p, {
+      salesVatPercent: vatPercent,
     })
   }, [cartSubtotal, shopFees, selectedZone])
 
@@ -236,6 +262,38 @@ export function CheckoutPage() {
     setFullName((n) => (n.trim() ? n : user.name))
     setEmail((e) => (e.trim() ? e : user.email))
   }, [user])
+
+  const shippingComplete = useMemo(() => {
+    if (!shopFees) return false
+    if (deliveryZones.length > 0 && !deliveryZoneId.trim()) return false
+    const phoneOk = phone.replace(/\D/g, '').length >= 7
+    return Boolean(
+      fullName.trim() &&
+        email.trim() &&
+        phoneOk &&
+        street.trim() &&
+        city.trim() &&
+        stateNg.trim(),
+    )
+  }, [
+    shopFees,
+    deliveryZones.length,
+    deliveryZoneId,
+    fullName,
+    email,
+    phone,
+    street,
+    city,
+    stateNg,
+  ])
+
+  useEffect(() => {
+    if (!paymentProofFile) {
+      setPaymentProofVerified(false)
+    }
+  }, [paymentProofFile])
+
+  const canPlaceOrder = Boolean(paymentProofFile && paymentConfirmed && !busy)
 
   if (!user) {
     return (
@@ -263,10 +321,8 @@ export function CheckoutPage() {
   }
 
   if (orderReceipt) {
-    const placedLabel = new Date(orderReceipt.placedAt).toLocaleString(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    })
+    const placedDateLabel = formatReceiptDate(orderReceipt.placedAt)
+    const placedTimeLabel = formatReceiptTime(orderReceipt.placedAt)
     const sh = orderReceipt.shipping
 
     return (
@@ -280,7 +336,8 @@ export function CheckoutPage() {
 
             <div className="px-6 pb-2 pt-8 text-center sm:px-8 sm:pt-10">
               <p className="text-[10px] font-semibold tracking-[0.28em] text-tle-gold uppercase">Sales receipt</p>
-              <p className="mt-1 font-sans text-xl font-bold tracking-tight text-tle-ink sm:text-2xl">{STORE_RECEIPT_NAME}</p>
+              <img src={siteLogoPath()} alt="TLE logo" className="mx-auto h-16 w-auto object-contain" />
+              <p className="mt-4 font-sans text-xl font-bold tracking-tight text-tle-ink sm:text-2xl">{STORE_RECEIPT_NAME}</p>
               <div className="mx-auto mt-4 flex size-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
                 <span className="material-symbols-outlined text-[26px] leading-none">check_circle</span>
               </div>
@@ -301,7 +358,11 @@ export function CheckoutPage() {
               </div>
               <div className="flex justify-between gap-3">
                 <span>Date</span>
-                <span className="text-right font-medium text-tle-ink">{placedLabel}</span>
+                <span className="text-right font-medium text-tle-ink">{placedDateLabel}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span>Time</span>
+                <span className="text-right font-medium text-tle-ink">{placedTimeLabel}</span>
               </div>
             </div>
 
@@ -346,8 +407,8 @@ export function CheckoutPage() {
                 <span className="shrink-0 tabular-nums font-medium text-tle-ink">{formatNaira(orderReceipt.deliveryNgn)}</span>
               </div>
               <div className="flex justify-between text-tle-muted">
-                <span>Processing</span>
-                <span className="tabular-nums font-medium text-tle-ink">{formatNaira(orderReceipt.processingNgn)}</span>
+                <span>Processing & tax</span>
+                <span className="tabular-nums font-medium text-tle-ink">{formatNaira(orderReceipt.processingNgn + orderReceipt.salesVatNgn)}</span>
               </div>
               <div className="flex justify-between border-t-2 border-tle-ink/90 pt-3 font-sans text-base font-bold text-tle-ink">
                 <span>Total</span>
@@ -433,74 +494,101 @@ export function CheckoutPage() {
     )
   }
 
-  const onSubmit = async (e: FormEvent) => {
+  const buildCheckoutPayload = () => {
+    if (!shopFees || !user) return null
+    const lineItems = cartItems.map((item) => {
+      const fromCart =
+        (typeof item.img === 'string' && item.img.trim() ? item.img.trim() : undefined) ??
+        getDefaultImageUrls(item).find((x) => typeof x === 'string' && x.trim())
+      const raw = fromCart?.trim()
+      const image = raw ? displayableImageUrl(raw) || undefined : undefined
+      return {
+        slug: item.slug,
+        variantId: item.variantId,
+        variantLabel: item.variantLabel,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image,
+        category: item.cat,
+        badge: typeof item.badge === 'string' && item.badge.trim() ? item.badge.trim() : undefined,
+      }
+    })
+    const subtotal = cartSubtotal
+    const zones = shopFees.deliveryZones
+    const zone = zones.length > 0 ? zones.find((z) => z.id === deliveryZoneId) ?? zones[0] : null
+    const d = zone ? zone.feeNgn : shopFees.deliveryFeeNgn
+    const p = shopFees.processingFeeNgn
+    const fees = computeCheckoutTotalWithFees(subtotal, d, p, {
+      salesVatPercent: shopFees.salesVatPercent,
+    })
+    const shipping = {
+      fullName: fullName.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      line1: street.trim(),
+      line2: landmark.trim() || undefined,
+      city: city.trim(),
+      state: stateNg.trim(),
+      country: 'Nigeria',
+      ...(zone ? { deliveryOptionId: zone.id, deliveryOptionLabel: zone.label } : {}),
+    }
+    return { lineItems, subtotal, zone, fees, shipping }
+  }
+
+  const onShippingSubmit = (e: FormEvent) => {
     e.preventDefault()
     setError(null)
-    if (!fullName.trim() || !email.trim() || !phone.trim() || !street.trim() || !city.trim() || !stateNg.trim()) {
-      setError('Please fill in all required fields, including state.')
+    if (!shippingComplete) {
+      setError('Please fill in all required delivery fields before continuing.')
       return
     }
+    setPaymentProofFile(null)
+    setPaymentConfirmed(false)
+    setPhase('payment')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
-    if (!shopFees) {
+  const confirmPaidOrder = async () => {
+    setError(null)
+    if (!shippingComplete) {
+      setError('Please complete delivery details first.')
+      setPhase('shipping')
+      return
+    }
+    if (!paymentProofFile || !paymentConfirmed) {
+      setError('Upload your transfer screenshot and tick "I\'ve made payment" to place your order.')
+      return
+    }
+    const payload = buildCheckoutPayload()
+    if (!payload || !user) {
       setError('Still loading. Try again in a moment.')
       return
     }
 
     setBusy(true)
     try {
-      const lineItems = cartItems.map((item) => {
-        const fromCart =
-          (typeof item.img === 'string' && item.img.trim() ? item.img.trim() : undefined) ??
-          getDefaultImageUrls(item).find((x) => typeof x === 'string' && x.trim())
-        const raw = fromCart?.trim()
-        const image = raw ? displayableImageUrl(raw) || undefined : undefined
-        return {
-          slug: item.slug,
-          variantId: item.variantId,
-          variantLabel: item.variantLabel,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          image,
-          category: item.cat,
-          badge: typeof item.badge === 'string' && item.badge.trim() ? item.badge.trim() : undefined,
-        }
-      })
+      const orderId = crypto.randomUUID()
+      const up = await uploadOrderPaymentProof(orderId, paymentProofFile)
+      if (up.ok === false) {
+        setError(up.message)
+        return
+      }
 
-      const subtotal = cartSubtotal
-      const zones = shopFees.deliveryZones
-      const zone =
-        zones.length > 0
-          ? zones.find((z) => z.id === deliveryZoneId) ?? zones[0]
-          : null
-      const d = zone ? zone.feeNgn : shopFees.deliveryFeeNgn
-      const p = shopFees.processingFeeNgn
-      const fees = computeCheckoutTotalWithFlatFees(subtotal, d, p, {
-        salesVatFlatNgn: shopFees.salesVatFlatNgn,
-      })
-
+      const { lineItems, subtotal, zone, fees, shipping } = payload
+      setPaymentProofVerified(true)
       const result = await createOrder({
+        id: orderId,
         userId: user.id,
         email: email.trim(),
-        shipping: {
-          fullName: fullName.trim(),
-          phone: phone.trim(),
-          email: email.trim(),
-          line1: street.trim(),
-          line2: landmark.trim() || undefined,
-          city: city.trim(),
-          state: stateNg.trim(),
-          country: 'Nigeria',
-          ...(zone
-            ? { deliveryOptionId: zone.id, deliveryOptionLabel: zone.label }
-            : {}),
-        },
+        shipping,
         lineItems,
         subtotalNgn: subtotal,
         deliveryNgn: fees.deliveryNgn,
         processingNgn: fees.processingNgn,
         salesVatNgn: fees.salesVatNgn,
         totalNgn: fees.totalNgn,
+        payment_proof_storage_path: up.path,
       })
 
       if (!result.ok) {
@@ -509,14 +597,14 @@ export function CheckoutPage() {
       }
 
       const shippingSnapshot: ReceiptShipping = {
-        fullName: fullName.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        line1: street.trim(),
-        line2: landmark.trim() || undefined,
-        city: city.trim(),
-        state: stateNg.trim(),
-        country: 'Nigeria',
+        fullName: shipping.fullName,
+        phone: shipping.phone,
+        email: shipping.email,
+        line1: shipping.line1,
+        line2: shipping.line2,
+        city: shipping.city,
+        state: shipping.state,
+        country: shipping.country,
         ...(zone ? { deliveryOptionLabel: zone.label } : {}),
       }
       const receiptLines: ReceiptLineItem[] = cartItems.map((item) => ({
@@ -538,6 +626,9 @@ export function CheckoutPage() {
         lines: receiptLines,
         shipping: shippingSnapshot,
       })
+      setPaymentProofFile(null)
+      setPaymentConfirmed(false)
+      setPhase('shipping')
       clearCart()
     } catch {
       setError('Something went wrong. Please try again.')
@@ -553,26 +644,32 @@ export function CheckoutPage() {
           <div className="h-px w-[22px] bg-tle-gold" />
           <span className="text-[10px] font-semibold tracking-[0.22em] text-tle-gold uppercase">Checkout</span>
         </div>
-        <h1 className="font-sans text-[clamp(1.75rem,4vw,2.25rem)] font-semibold text-tle-ink">Delivery in Nigeria</h1>
+        <h1 className="font-sans text-[clamp(1.75rem,4vw,2.25rem)] font-semibold text-tle-ink">
+          {phase === 'shipping' ? 'Delivery in Nigeria' : 'Pay by transfer'}
+        </h1>
         <p className="mt-2 max-w-xl text-sm text-tle-muted">
-          {deliveryZones.length > 0
-            ? `Pick your delivery or pickup option. Processing ${formatNaira(processingNgn)} applies once per order.`
-            : `Delivery ${formatNaira(deliveryNgn)} plus processing ${formatNaira(processingNgn)} per order.`}
+          {phase === 'shipping'
+            ? deliveryZones.length > 0
+              ? `Complete every field below, then continue to payment. Processing & tax ${formatNaira(processingNgn + salesVatNgn)} applies once per order.`
+              : `Complete every field below, then continue to payment. Delivery ${formatNaira(deliveryNgn)} plus processing & tax ${formatNaira(processingNgn + salesVatNgn)} per order.`
+            : `Transfer exactly ${formatNaira(totalNgn)} to the account below within the timer. Upload your payment screenshot before placing the order.`}
         </p>
 
         <form
-          onSubmit={onSubmit}
+          onSubmit={phase === 'shipping' ? onShippingSubmit : (e) => e.preventDefault()}
           className="mt-10 grid gap-10 lg:grid-cols-[1fr_380px] lg:items-start"
         >
           <div className="rounded-[28px] border border-black/8 bg-white p-6 shadow-[0_10px_40px_rgba(0,0,0,0.04)] sm:p-8">
-            <h2 className="font-sans text-lg font-semibold text-tle-ink">Where should we deliver?</h2>
-            <p className="mt-1 text-xs text-tle-muted">All deliveries are within Nigeria. * Required.</p>
-
             {error ? (
               <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
                 {error}
               </p>
             ) : null}
+
+            {phase === 'shipping' ? (
+              <>
+            <h2 className="font-sans text-lg font-semibold text-tle-ink">Where should we deliver?</h2>
+            <p className="mt-1 text-xs text-tle-muted">All deliveries are within Nigeria. * Required.</p>
 
             {deliveryZones.length > 0 ? (
               <label className="mt-6 block">
@@ -702,13 +799,57 @@ export function CheckoutPage() {
               Country: <span className="font-medium text-tle-ink">Nigeria</span> — no extra fields needed.
             </p>
 
-            <button
-              type="submit"
-              disabled={busy || !shopFees}
-              className="mt-8 w-full rounded-full bg-tle-charcoal py-3.5 text-[12px] font-bold tracking-[0.12em] text-white uppercase transition-colors hover:bg-tle-pink disabled:opacity-60 lg:hidden"
-            >
-              {busy ? 'Placing order…' : `Place order · ${formatNaira(totalNgn)}`}
-            </button>
+              <button
+                type="submit"
+                disabled={!shippingComplete || !shopFees}
+                className="mt-8 w-full rounded-full bg-tle-charcoal py-3.5 text-[12px] font-bold tracking-[0.12em] text-white uppercase transition-colors hover:bg-tle-pink disabled:cursor-not-allowed disabled:opacity-60 lg:hidden"
+              >
+                Continue to payment · {formatNaira(totalNgn)}
+              </button>
+              </>
+            ) : (
+              <div className="mt-2">
+                <h2 className="font-sans text-lg font-semibold text-tle-ink">Transfer &amp; payment proof</h2>
+                <p className="mt-1 text-xs text-tle-muted">
+                  Complete your transfer, then upload a screenshot. Your order receipt is generated only after this step.
+                </p>
+                <div className="mt-6">
+                  <BookingTransferDetailsCard details={BOOKING_TRANSFER_DEMO} className="mb-6" />
+                  <BookingPaymentProofFields
+                    context="checkout"
+                    file={paymentProofFile}
+                    onFileChange={setPaymentProofFile}
+                    confirmed={paymentConfirmed}
+                    onConfirmedChange={setPaymentConfirmed}
+                  />
+                  {paymentProofVerified ? (
+                    <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                      Payment proof uploaded successfully. This order will be created as <strong>paid</strong>.
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+                  <button
+                    type="button"
+                    className="rounded-full border-[1.5px] border-black/10 px-8 py-3.5 text-[12px] font-semibold tracking-wide text-tle-muted uppercase hover:border-tle-ink hover:text-tle-ink"
+                    onClick={() => {
+                      setError(null)
+                      setPhase('shipping')
+                    }}
+                  >
+                    Back to delivery
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canPlaceOrder}
+                    onClick={() => void confirmPaidOrder()}
+                    className="rounded-full bg-tle-pink px-8 py-3.5 text-[12px] font-bold tracking-[0.12em] text-white uppercase transition-colors hover:bg-tle-deep disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {busy ? 'Placing order…' : `Place order · ${formatNaira(totalNgn)}`}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <aside className="rounded-[28px] border border-black/8 bg-white p-6 shadow-[0_10px_40px_rgba(0,0,0,0.04)] sm:p-8 lg:sticky lg:top-28">
@@ -741,19 +882,13 @@ export function CheckoutPage() {
                 <span>Subtotal</span>
                 <span className="font-medium text-tle-ink">{formatNaira(cartSubtotal)}</span>
               </div>
-              {salesVatNgn > 0 ? (
-                <div className="flex justify-between text-tle-muted">
-                  <span>VAT on products</span>
-                  <span className="font-medium text-tle-ink">{formatNaira(salesVatNgn)}</span>
-                </div>
-              ) : null}
               <div className="flex justify-between text-tle-muted">
                 <span>{deliveryZones.length > 0 ? 'Delivery / pickup' : 'Delivery'}</span>
                 <span className="font-medium text-tle-ink">{formatNaira(deliveryNgn)}</span>
               </div>
               <div className="flex justify-between text-tle-muted">
-                <span>Processing</span>
-                <span className="font-medium text-tle-ink">{formatNaira(processingNgn)}</span>
+                <span>Processing & tax</span>
+                <span className="font-medium text-tle-ink">{formatNaira(processingNgn + salesVatNgn)}</span>
               </div>
               <div className="flex justify-between border-t border-black/[0.08] pt-3 font-sans text-lg font-semibold text-tle-ink">
                 <span>Total</span>
@@ -761,16 +896,29 @@ export function CheckoutPage() {
               </div>
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-tle-faint">
-              Payment details will be confirmed with you before dispatch.
+              {phase === 'shipping'
+                ? 'Fill in delivery details to continue to bank transfer.'
+                : 'Upload your transfer screenshot, then place your order to get your receipt.'}
             </p>
 
-            <button
-              type="submit"
-              disabled={busy || !shopFees}
-              className="mt-6 hidden w-full rounded-full bg-tle-charcoal py-[18px] text-xs font-bold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink disabled:opacity-60 lg:block"
-            >
-              {busy ? 'Placing order…' : `Place order · ${formatNaira(totalNgn)}`}
-            </button>
+            {phase === 'shipping' ? (
+              <button
+                type="submit"
+                disabled={!shippingComplete || !shopFees}
+                className="mt-6 hidden w-full rounded-full bg-tle-charcoal py-[18px] text-xs font-bold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink disabled:cursor-not-allowed disabled:opacity-60 lg:block"
+              >
+                Continue to payment · {formatNaira(totalNgn)}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!canPlaceOrder}
+                onClick={() => void confirmPaidOrder()}
+                className="mt-6 hidden w-full rounded-full bg-tle-pink py-[18px] text-xs font-bold tracking-wide text-white uppercase transition-colors hover:bg-tle-deep disabled:cursor-not-allowed disabled:opacity-60 lg:block"
+              >
+                {busy ? 'Placing order…' : `Place order · ${formatNaira(totalNgn)}`}
+              </button>
+            )}
           </aside>
         </form>
       </div>
