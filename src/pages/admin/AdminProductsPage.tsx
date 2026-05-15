@@ -209,7 +209,7 @@ export function AdminProductsPage() {
   const [newPresetName, setNewPresetName] = useState('')
   const [presetBusy, setPresetBusy] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [mainTab, setMainTab] = useState<'inventory' | 'collections'>('inventory')
+  const [mainTab, setMainTab] = useState<'inventory' | 'collections' | 'archive'>('inventory')
   const [collectionsOpen, setCollectionsOpen] = useState<Set<string>>(() => new Set())
   const collectionsDefaultedRef = useRef(false)
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all')
@@ -267,8 +267,17 @@ export function AdminProductsPage() {
     const q = search.trim().toLowerCase()
     return rows.filter((row) => {
       const p = row.payload
-      if (stockFilter === 'out_of_stock' && !isProductOutOfStock(p)) return false
-      if (stockFilter === 'in_stock' && isProductOutOfStock(p)) return false
+      const isOos = isProductOutOfStock(p)
+
+      // Archive tab shows only OOS, Inventory tab shows only in-stock
+      if (mainTab === 'archive') {
+        if (!isOos) return false
+      } else if (mainTab === 'inventory') {
+        if (isOos) return false
+      }
+
+      if (stockFilter === 'out_of_stock' && !isOos) return false
+      if (stockFilter === 'in_stock' && isOos) return false
       if (collectionFilter !== 'all' && (p.cat?.trim() || '') !== collectionFilter) return false
       if (q) {
         const hay = `${p.name} ${row.slug} ${p.cat ?? ''}`.toLowerCase()
@@ -276,7 +285,7 @@ export function AdminProductsPage() {
       }
       return true
     })
-  }, [rows, search, stockFilter, collectionFilter])
+  }, [rows, search, stockFilter, collectionFilter, mainTab])
 
   const stats = useMemo(() => {
     const inv = computeInventoryValueNgn(rows)
@@ -615,9 +624,9 @@ export function AdminProductsPage() {
           <p className={muted + ' mt-1 text-[12px]'}>Sum of line quantities across orders.</p>
         </div>
         <div className={'rounded-2xl border p-4 ' + ad(theme, 'border-stone-200 bg-white', 'border-neutral-700 bg-neutral-900/40')}>
-          <p className={label}>Out of stock</p>
+          <p className={label}>Archived products</p>
           <p className={'mt-2 text-xl font-bold tabular-nums ' + ad(theme, 'text-stone-900', 'text-white')}>{stats.oos}</p>
-          <p className={muted + ' mt-1 text-[12px]'}>Tracked quantity at 0 — sold out or not released yet.</p>
+          <p className={muted + ' mt-1 text-[12px]'}>Tracked quantity at 0 — hidden from storefront.</p>
         </div>
       </div>
 
@@ -647,9 +656,21 @@ export function AdminProductsPage() {
           >
             Collections
           </button>
+          <button
+            type="button"
+            onClick={() => setMainTab('archive')}
+            className={
+              'rounded-lg px-4 py-2 text-[13px] font-bold transition ' +
+              (mainTab === 'archive'
+                ? ad(theme, 'bg-emerald-600 text-white', 'bg-emerald-600 text-white')
+                : ad(theme, 'text-stone-600 hover:bg-stone-50', 'text-neutral-400 hover:bg-neutral-800/60'))
+            }
+          >
+            Archive
+          </button>
         </div>
 
-        {mainTab === 'inventory' ? (
+        {(mainTab === 'inventory' || mainTab === 'archive') ? (
           <>
             <div className={'flex flex-col gap-3 border-b px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4 ' + ad(theme, 'border-stone-100 bg-stone-50/50', 'border-neutral-800 bg-neutral-950/30')}>
               <div className="flex flex-wrap gap-2">
@@ -664,42 +685,51 @@ export function AdminProductsPage() {
                 >
                   Clear filters
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setStockFilter('all')}
-                  className={
-                    'rounded-lg px-3 py-1.5 text-[12px] font-semibold ' +
-                    (stockFilter === 'all'
-                      ? ad(theme, 'bg-stone-800 text-white', 'bg-neutral-200 text-neutral-900')
-                      : ad(theme, 'text-stone-600 hover:bg-stone-100', 'text-neutral-400 hover:bg-neutral-800'))
-                  }
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStockFilter('in_stock')}
-                  className={
-                    'rounded-lg px-3 py-1.5 text-[12px] font-semibold ' +
-                    (stockFilter === 'in_stock'
-                      ? ad(theme, 'bg-emerald-100 text-emerald-900', 'bg-emerald-950/50 text-emerald-200')
-                      : ad(theme, 'text-stone-600 hover:bg-stone-100', 'text-neutral-400 hover:bg-neutral-800'))
-                  }
-                >
-                  In stock
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStockFilter('out_of_stock')}
-                  className={
-                    'rounded-lg px-3 py-1.5 text-[12px] font-semibold ' +
-                    (stockFilter === 'out_of_stock'
-                      ? ad(theme, 'bg-rose-100 text-rose-900', 'bg-rose-950/40 text-rose-200')
-                      : ad(theme, 'text-stone-600 hover:bg-stone-100', 'text-neutral-400 hover:bg-neutral-800'))
-                  }
-                >
-                  Out of stock
-                </button>
+                {mainTab === 'inventory' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setStockFilter('all')}
+                      className={
+                        'rounded-lg px-3 py-1.5 text-[12px] font-semibold ' +
+                        (stockFilter === 'all'
+                          ? ad(theme, 'bg-stone-800 text-white', 'bg-neutral-200 text-neutral-900')
+                          : ad(theme, 'text-stone-600 hover:bg-stone-100', 'text-neutral-400 hover:bg-neutral-800'))
+                      }
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStockFilter('in_stock')}
+                      className={
+                        'rounded-lg px-3 py-1.5 text-[12px] font-semibold ' +
+                        (stockFilter === 'in_stock'
+                          ? ad(theme, 'bg-emerald-100 text-emerald-900', 'bg-emerald-950/50 text-emerald-200')
+                          : ad(theme, 'text-stone-600 hover:bg-stone-100', 'text-neutral-400 hover:bg-neutral-800'))
+                      }
+                    >
+                      In stock
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStockFilter('out_of_stock')}
+                      className={
+                        'rounded-lg px-3 py-1.5 text-[12px] font-semibold ' +
+                        (stockFilter === 'out_of_stock'
+                          ? ad(theme, 'bg-rose-100 text-rose-900', 'bg-rose-950/40 text-rose-200')
+                          : ad(theme, 'text-stone-600 hover:bg-stone-100', 'text-neutral-400 hover:bg-neutral-800'))
+                      }
+                    >
+                      Out of stock
+                    </button>
+                  </>
+                )}
+                {mainTab === 'archive' && (
+                  <div className={'flex items-center rounded-lg bg-rose-100 px-3 py-1.5 text-[12px] font-bold text-rose-900 ' + ad(theme, '', 'bg-rose-950/40 text-rose-200')}>
+                    Archived (Stock: 0)
+                  </div>
+                )}
               </div>
               <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                 <select
