@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from './mapSupabaseAuthError'
 
 export const DEFAULT_DELIVERY_FEE_NGN = 4_000
 export const DEFAULT_PROCESSING_FEE_NGN = 1_200
-export const DEFAULT_SALES_VAT_FLAT_NGN = 0
+export const DEFAULT_SALES_VAT_PERCENT = 0
 
 export type DeliveryZone = {
   id: string
@@ -16,8 +16,8 @@ export type DeliveryZone = {
 export type ShopFees = {
   deliveryFeeNgn: number
   processingFeeNgn: number
-  /** Whole naira: VAT on goods once per order (0 = none). */
-  salesVatFlatNgn: number
+  /** Percent VAT on goods subtotal (0-100). */
+  salesVatPercent: number
   /** When non-empty, checkout uses these options instead of the flat delivery fee. */
   deliveryZones: DeliveryZone[]
 }
@@ -33,11 +33,11 @@ function clampFee(n: unknown, fallback: number): number {
   return Math.min(v, 50_000_000)
 }
 
-/** Fixed VAT amount in whole naira (0 = off). */
-function clampFlatSalesVat(n: unknown): number {
-  const v = Math.round(Number(n))
+/** Percent VAT on goods subtotal (0-100). */
+function clampSalesVatPercent(n: unknown): number {
+  const v = Number(n)
   if (!Number.isFinite(v) || v < 0) return 0
-  return Math.min(v, 50_000_000)
+  return Math.min(v, 100)
 }
 
 /** Match Edge Function admin-push-hook: origin only, no trailing path. */
@@ -89,7 +89,7 @@ export function normalizeDeliveryZones(raw: unknown): DeliveryZone[] {
 type ShopSettingsRow = {
   delivery_fee_ngn: unknown
   processing_fee_ngn: unknown
-  sales_vat_flat_ngn?: unknown
+  sales_vat_percent?: unknown
   public_app_url?: string | null
   delivery_zones?: unknown
 }
@@ -109,14 +109,14 @@ export async function fetchShopFees(): Promise<ShopFees> {
     return {
       deliveryFeeNgn: DEFAULT_DELIVERY_FEE_NGN,
       processingFeeNgn: DEFAULT_PROCESSING_FEE_NGN,
-      salesVatFlatNgn: DEFAULT_SALES_VAT_FLAT_NGN,
+      salesVatPercent: DEFAULT_SALES_VAT_PERCENT,
       deliveryZones: [],
     }
   }
   return {
     deliveryFeeNgn: clampFee(row.delivery_fee_ngn, DEFAULT_DELIVERY_FEE_NGN),
     processingFeeNgn: clampFee(row.processing_fee_ngn, DEFAULT_PROCESSING_FEE_NGN),
-    salesVatFlatNgn: clampFlatSalesVat(row.sales_vat_flat_ngn),
+    salesVatPercent: clampSalesVatPercent(row.sales_vat_percent),
     deliveryZones: normalizeDeliveryZones(row.delivery_zones),
   }
 }
@@ -127,7 +127,7 @@ export async function fetchShopAccountSettings(): Promise<ShopAccountSettings> {
     return {
       deliveryFeeNgn: DEFAULT_DELIVERY_FEE_NGN,
       processingFeeNgn: DEFAULT_PROCESSING_FEE_NGN,
-      salesVatFlatNgn: DEFAULT_SALES_VAT_FLAT_NGN,
+      salesVatPercent: DEFAULT_SALES_VAT_PERCENT,
       deliveryZones: [],
       publicAppUrl: null,
     }
@@ -135,7 +135,7 @@ export async function fetchShopAccountSettings(): Promise<ShopAccountSettings> {
   const fees = {
     deliveryFeeNgn: clampFee(row.delivery_fee_ngn, DEFAULT_DELIVERY_FEE_NGN),
     processingFeeNgn: clampFee(row.processing_fee_ngn, DEFAULT_PROCESSING_FEE_NGN),
-    salesVatFlatNgn: clampFlatSalesVat(row.sales_vat_flat_ngn),
+    salesVatPercent: clampSalesVatPercent(row.sales_vat_percent),
     deliveryZones: normalizeDeliveryZones(row.delivery_zones),
   }
   const raw = row.public_app_url
@@ -148,8 +148,8 @@ export type UpdateShopFeesOptions = {
   publicAppUrlInput?: string | null
   /** When set, replaces `delivery_zones` in the database (can be []). */
   deliveryZones?: DeliveryZone[]
-  /** Whole naira: VAT on goods once per order. */
-  salesVatFlatNgn?: number
+  /** Percent VAT on goods subtotal (0-100). */
+  salesVatPercent?: number
 }
 
 export async function updateShopFees(
@@ -167,8 +167,8 @@ export async function updateShopFees(
     updated_at: new Date().toISOString(),
   }
 
-  if (options?.salesVatFlatNgn !== undefined) {
-    patch.sales_vat_flat_ngn = clampFlatSalesVat(options.salesVatFlatNgn)
+  if (options?.salesVatPercent !== undefined) {
+    patch.sales_vat_percent = clampSalesVatPercent(options.salesVatPercent)
   }
 
   const publicAppUrlInput = options?.publicAppUrlInput

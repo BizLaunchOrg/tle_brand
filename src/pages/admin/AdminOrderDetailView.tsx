@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { AdminTheme } from './AdminThemeContext.tsx'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
@@ -18,9 +18,10 @@ import { adminDeliveryPillClass, adminPaymentPillClass } from './adminRangeTabs.
 import { ad, adminFont } from './adminUi.ts'
 import { effectiveDeliveryStatus, orderIsPaymentPaid } from '../../lib/adminOrderAnalytics.ts'
 import { normalizeOrderLineItems, pickLineImageFromItem } from '../../lib/adminOrderLineSnapshots.ts'
-import { printShippingSlip } from './shippingSlipPrint.ts'
+import { getOrderPaymentProofSignedUrl } from '../../lib/orderPaymentProof.ts'
+import { printShippingSlip, downloadShippingSlip, downloadSellerReceipt } from './shippingSlipPrint.ts'
 
-const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
+const formatNaira = (n: number) => `â‚¦${Math.round(n).toLocaleString()}`
 
 const DELIVERY_OPTIONS = ['pending', 'processing', 'delivered'] as const
 
@@ -115,7 +116,7 @@ function buildLineDisplaysExt(raw: unknown): LineDisplayExt[] {
     const slug = typeof o.slug === 'string' ? o.slug.trim() : ''
     const name = typeof o.name === 'string' ? o.name : slug || 'Item'
     const qty = Math.min(999, Math.max(1, Math.floor(Number(o.quantity)) || 1))
-    const priceStr = typeof o.price === 'string' ? o.price : typeof o.price === 'number' ? formatNaira(o.price) : '₦0'
+    const priceStr = typeof o.price === 'string' ? o.price : typeof o.price === 'number' ? formatNaira(o.price) : 'â‚¦0'
     const unit = parseProductPriceNgn(priceStr)
     const variantId = typeof o.variantId === 'string' && o.variantId.trim() ? o.variantId.trim() : undefined
     const variantLabel =
@@ -260,6 +261,28 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
   const [saving, setSaving] = useState(false)
   const [slipBusy, setSlipBusy] = useState(false)
   const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [proofSignedUrl, setProofSignedUrl] = useState<string | null>(null)
+  const [proofBusy, setProofBusy] = useState(false)
+
+  useEffect(() => {
+    const path = order.payment_proof_storage_path?.trim()
+    if (!path) {
+      setProofSignedUrl(null)
+      setProofBusy(false)
+      return
+    }
+    let cancelled = false
+    setProofBusy(true)
+    setProofSignedUrl(null)
+    void getOrderPaymentProofSignedUrl(path, 3600).then((url) => {
+      if (cancelled) return
+      setProofSignedUrl(url)
+      setProofBusy(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [order.payment_proof_storage_path])
 
   useEffect(() => {
     setCatalog(new Map())
@@ -316,7 +339,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
       setBanner({ type: 'ok', text: `${label} copied.` })
       window.setTimeout(() => setBanner(null), 2200)
     } catch {
-      setBanner({ type: 'err', text: 'Copy blocked — select and copy manually.' })
+      setBanner({ type: 'err', text: 'Copy blocked â€” select and copy manually.' })
     }
   }
 
@@ -369,7 +392,25 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
     setBanner(null)
     const ok = printShippingSlip(order)
     if (!ok) {
-      setBanner({ type: 'err', text: 'Pop-up blocked — allow pop-ups for this site, then try Print again.' })
+      setBanner({ type: 'err', text: 'Pop-up blocked â€” allow pop-ups for this site, then try Print again.' })
+    }
+  }
+
+  const onDownloadShippingSlip = () => {
+    setBanner(null)
+    try {
+      downloadShippingSlip(order)
+    } catch {
+      setBanner({ type: 'err', text: 'Could not download shipping slip.' })
+    }
+  }
+
+  const onDownloadSellerReceipt = () => {
+    setBanner(null)
+    try {
+      downloadSellerReceipt(order)
+    } catch {
+      setBanner({ type: 'err', text: 'Could not download receipt.' })
     }
   }
 
@@ -424,7 +465,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
           </div>
         </div>
         <p className={muted + ' text-[12px]'}>
-          {contextTitle} · Transaction reference <span className={'font-mono font-semibold ' + strong}>{order.id}</span>
+          {contextTitle} Â· Transaction reference <span className={'font-mono font-semibold ' + strong}>{order.id}</span>
         </p>
         {banner ? (
           <div
@@ -473,7 +514,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
               <div>
                 <p className={'text-[10px] font-bold uppercase tracking-wider ' + muted}>Customer</p>
                 <p className={'mt-1 text-[15px] font-bold ' + strong}>{customerDisplayName(order)}</p>
-                <p className={'mt-1 break-all text-[13px] ' + strong}>{order.email || '—'}</p>
+                <p className={'mt-1 break-all text-[13px] ' + strong}>{order.email || 'â€”'}</p>
                 {formatCell(ship.phone) ? <p className={'mt-1 text-[13px] ' + strong}>{formatCell(ship.phone)}</p> : null}
               </div>
               <div>
@@ -550,10 +591,14 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
                           ) : null}
                         </div>
                         <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 border-t border-black/5 pt-2 sm:pt-3">
-                          <p className={muted + ' text-[12px]'}>
-                            Qty <span className={'font-bold tabular-nums ' + strong}>{row.quantity}</span>
-                            <span className="mx-1.5">·</span>
-                            Unit <span className={'font-semibold ' + strong}>{row.unitPriceLabel}</span>
+                          <p className={muted + ' text-[12px] flex flex-wrap items-center gap-2'}>
+                            <span>
+                              Qty <span className={'font-bold tabular-nums ' + strong}>{row.quantity}</span>
+                            </span>
+                            <span className="text-[12px]">·</span>
+                            <span>
+                              Unit <span className={'font-semibold ' + strong}>{row.unitPriceLabel}</span>
+                            </span>
                           </p>
                           <p className={'text-[15px] font-bold tabular-nums ' + ad(theme, 'text-emerald-700', 'text-emerald-300')}>{formatNaira(row.lineTotalNgn)}</p>
                         </div>
@@ -582,7 +627,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
 
           <section className={'rounded-2xl border p-4 sm:p-5 ' + border + ' ' + panel}>
             <h2 className={'text-[11px] font-bold uppercase tracking-[0.12em] ' + muted}>Delivery</h2>
-            <p className={muted + ' mt-1 text-[12px]'}>Pending → preparing → delivered to the customer.</p>
+            <p className={muted + ' mt-1 text-[12px]'}>Pending â†’ preparing â†’ delivered to the customer.</p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
               <label className="block min-w-0 flex-1">
                 <span className={'mb-1 block text-[10px] font-bold uppercase tracking-wide ' + muted}>Status</span>
@@ -684,6 +729,35 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
           </div>
 
           <div className={'rounded-2xl border p-4 ' + border + ' ' + panel}>
+            <h2 className={'text-[11px] font-bold uppercase tracking-[0.12em] ' + muted}>Transfer screenshot</h2>
+            {!order.payment_proof_storage_path?.trim() ? (
+              <p className={muted + ' mt-2 text-[12px]'}>No payment screenshot on this order.</p>
+            ) : proofBusy ? (
+              <p className={muted + ' mt-2 text-[12px]'}>Loading imageâ€¦</p>
+            ) : !proofSignedUrl ? (
+              <p className={'mt-2 text-[12px] text-rose-700'}>Could not load payment proof.</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                <div className={'overflow-hidden rounded-xl border ' + border}>
+                  <img src={proofSignedUrl} alt="Customer payment screenshot" className="max-h-56 w-full object-contain" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <a href={proofSignedUrl} target="_blank" rel="noopener noreferrer" className={quickBtn + ' py-2 text-[11px] no-underline'}>
+                    Open full size
+                  </a>
+                  <a
+                    href={proofSignedUrl}
+                    download={`tobilicious-order-${order.id.slice(0, 8)}-payment`}
+                    className={ghostBtn + ' py-2 text-[11px] no-underline'}
+                  >
+                    Download
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className={'rounded-2xl border p-4 ' + border + ' ' + panel}>
             <div className="flex items-start justify-between gap-2">
               <h2 className={'text-[11px] font-bold uppercase tracking-[0.12em] ' + muted}>Deliver to</h2>
               <button
@@ -696,7 +770,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
                 Copy
               </button>
             </div>
-            <p className={'mt-3 whitespace-pre-line break-words text-[13px] leading-relaxed ' + strong}>{deliverText || '—'}</p>
+            <p className={'mt-3 whitespace-pre-line break-words text-[13px] leading-relaxed ' + strong}>{deliverText || 'â€”'}</p>
           </div>
 
           <div className={'rounded-2xl border p-4 ' + border + ' ' + panel}>
@@ -707,6 +781,10 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
                 <span className="material-symbols-outlined text-[18px] font-light">print</span>
                 Print shipping slip
               </button>
+              <button type="button" onClick={onDownloadShippingSlip} className={ghostBtn + ' justify-center py-2.5'}>
+                <span className="material-symbols-outlined text-[18px] font-light">download</span>
+                Download slip
+              </button>
               <button
                 type="button"
                 disabled={cancelled || slipBusy}
@@ -714,13 +792,13 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
                 className={quickBtn + ' justify-center py-2.5'}
               >
                 <span className="material-symbols-outlined text-[18px] font-light">check_circle</span>
-                {slipBusy ? 'Saving…' : 'Confirm slip printed'}
+                {slipBusy ? 'Saving...' : 'Confirm slip printed'}
               </button>
             </div>
             <p className={'mt-3 text-[12px] leading-relaxed ' + (slipPrintedLabel ? strong : muted)}>
               {slipPrintedLabel ? (
                 <>
-                  <span className={muted + ' font-bold uppercase tracking-wide'}>Printed · </span>
+                  <span className={muted + ' font-bold uppercase tracking-wide'}>Printed Â· </span>
                   {slipPrintedLabel}
                 </>
               ) : (
@@ -728,8 +806,20 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
               )}
             </p>
           </div>
+
+          <div className={'rounded-2xl border p-4 ' + border + ' ' + panel}>
+            <h2 className={'text-[11px] font-bold uppercase tracking-[0.12em] ' + muted}>Order receipts</h2>
+            <p className={muted + ' mt-1 text-[12px]'}>Download for records and customer copy.</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <button type="button" onClick={onDownloadSellerReceipt} className={ghostBtn + ' justify-center py-2.5'}>
+                <span className="material-symbols-outlined text-[18px] font-light">receipt_long</span>
+                Download full receipt
+              </button>
+            </div>
+          </div>
         </aside>
       </div>
     </div>
   )
 }
+

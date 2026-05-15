@@ -4,15 +4,15 @@ import { fetchOrdersForAdmin } from '../../lib/adminOrders.ts'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import {
   countAndRevenue,
-  effectiveDeliveryStatus,
   filterOrdersByRange,
   orderIsOpenPipeline,
+  orderIsPaymentPaid,
   orderIsSettledComplete,
   type DateRangeFilter,
 } from '../../lib/adminOrderAnalytics.ts'
 import { firstLineItemDisplayableImage } from '../../lib/adminOrderLineSnapshots.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { AdminRangeTabs, AdminStatusBucketTabs, adminDeliveryPillClass, type AdminOrderBucket } from './adminRangeTabs.tsx'
+import { AdminRangeTabs, AdminStatusBucketTabs, adminPaymentPillClass, type AdminOrderBucket } from './adminRangeTabs.tsx'
 import { OrderRelativeTime } from './OrderRelativeTime.tsx'
 import { ad, adminFont } from './adminUi.ts'
 import { printOrdersStatement } from './statementPrint.ts'
@@ -266,8 +266,8 @@ export function AdminTransactionsPage() {
                 </div>
                 <div className="shrink-0 text-right">
                   <p className={ad(theme, 'text-lg font-bold tabular-nums text-emerald-700', 'text-lg font-bold tabular-nums text-emerald-300')}>{formatNaira(Number(o.total_ngn) || 0)}</p>
-                  <span className={'mt-1 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ' + adminDeliveryPillClass(effectiveDeliveryStatus(o), theme)}>
-                    {effectiveDeliveryStatus(o)}
+                  <span className={'mt-1 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ' + adminPaymentPillClass(orderIsPaymentPaid(o), theme)}>
+                    {orderIsPaymentPaid(o) ? 'paid' : 'unpaid'}
                   </span>
                 </div>
               </div>
@@ -320,8 +320,8 @@ export function AdminTransactionsPage() {
                       {formatNaira(Number(o.total_ngn) || 0)}
                     </td>
                     <td className={td}>
-                      <span className={'inline-block rounded-full px-2.5 py-1 text-[11px] font-bold capitalize ' + adminDeliveryPillClass(effectiveDeliveryStatus(o), theme)}>
-                        {effectiveDeliveryStatus(o)}
+                      <span className={'inline-block rounded-full px-2.5 py-1 text-[11px] font-bold capitalize ' + adminPaymentPillClass(orderIsPaymentPaid(o), theme)}>
+                        {orderIsPaymentPaid(o) ? 'paid' : 'unpaid'}
                       </span>
                     </td>
                     <td className={td}>

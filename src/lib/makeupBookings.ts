@@ -17,9 +17,12 @@ export type MakeupBookingRow = {
   skin_type: string
   allergies: string
   notes: string
+  payment_proof_storage_path?: string | null
 }
 
 export type MakeupBookingPayload = {
+  /** Client-generated UUID so the payment screenshot is uploaded under this folder before insert. */
+  id: string
   source: 'landing' | 'makeup'
   service_name: string
   service_price: string
@@ -32,15 +35,23 @@ export type MakeupBookingPayload = {
   skin_type: string
   allergies: string
   notes: string
+  payment_proof_storage_path: string
 }
 
 export async function insertMakeupBooking(
   payload: MakeupBookingPayload,
 ): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) return { ok: false, message: 'Booking is not available (server not configured).' }
+  const bookingId = payload.id.trim()
+  const proofPath = payload.payment_proof_storage_path.trim()
+  if (!bookingId || !proofPath) {
+    return { ok: false, message: 'Could not save booking. Please refresh and try again.' }
+  }
+
   const { data, error } = await getSupabase()
     .from('makeup_bookings')
     .insert({
+      id: bookingId,
       source: payload.source,
       service_name: payload.service_name,
       service_price: payload.service_price,
@@ -53,6 +64,7 @@ export async function insertMakeupBooking(
       skin_type: payload.skin_type,
       allergies: payload.allergies,
       notes: payload.notes,
+      payment_proof_storage_path: proofPath,
       status: 'pending',
     })
     .select('id')

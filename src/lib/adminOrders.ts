@@ -18,6 +18,7 @@ export type AdminOrderRow = {
   delivery_status?: string | null
   created_at: string
   shipping_slip_printed_at?: string | null
+  payment_proof_storage_path?: string | null
 }
 
 export async function fetchOrdersForAdmin(limit = 500): Promise<AdminOrderRow[]> {

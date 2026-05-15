@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { MakeupBookingDateTimePick } from "../../components/MakeupBookingDateTimePick.tsx";
+import { BookingPaymentProofFields } from "../../components/BookingPaymentProofFields.tsx";
 import { BookingTransferDetailsCard } from "../../components/BookingTransferDetailsCard.tsx";
 import { ProductCard } from "../../components/ProductCard.tsx";
 import {
@@ -21,7 +22,9 @@ import {
   bookableServiceFromPhotoshootLine,
 } from "../../data/bookingServices.ts";
 import { BOOKING_TRANSFER_DEMO } from "../../data/bookingTransferDetails.ts";
+import { validateLandingBookingDetails } from "../../lib/bookingFormValidation.ts";
 import { formatBookingDateLabel } from "../../lib/makeupBookingDates.ts";
+import { uploadMakeupBookingPaymentProof } from "../../lib/makeupBookingPaymentProof.ts";
 import { insertMakeupBooking } from "../../lib/makeupBookings.ts";
 import {
   fetchPublicMakeupAvailability,
@@ -173,6 +176,8 @@ export function LandingPage() {
   const [bookingNotes, setBookingNotes] = useState("");
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [availabilityRules, setAvailabilityRules] = useState<
     MakeupAvailabilityRuleRow[]
   >([]);
@@ -313,16 +318,38 @@ export function LandingPage() {
     const name = customerName.trim();
     const phone = customerPhone.trim();
     const email = customerEmail.trim();
-    if (!name || !phone || !email) {
-      setBookingError(
-        "Please complete your details (name, phone, and email) on the previous step.",
-      );
+    const detailErr = validateLandingBookingDetails({
+      name: customerName,
+      phone: customerPhone,
+      email: customerEmail,
+      location: customerLocation,
+      skinType,
+      allergies,
+    });
+    if (detailErr) {
+      setBookingError(detailErr);
       goToStep(3);
       return;
     }
 
+    if (!paymentProofFile || !paymentConfirmed) {
+      setBookingError(
+        'Upload a payment screenshot and tick "I\'ve made payment" to submit your booking.',
+      );
+      return;
+    }
+
     setBookingSubmitting(true);
+    const bookingId = crypto.randomUUID();
+    const up = await uploadMakeupBookingPaymentProof(bookingId, paymentProofFile);
+    if (up.ok === false) {
+      setBookingSubmitting(false);
+      setBookingError(up.message);
+      return;
+    }
+
     const res = await insertMakeupBooking({
+      id: bookingId,
       source: "landing",
       service_name: selectedService.name,
       service_price: selectedService.price,
@@ -335,6 +362,7 @@ export function LandingPage() {
       skin_type: skinType.trim(),
       allergies: allergies.trim(),
       notes: bookingNotes.trim(),
+      payment_proof_storage_path: up.path,
     });
     setBookingSubmitting(false);
 
@@ -343,6 +371,8 @@ export function LandingPage() {
       return;
     }
 
+    setPaymentProofFile(null);
+    setPaymentConfirmed(false);
     setSuccessDetails({
       service: selectedService.name || "Studio Session",
       date: preferredDateLabel,
@@ -360,6 +390,8 @@ export function LandingPage() {
   const resetSuccess = () => {
     setShowSuccess(false);
     setBookingError(null);
+    setPaymentProofFile(null);
+    setPaymentConfirmed(false);
     scrollToBooking();
   };
 
@@ -1266,7 +1298,21 @@ export function LandingPage() {
                   <button
                     type="button"
                     className="inline-flex items-center gap-2.5 rounded-full bg-tle-charcoal px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-pink"
-                    onClick={() => goToStep(4)}
+                    onClick={() => {
+                      const err = validateLandingBookingDetails({
+                        name: customerName,
+                        phone: customerPhone,
+                        email: customerEmail,
+                        location: customerLocation,
+                        skinType,
+                        allergies,
+                      });
+                      if (err) {
+                        setBookingError(err);
+                        return;
+                      }
+                      goToStep(4);
+                    }}
                   >
                     Review Booking
                     <span className="material-symbols-outlined text-lg">
@@ -1317,20 +1363,35 @@ export function LandingPage() {
 
                 <BookingTransferDetailsCard
                   details={BOOKING_TRANSFER_DEMO}
-                  className="mb-10"
+                  className="mb-6"
+                />
+
+                <BookingPaymentProofFields
+                  file={paymentProofFile}
+                  onFileChange={setPaymentProofFile}
+                  confirmed={paymentConfirmed}
+                  onConfirmedChange={setPaymentConfirmed}
                 />
 
                 <div className="mt-10 flex items-center justify-between gap-4">
                   <button
                     type="button"
                     className="rounded-full border-[1.5px] border-black/10 bg-transparent px-8 py-3.5 font-sans text-xs font-semibold tracking-wide text-tle-muted uppercase transition-colors hover:border-tle-ink hover:text-tle-ink"
-                    onClick={() => goToStep(3)}
+                    onClick={() => {
+                      setPaymentProofFile(null);
+                      setPaymentConfirmed(false);
+                      goToStep(3);
+                    }}
                   >
                     Back
                   </button>
                   <button
                     type="button"
-                    disabled={bookingSubmitting}
+                    disabled={
+                      bookingSubmitting ||
+                      !paymentProofFile ||
+                      !paymentConfirmed
+                    }
                     className="inline-flex items-center gap-2.5 rounded-full bg-tle-pink px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-deep disabled:cursor-not-allowed disabled:opacity-60"
                     onClick={() => void confirmBooking()}
                   >

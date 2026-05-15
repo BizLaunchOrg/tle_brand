@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { getMakeupBookingPaymentProofSignedUrl } from '../../lib/makeupBookingPaymentProof.ts'
 import {
   fetchMakeupBookingByIdForAdmin,
   fetchMakeupBookingsForAdmin,
@@ -37,6 +38,8 @@ export function AdminMakeupBookingsPage() {
   const [actionMsg, setActionMsg] = useState<string | null>(null)
   const [detailRow, setDetailRow] = useState<MakeupBookingRow | null>(null)
   const [copyHint, setCopyHint] = useState<string | null>(null)
+  const [proofSignedUrl, setProofSignedUrl] = useState<string | null>(null)
+  const [proofBusy, setProofBusy] = useState(false)
   const openedFromQueryRef = useRef<string | null>(null)
 
   const load = useCallback(async () => {
@@ -101,6 +104,26 @@ export function AdminMakeupBookingsPage() {
     const t = window.setTimeout(() => setCopyHint(null), 2000)
     return () => window.clearTimeout(t)
   }, [copyHint])
+
+  useEffect(() => {
+    const path = detailRow?.payment_proof_storage_path?.trim()
+    if (!path) {
+      setProofSignedUrl(null)
+      setProofBusy(false)
+      return
+    }
+    let cancelled = false
+    setProofBusy(true)
+    setProofSignedUrl(null)
+    void getMakeupBookingPaymentProofSignedUrl(path, 3600).then((url) => {
+      if (cancelled) return
+      setProofSignedUrl(url)
+      setProofBusy(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [detailRow?.payment_proof_storage_path])
 
   const filtered = useMemo(() => {
     const byStatus = rows.filter((r) => r.status === tab)
@@ -332,6 +355,62 @@ export function AdminMakeupBookingsPage() {
             </section>
 
             <section>
+              <h3 className={muted + ' mb-2 text-[10px] font-bold uppercase tracking-wide'}>Payment receipt</h3>
+              {!r.payment_proof_storage_path?.trim() ? (
+                <p className={muted + ' text-[13px] leading-relaxed'}>No payment screenshot for this request.</p>
+              ) : proofBusy ? (
+                <p className={muted + ' text-[13px]'}>Loading image…</p>
+              ) : !proofSignedUrl ? (
+                <p
+                  className={
+                    'text-[13px] leading-relaxed ' + ad(theme, 'text-rose-800', 'text-rose-300')
+                  }
+                >
+                  Could not load the receipt image. Confirm the storage bucket and admin policies are deployed.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  <div
+                    className={
+                      'overflow-hidden rounded-xl border ' + ad(theme, 'border-stone-200 bg-stone-50', 'border-neutral-700 bg-neutral-950/40')
+                    }
+                  >
+                    <img
+                      src={proofSignedUrl}
+                      alt="Customer payment screenshot"
+                      className="max-h-72 w-full object-contain"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={proofSignedUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={
+                        'inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold no-underline ' +
+                        ad(theme, 'bg-emerald-600 text-white hover:bg-emerald-700', 'bg-emerald-600 text-white hover:bg-emerald-500')
+                      }
+                    >
+                      <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                      Open full size
+                    </a>
+                    <a
+                      href={proofSignedUrl}
+                      download={`tle-booking-${r.id.slice(0, 8)}-receipt`}
+                      className={
+                        'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold no-underline ' +
+                        ad(theme, 'border-stone-200 bg-white text-stone-800 hover:bg-stone-50', 'border-neutral-600 bg-neutral-800 text-neutral-100 hover:bg-neutral-700')
+                      }
+                    >
+                      <span className="material-symbols-outlined text-[16px]">download</span>
+                      Download
+                    </a>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <section>
               <h3 className={muted + ' mb-2 text-[10px] font-bold uppercase tracking-wide'}>Client</h3>
               <p className={ad(theme, 'font-semibold text-stone-900', 'font-semibold text-neutral-100')}>{r.customer_name}</p>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -558,6 +637,12 @@ export function AdminMakeupBookingsPage() {
                 <th className={th}>Requested slot</th>
                 <th className={th}>Service</th>
                 <th className={th}>Client</th>
+                <th className={th + ' w-12 text-center'} title="Payment screenshot">
+                  <span className="sr-only">Receipt</span>
+                  <span className="material-symbols-outlined align-middle text-[18px] opacity-70" aria-hidden>
+                    receipt_long
+                  </span>
+                </th>
                 <th className={th + ' hidden md:table-cell'}>Source</th>
                 <th className={th + ' text-right'}>Actions</th>
               </tr>
@@ -565,13 +650,13 @@ export function AdminMakeupBookingsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className={td + ' py-14 text-center ' + muted}>
+                  <td colSpan={7} className={td + ' py-14 text-center ' + muted}>
                     Loading requests…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className={td + ' py-14 text-center ' + muted}>
+                  <td colSpan={7} className={td + ' py-14 text-center ' + muted}>
                     {query.trim() ? 'No results for this search in this tab.' : `No ${tab} requests.`}
                   </td>
                 </tr>
@@ -618,6 +703,19 @@ export function AdminMakeupBookingsPage() {
                         <p className={muted + ' max-w-[200px] truncate text-[12px] sm:max-w-[240px]'} title={r.customer_email}>
                           {r.customer_email}
                         </p>
+                      </td>
+                      <td className={td + ' text-center align-middle'}>
+                        {r.payment_proof_storage_path?.trim() ? (
+                          <span
+                            className="material-symbols-outlined text-[22px] text-emerald-600"
+                            title="Payment screenshot submitted"
+                            aria-label="Payment screenshot submitted"
+                          >
+                            receipt_long
+                          </span>
+                        ) : (
+                          <span className={muted + ' text-[12px]'}>—</span>
+                        )}
                       </td>
                       <td className={td + ' hidden md:table-cell ' + muted}>{sourceLabel(r.source)}</td>
                       <td className={td + ' text-right'} onClick={(e) => e.stopPropagation()}>

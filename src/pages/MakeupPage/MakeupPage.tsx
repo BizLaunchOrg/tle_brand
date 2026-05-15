@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { MakeupBookingDateTimePick } from '../../components/MakeupBookingDateTimePick.tsx'
+import { BookingPaymentProofFields } from '../../components/BookingPaymentProofFields.tsx'
+import { BookingTransferDetailsCard } from '../../components/BookingTransferDetailsCard.tsx'
 import {
   BOOKABLE_SERVICES,
   PHOTOSHOOT_PACKAGES,
@@ -8,13 +10,16 @@ import {
   isPhotoshootService,
 } from '../../data/bookingServices.ts'
 import type { BookableServiceItem } from '../../data/bookingServices.ts'
+import { validateMakeupBookingDetails } from '../../lib/bookingFormValidation.ts'
 import { formatBookingDateLabel } from '../../lib/makeupBookingDates.ts'
 import { insertMakeupBooking } from '../../lib/makeupBookings.ts'
+import { uploadMakeupBookingPaymentProof } from '../../lib/makeupBookingPaymentProof.ts'
 import {
   fetchPublicMakeupAvailability,
   type MakeupAvailabilityRuleRow,
   type MakeupCalendarDay,
 } from '../../lib/makeupAvailability.ts'
+import { BOOKING_TRANSFER_DEMO } from '../../data/bookingTransferDetails.ts'
 
 const TESTIMONIALS = [
   {
@@ -62,6 +67,8 @@ export function MakeupPage() {
   const [bookingNotes, setBookingNotes] = useState('')
   const [bookingError, setBookingError] = useState<string | null>(null)
   const [bookingSubmitting, setBookingSubmitting] = useState(false)
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null)
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false)
   const [bookingSuccessRef, setBookingSuccessRef] = useState<string | null>(null)
   const [availabilityRules, setAvailabilityRules] = useState<MakeupAvailabilityRuleRow[]>([])
   const [availabilityCalendar, setAvailabilityCalendar] = useState<MakeupCalendarDay[]>([])
@@ -105,14 +112,33 @@ export function MakeupPage() {
     const name = customerName.trim()
     const phone = customerPhone.trim()
     const email = customerEmail.trim()
-    if (!name || !phone || !email) {
-      setBookingError('Please add your name, phone, and email.')
+    const detailErr = validateMakeupBookingDetails({
+      name: customerName,
+      phone: customerPhone,
+      email: customerEmail,
+    })
+    if (detailErr) {
+      setBookingError(detailErr)
       goToStep(3)
       return
     }
 
+    if (!paymentProofFile || !paymentConfirmed) {
+      setBookingError('Upload a payment screenshot and tick "I\'ve made payment" to submit your booking.')
+      return
+    }
+
     setBookingSubmitting(true)
+    const bookingId = crypto.randomUUID()
+    const up = await uploadMakeupBookingPaymentProof(bookingId, paymentProofFile)
+    if (up.ok === false) {
+      setBookingSubmitting(false)
+      setBookingError(up.message)
+      return
+    }
+
     const res = await insertMakeupBooking({
+      id: bookingId,
       source: 'makeup',
       service_name: selectedService.name,
       service_price: selectedService.price,
@@ -125,6 +151,7 @@ export function MakeupPage() {
       skin_type: '',
       allergies: '',
       notes: bookingNotes.trim(),
+      payment_proof_storage_path: up.path,
     })
     setBookingSubmitting(false)
 
@@ -132,6 +159,8 @@ export function MakeupPage() {
       setBookingError(res.message)
       return
     }
+    setPaymentProofFile(null)
+    setPaymentConfirmed(false)
     setBookingSuccessRef(res.id.slice(0, 8).toUpperCase())
     setFormStep(1)
     setSelectedService(null)
@@ -482,7 +511,18 @@ export function MakeupPage() {
               <button
                 type="button"
                 className="rounded-full bg-tle-charcoal px-6 py-2.5 text-[11px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink"
-                onClick={() => goToStep(4)}
+                onClick={() => {
+                  const err = validateMakeupBookingDetails({
+                    name: customerName,
+                    phone: customerPhone,
+                    email: customerEmail,
+                  })
+                  if (err) {
+                    setBookingError(err)
+                    return
+                  }
+                  goToStep(4)
+                }}
               >
                 Continue
               </button>
@@ -509,17 +549,31 @@ export function MakeupPage() {
                 <span className="text-sm font-semibold text-tle-gold">{selectedService?.price || '—'}</span>
               </div>
             </div>
+
+            <BookingTransferDetailsCard details={BOOKING_TRANSFER_DEMO} className="mb-6 mt-6" />
+
+            <BookingPaymentProofFields
+              file={paymentProofFile}
+              onFileChange={setPaymentProofFile}
+              confirmed={paymentConfirmed}
+              onConfirmedChange={setPaymentConfirmed}
+            />
+
             <div className="mt-5 flex items-center justify-between">
               <button
                 type="button"
                 className="rounded-full border border-black/10 px-5 py-2.5 text-[11px] font-semibold tracking-wide text-tle-muted uppercase"
-                onClick={() => goToStep(3)}
+                onClick={() => {
+                  setPaymentProofFile(null)
+                  setPaymentConfirmed(false)
+                  goToStep(3)
+                }}
               >
                 Back
               </button>
               <button
                 type="button"
-                disabled={bookingSubmitting}
+                disabled={bookingSubmitting || !paymentProofFile || !paymentConfirmed}
                 className="rounded-full bg-tle-pink px-6 py-2.5 text-[11px] font-semibold tracking-wide text-white uppercase transition-colors hover:bg-tle-deep disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={() => void confirmMakeupBooking()}
               >

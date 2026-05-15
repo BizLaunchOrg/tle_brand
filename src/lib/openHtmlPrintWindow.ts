@@ -16,7 +16,32 @@ export function openHtmlPrintWindow(html: string): boolean {
       if (!doc?.body?.innerHTML?.trim()) return
       printed = true
       w.focus()
-      w.print()
+
+      const imgs = [...doc.images]
+      if (imgs.length === 0) {
+        w.print()
+        return
+      }
+
+      void Promise.all(
+        imgs.map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete) {
+                resolve()
+                return
+              }
+              img.addEventListener('load', () => resolve(), { once: true })
+              img.addEventListener('error', () => resolve(), { once: true })
+            }),
+        ),
+      ).then(() => {
+        try {
+          w.print()
+        } catch {
+          /* ignore */
+        }
+      })
     } catch {
       /* ignore */
     }
