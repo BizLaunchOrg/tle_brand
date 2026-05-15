@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import { ShopProductsProvider } from './context/ShopProductsContext.tsx'
 import { MainLayout } from './components/MainLayout.tsx'
@@ -29,6 +30,7 @@ function App() {
   return (
     <AuthProvider>
       <ShopProductsProvider>
+      <Toaster position="top-right" reverseOrder={false} />
       <Routes>
         <Route path="/" element={<MainLayout />}>
           <Route index element={<LandingPage />} />

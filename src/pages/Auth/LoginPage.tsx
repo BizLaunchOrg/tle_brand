@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { toast } from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 
 export function LoginPage() {
@@ -12,7 +13,6 @@ export function LoginPage() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -22,17 +22,17 @@ export function LoginPage() {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError(null)
     setBusy(true)
     try {
       const result = await login(email, password)
       if (!result.ok) {
-        setError(result.message)
+        toast.error(result.message)
         return
       }
+      toast.success('Signed in successfully')
       navigate(safeFrom, { replace: true })
     } catch {
-      setError('Unable to sign in right now. Please try again.')
+      toast.error('Unable to sign in right now. Please try again.')
     } finally {
       setBusy(false)
     }
@@ -64,14 +64,6 @@ export function LoginPage() {
               role="status"
             >
               {authNotice}
-            </p>
-          ) : null}
-          {error ? (
-            <p
-              className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-              role="alert"
-            >
-              {error}
             </p>
           ) : null}
 

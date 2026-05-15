@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-hot-toast'
 import { fetchOrdersForAdmin, updateOrderDeliveryStatus } from '../../lib/adminOrders.ts'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import {
@@ -16,6 +17,7 @@ import { useAdminTheme } from './AdminThemeContext.tsx'
 import { adminDeliveryPillClass, adminPaymentPillClass } from './adminRangeTabs.tsx'
 import { ad, adminFont } from './adminUi.ts'
 import { OrderRelativeTime } from './OrderRelativeTime.tsx'
+import { OfflineOrderModal } from './OfflineOrderModal.tsx'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
@@ -73,13 +75,13 @@ export function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState<DateRangeFilter>('today')
-  const [listTab, setListTab] = useState<'all' | 'attention'>('all')
+  const [listTab, setListTab] = useState<'all' | 'attention' | 'offline'>('all')
   const [deliveryFilter, setDeliveryFilter] = useState<string>('all')
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [updating, setUpdating] = useState<string | null>(null)
-  const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [offlineModalOpen, setOfflineModalOpen] = useState(false)
   const load = async () => {
     setOrders(await fetchOrdersForAdmin(500))
     setLoading(false)
@@ -97,6 +99,7 @@ export function AdminOrdersPage() {
     let completedNgn = 0
     let awaitingDeliveryNgn = 0
     let awaitingDeliveryCount = 0
+    let offlineCount = 0
     for (const o of ranged) {
       const t = Number(o.total_ngn) || 0
       if (orderIsSettledComplete(o)) completedNgn += t
@@ -104,18 +107,27 @@ export function AdminOrdersPage() {
         awaitingDeliveryNgn += t
         awaitingDeliveryCount += 1
       }
+      const ship = o.shipping && typeof o.shipping === 'object' ? (o.shipping as Record<string, unknown>) : {}
+      if (ship.isOffline === true) offlineCount += 1
     }
     return {
       totalCount: ranged.length,
       completedNgn,
       awaitingDeliveryNgn,
       awaitingDeliveryCount,
+      offlineCount,
     }
   }, [ranged])
 
   const filtered = useMemo(() => {
     let rows = ranged
     if (listTab === 'attention') rows = rows.filter((o) => orderIsPaidAwaitingDelivery(o))
+    if (listTab === 'offline') {
+      rows = rows.filter((o) => {
+        const ship = o.shipping && typeof o.shipping === 'object' ? (o.shipping as Record<string, unknown>) : {}
+        return ship.isOffline === true
+      })
+    }
     if (deliveryFilter !== 'all') rows = rows.filter((o) => effectiveDeliveryStatus(o) === deliveryFilter)
     if (paymentFilter === 'paid') rows = rows.filter((o) => orderIsPaymentPaid(o))
     if (paymentFilter === 'unpaid') rows = rows.filter((o) => !orderIsCancelled(o) && !orderIsPaymentPaid(o))
@@ -162,15 +174,13 @@ export function AdminOrdersPage() {
 
   const onDeliveryChange = async (orderId: string, delivery: (typeof DELIVERY_OPTIONS)[number]) => {
     setUpdating(orderId)
-    setBanner(null)
     const res = await updateOrderDeliveryStatus(orderId, delivery)
     setUpdating(null)
     if (res.ok) {
-      setBanner({ type: 'ok', text: 'Delivery updated.' })
+      toast.success('Delivery updated')
       await load()
-      window.setTimeout(() => setBanner(null), 3200)
     } else {
-      setBanner({ type: 'err', text: res.message })
+      toast.error(res.message)
     }
   }
 
@@ -212,6 +222,17 @@ export function AdminOrdersPage() {
             when checkout completes (no card gateway yet). Open a row for full details.
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setOfflineModalOpen(true)}
+          className={
+            'inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[14px] font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] ' +
+            ad(theme, 'bg-stone-900 text-white hover:bg-stone-800', 'bg-emerald-600 text-white hover:bg-emerald-500')
+          }
+        >
+          <span className="material-symbols-outlined text-[20px]">add_shopping_cart</span>
+          Upload Offline Sale
+        </button>
       </div>
 
       {attentionCount > 0 ? (
@@ -240,22 +261,7 @@ export function AdminOrdersPage() {
         </div>
       ) : null}
 
-      {banner ? (
-        <div
-          role="status"
-          className={
-            'mt-4 flex items-center gap-2 rounded-2xl border px-4 py-3 text-[13px] font-medium ' +
-            (banner.type === 'ok'
-              ? ad(theme, 'border-emerald-200 bg-emerald-50 text-emerald-900', 'border-emerald-800/50 bg-emerald-950/40 text-emerald-200')
-              : ad(theme, 'border-rose-200 bg-rose-50 text-rose-900', 'border-rose-900/40 bg-rose-950/30 text-rose-200'))
-          }
-        >
-          <span className="material-symbols-outlined text-[20px] font-light">{banner.type === 'ok' ? 'check_circle' : 'error'}</span>
-          {banner.text}
-        </div>
-      ) : null}
-
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className={'rounded-2xl border p-4 ' + cardWrap}>
           <div className="flex items-center justify-between gap-2">
             <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-wider text-stone-500', 'text-[10px] font-bold uppercase tracking-wider text-neutral-500')}>Total orders</p>
@@ -281,6 +287,14 @@ export function AdminOrdersPage() {
           <p className={muted + ' mt-1 text-[11px]'}>
             {stats.awaitingDeliveryCount} paid, not yet delivered
           </p>
+        </div>
+        <div className={'rounded-2xl border p-4 ' + cardWrap}>
+          <div className="flex items-center justify-between gap-2">
+            <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-wider text-stone-500', 'text-[10px] font-bold uppercase tracking-wider text-neutral-500')}>Offline Sales</p>
+            <span className="material-symbols-outlined text-[22px] font-light text-sky-600">share</span>
+          </div>
+          <p className={'mt-2 text-2xl font-bold tabular-nums ' + ad(theme, 'text-stone-900', 'text-white')}>{stats.offlineCount}</p>
+          <p className={muted + ' mt-1 text-[11px]'}>Uploaded from social media</p>
         </div>
       </div>
 
@@ -337,6 +351,20 @@ export function AdminOrdersPage() {
                     {attentionCount > 9 ? '9+' : attentionCount}
                   </span>
                 ) : null}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={listTab === 'offline'}
+                onClick={() => setListTab('offline')}
+                className={
+                  'rounded-md px-3 py-1.5 text-[12px] font-bold transition sm:px-4 sm:py-2 sm:text-[13px] ' +
+                  (listTab === 'offline'
+                    ? ad(theme, 'bg-emerald-600 text-white shadow-sm', 'bg-emerald-600 text-white shadow-sm')
+                    : ad(theme, 'text-stone-600 hover:bg-white/70', 'text-neutral-400 hover:bg-neutral-700/80'))
+                }
+              >
+                Offline
               </button>
             </div>
           </div>
@@ -474,12 +502,34 @@ export function AdminOrdersPage() {
                         <input type="checkbox" className="rounded border-stone-300" checked={selected.has(o.id)} onChange={() => toggleRow(o.id)} onClick={(e) => e.stopPropagation()} />
                       </td>
                       <td className={td + ' min-w-0'}>
-                        <p className={'break-words font-semibold leading-snug ' + ad(theme, 'text-stone-900', 'text-white')}>
-                          <span className={'font-mono text-[11px] ' + ad(theme, 'text-stone-500', 'text-neutral-400')}>{orderRefShort(o.id)}</span>
-                          <span className={ad(theme, 'text-stone-400', 'text-neutral-500')}> · </span>
-                          {name}
-                        </p>
-                        <p className={'mt-0.5 line-clamp-2 break-words text-[11px] leading-snug ' + muted}>{summary}</p>
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className={'break-words font-semibold leading-snug ' + ad(theme, 'text-stone-900', 'text-white')}>
+                              <span className={'font-mono text-[11px] ' + ad(theme, 'text-stone-500', 'text-neutral-400')}>{orderRefShort(o.id)}</span>
+                              <span className={ad(theme, 'text-stone-400', 'text-neutral-500')}> · </span>
+                              {name}
+                            </p>
+                            <p className={'mt-0.5 line-clamp-2 break-words text-[11px] leading-snug ' + muted}>{summary}</p>
+                          </div>
+                          {(() => {
+                            const ship = o.shipping && typeof o.shipping === 'object' ? (o.shipping as Record<string, unknown>) : {}
+                            if (ship.isOffline !== true) return null
+                            const src = String(ship.source || 'other')
+                            const icon = src === 'whatsapp' ? 'https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg' :
+                                        src === 'instagram' ? 'https://upload.wikimedia.org/wikipedia/commons/e/e7/Instagram_logo_2016.svg' :
+                                        src === 'facebook' ? 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg' :
+                                        src === 'tiktok' ? 'https://upload.wikimedia.org/wikipedia/en/a/a9/TikTok_logo.svg' : null
+                            return (
+                              <div className="mt-0.5 shrink-0" title={`Offline Sale: ${src}`}>
+                                {icon ? (
+                                  <img src={icon} alt={src} className="size-3.5 opacity-80" />
+                                ) : (
+                                  <span className="material-symbols-outlined text-[16px] text-stone-400">share</span>
+                                )}
+                              </div>
+                            )
+                          })()}
+                        </div>
                       </td>
                       <td className={td + ' text-right text-[12px] font-bold tabular-nums sm:text-[13px] ' + ad(theme, 'text-emerald-700', 'text-emerald-300')}>
                         {formatNaira(Number(o.total_ngn) || 0)}
@@ -538,8 +588,30 @@ export function AdminOrdersPage() {
                       ad(theme, 'border-stone-100 bg-white/80 hover:bg-white', 'border-neutral-800 bg-neutral-950/40 hover:bg-neutral-900/50')
                     }
                   >
-                    <p className={'font-mono text-[11px] ' + muted}>{orderRefShort(o.id)}</p>
-                    <p className={'text-[15px] font-semibold ' + ad(theme, 'text-stone-900', 'text-white')}>{customerDisplayName(o)}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className={'font-mono text-[11px] ' + muted}>{orderRefShort(o.id)}</p>
+                        <p className={'text-[15px] font-semibold ' + ad(theme, 'text-stone-900', 'text-white')}>{customerDisplayName(o)}</p>
+                      </div>
+                      {(() => {
+                        const ship = o.shipping && typeof o.shipping === 'object' ? (o.shipping as Record<string, unknown>) : {}
+                        if (ship.isOffline !== true) return null
+                        const src = String(ship.source || 'other')
+                        const icon = src === 'whatsapp' ? 'https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg' :
+                                    src === 'instagram' ? 'https://upload.wikimedia.org/wikipedia/commons/e/e7/Instagram_logo_2016.svg' :
+                                    src === 'facebook' ? 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg' :
+                                    src === 'tiktok' ? 'https://upload.wikimedia.org/wikipedia/en/a/a9/TikTok_logo.svg' : null
+                        return (
+                          <div className="shrink-0 rounded-lg border p-1.5 bg-white/50 dark:bg-black/20">
+                            {icon ? (
+                              <img src={icon} alt={src} className="size-4" />
+                            ) : (
+                              <span className="material-symbols-outlined text-[18px] text-stone-400">share</span>
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </div>
                     <p className={'mt-0.5 line-clamp-2 text-[12px] ' + muted}>{orderLineSummary(o.line_items)}</p>
                     <p className={'mt-2 text-lg font-bold tabular-nums ' + ad(theme, 'text-emerald-700', 'text-emerald-300')}>{formatNaira(Number(o.total_ngn) || 0)}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -571,6 +643,15 @@ export function AdminOrdersPage() {
           )}
         </div>
       </div>
+
+      {offlineModalOpen && (
+        <OfflineOrderModal
+          onClose={() => setOfflineModalOpen(false)}
+          onSuccess={() => {
+            void load()
+          }}
+        />
+      )}
     </div>
   )
 }
