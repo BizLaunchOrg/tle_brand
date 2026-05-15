@@ -17,7 +17,6 @@ import { useAdminTheme } from './AdminThemeContext.tsx'
 import { adminDeliveryPillClass, adminPaymentPillClass } from './adminRangeTabs.tsx'
 import { ad, adminFont } from './adminUi.ts'
 import { OrderRelativeTime } from './OrderRelativeTime.tsx'
-import { OfflineOrderModal } from './OfflineOrderModal.tsx'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
@@ -81,7 +80,6 @@ export function AdminOrdersPage() {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [updating, setUpdating] = useState<string | null>(null)
-  const [offlineModalOpen, setOfflineModalOpen] = useState(false)
   const load = async () => {
     setOrders(await fetchOrdersForAdmin(500))
     setLoading(false)
@@ -224,7 +222,7 @@ export function AdminOrdersPage() {
         </div>
         <button
           type="button"
-          onClick={() => setOfflineModalOpen(true)}
+          onClick={() => navigate('/admin/orders/record')}
           className={
             'inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[14px] font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] ' +
             ad(theme, 'bg-stone-900 text-white hover:bg-stone-800', 'bg-emerald-600 text-white hover:bg-emerald-500')
@@ -643,15 +641,6 @@ export function AdminOrdersPage() {
           )}
         </div>
       </div>
-
-      {offlineModalOpen && (
-        <OfflineOrderModal
-          onClose={() => setOfflineModalOpen(false)}
-          onSuccess={() => {
-            void load()
-          }}
-        />
-      )}
     </div>
   )
 }
