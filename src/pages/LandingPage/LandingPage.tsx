@@ -20,6 +20,7 @@ import {
   MAKEUP_HIGHLIGHT_TAGS,
   PHOTOSHOOT_PACKAGES,
   bookableServiceFromPhotoshootLine,
+  isLocationRequiredForService,
 } from "../../data/bookingServices.ts";
 import { BOOKING_TRANSFER_DEMO } from "../../data/bookingTransferDetails.ts";
 import { validateLandingBookingDetails } from "../../lib/bookingFormValidation.ts";
@@ -169,10 +170,7 @@ export function LandingPage() {
   });
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
   const [customerLocation, setCustomerLocation] = useState("");
-  const [skinType, setSkinType] = useState("");
-  const [allergies, setAllergies] = useState("");
   const [bookingNotes, setBookingNotes] = useState("");
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
@@ -317,9 +315,8 @@ export function LandingPage() {
     }
     const name = customerName.trim();
     const phone = customerPhone.trim();
-    const isLocationRequired = !selectedService.name.toLowerCase().includes("studio") && 
-                              !selectedService.name.toLowerCase().includes("photoshoot");
-    
+    const isLocationRequired = isLocationRequiredForService(selectedService.name);
+
     const detailErr = validateLandingBookingDetails({
       name: customerName,
       phone: customerPhone,
@@ -357,10 +354,10 @@ export function LandingPage() {
       preferred_time: selectedTime,
       customer_name: name,
       customer_phone: phone,
-      customer_email: "", // Removed from form
-      location_venue: customerLocation.trim(),
-      skin_type: "", // Removed from form
-      allergies: "", // Removed from form
+      customer_email: "",
+      location_venue: isLocationRequired ? customerLocation.trim() : "",
+      skin_type: "",
+      allergies: "",
       notes: bookingNotes.trim(),
       payment_proof_storage_path: up.path,
     });
@@ -1218,11 +1215,7 @@ export function LandingPage() {
                       autoComplete="tel"
                     />
                   </div>
-                  {(() => {
-                    const isStudio = selectedService.name.toLowerCase().includes("studio") || 
-                                    selectedService.name.toLowerCase().includes("photoshoot");
-                    if (isStudio) return null;
-                    return (
+                  {isLocationRequiredForService(selectedService.name) ? (
                       <div className="flex flex-col gap-2 md:col-span-2">
                         <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
                           Location / Venue
@@ -1235,8 +1228,7 @@ export function LandingPage() {
                           placeholder="Your address or venue name"
                         />
                       </div>
-                    );
-                  })()}
+                  ) : null}
                 </div>
                 <div className="mt-4 flex flex-col gap-2">
                   <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
@@ -1261,8 +1253,9 @@ export function LandingPage() {
                     type="button"
                     className="inline-flex items-center gap-2.5 rounded-full bg-tle-charcoal px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-pink"
                     onClick={() => {
-                      const isLocationRequired = !selectedService.name.toLowerCase().includes("studio") && 
-                                                !selectedService.name.toLowerCase().includes("photoshoot");
+                      const isLocationRequired = isLocationRequiredForService(
+                        selectedService.name,
+                      );
                       const err = validateLandingBookingDetails({
                         name: customerName,
                         phone: customerPhone,
@@ -1381,8 +1374,8 @@ export function LandingPage() {
             You&apos;re All Booked! 🎉
           </h2>
           <p className="mb-10 max-w-[440px] text-center text-[15px] leading-relaxed text-tle-muted">
-            Your session is confirmed. Check your email for a full summary and
-            reminder. We can&apos;t wait to see you!
+            Your session is confirmed. We&apos;ll reach out on the phone number you
+            provided. We can&apos;t wait to see you!
           </p>
           <div className="mb-9 w-full max-w-[480px] rounded-[20px] border border-tle-gold/20 bg-white px-8 py-8">
             {[

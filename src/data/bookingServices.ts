@@ -70,3 +70,14 @@ export function isPhotoshootService(name: string): boolean {
   const s = BOOKABLE_SERVICES.find((x) => x.name === name)
   return s?.duration === 'Photoshoot'
 }
+
+export function isStudioSessionService(name: string): boolean {
+  return name.trim() === 'Studio Session'
+}
+
+/** Home / bridal need a venue; studio and photoshoot packages do not. */
+export function isLocationRequiredForService(name: string): boolean {
+  const trimmed = name.trim()
+  if (!trimmed) return false
+  return !isStudioSessionService(trimmed) && !isPhotoshootService(trimmed)
+}

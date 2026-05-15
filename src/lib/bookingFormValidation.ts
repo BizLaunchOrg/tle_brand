@@ -1,5 +1,3 @@
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
 function phoneDigitsLen(phone: string): number {
   return phone.replace(/\D/g, "").length
 }
@@ -21,17 +19,14 @@ export function validateLandingBookingDetails(params: {
   return null
 }
 
-/** Makeup page booking — name, phone, email only. */
+/** Makeup page booking — name and phone only. */
 export function validateMakeupBookingDetails(params: {
   name: string
   phone: string
-  email: string
 }): string | null {
   if (!params.name.trim()) return "Please enter your full name."
   if (phoneDigitsLen(params.phone) < 7) {
     return "Please enter a valid phone number (at least 7 digits)."
   }
-  const em = params.email.trim()
-  if (!em || !EMAIL_RE.test(em)) return "Please enter a valid email address."
   return null
 }

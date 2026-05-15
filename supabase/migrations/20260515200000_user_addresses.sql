@@ -18,6 +18,11 @@ create index if not exists user_addresses_user_id_idx on public.user_addresses (
 
 alter table public.user_addresses enable row level security;
 
+drop policy if exists "user_addresses_select_own" on public.user_addresses;
+drop policy if exists "user_addresses_insert_own" on public.user_addresses;
+drop policy if exists "user_addresses_update_own" on public.user_addresses;
+drop policy if exists "user_addresses_delete_own" on public.user_addresses;
+
 create policy "user_addresses_select_own"
   on public.user_addresses for select
   using (auth.uid() = user_id);
