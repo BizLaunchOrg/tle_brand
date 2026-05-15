@@ -19,6 +19,8 @@ import { formatReceiptDate, formatReceiptTime } from '../../lib/receiptDateTime.
 import { fetchShopFees, type ShopFees } from '../../lib/shopSettings.ts'
 import { STORE_RECEIPT_NAME } from '../../lib/storeBrand.ts'
 import { createOrder } from '../../lib/userShopSync.ts'
+import { fetchUserAddresses, saveUserAddress, type UserAddress } from '../../lib/userAddresses.ts'
+import { toast } from 'react-hot-toast'
 
 const formatNaira = (value: number) => `₦${value.toLocaleString()}`
 
@@ -213,6 +215,11 @@ export function CheckoutPage() {
   const [city, setCity] = useState('')
   const [stateNg, setStateNg] = useState('')
 
+  const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([])
+  const [selectedAddressId, setSelectedAddressId] = useState<string | 'new'>('new')
+  const [addressLabel, setAddressLabel] = useState('')
+  const [shouldSaveAddress, setShouldSaveAddress] = useState(false)
+
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [phase, setPhase] = useState<CheckoutPhase>('shipping')
@@ -222,6 +229,44 @@ export function CheckoutPage() {
   const [orderReceipt, setOrderReceipt] = useState<OrderReceipt | null>(null)
   const [shopFees, setShopFees] = useState<ShopFees | null>(null)
   const [deliveryZoneId, setDeliveryZoneId] = useState('')
+
+  useEffect(() => {
+    if (!user) return
+    void (async () => {
+      const addrs = await fetchUserAddresses()
+      setSavedAddresses(addrs)
+      if (addrs.length > 0) {
+        setSelectedAddressId(addrs[0].id)
+        applySavedAddress(addrs[0])
+      }
+    })()
+  }, [user])
+
+  const applySavedAddress = (addr: UserAddress) => {
+    setFullName(addr.full_name)
+    setPhone(addr.phone)
+    setStreet(addr.street)
+    setLandmark(addr.landmark ?? '')
+    setCity(addr.city)
+    setStateNg(addr.state)
+  }
+
+  const onSelectAddress = (id: string | 'new') => {
+    setSelectedAddressId(id)
+    if (id === 'new') {
+      setFullName(user?.name ?? '')
+      setPhone('')
+      setStreet('')
+      setLandmark('')
+      setCity('')
+      setStateNg('')
+      setAddressLabel('')
+      setShouldSaveAddress(false)
+    } else {
+      const addr = savedAddresses.find(a => a.id === id)
+      if (addr) applySavedAddress(addr)
+    }
+  }
 
   useEffect(() => {
     let on = true
@@ -536,13 +581,37 @@ export function CheckoutPage() {
     return { lineItems, subtotal, zone, fees, shipping }
   }
 
-  const onShippingSubmit = (e: FormEvent) => {
+  const onShippingSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
     if (!shippingComplete) {
       setError('Please fill in all required delivery fields before continuing.')
       return
     }
+
+    if (selectedAddressId === 'new' && shouldSaveAddress) {
+      if (!addressLabel.trim()) {
+        setError('Please name this address (e.g., Home, Work) to save it.')
+        return
+      }
+      setBusy(true)
+      const res = await saveUserAddress({
+        name: addressLabel.trim(),
+        full_name: fullName.trim(),
+        phone: phone.trim(),
+        street: street.trim(),
+        landmark: landmark.trim() || null,
+        city: city.trim(),
+        state: stateNg.trim(),
+      })
+      setBusy(false)
+      if (!res.ok) {
+        toast.error('Could not save address: ' + res.message)
+      } else {
+        toast.success('Address saved for next time.')
+      }
+    }
+
     setPaymentProofFile(null)
     setPaymentConfirmed(false)
     setPhase('payment')
@@ -671,6 +740,77 @@ export function CheckoutPage() {
             <h2 className="font-sans text-lg font-semibold text-tle-ink">Where should we deliver?</h2>
             <p className="mt-1 text-xs text-tle-muted">All deliveries are within Nigeria. * Required.</p>
 
+            {user && (savedAddresses.length > 0 || selectedAddressId === 'new') && (
+              <div className="mt-8">
+                <span className="mb-3 block text-[10px] font-bold tracking-[0.18em] text-tle-muted uppercase">Select shipping address</span>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {savedAddresses.map((addr) => (
+                    <button
+                      key={addr.id}
+                      type="button"
+                      onClick={() => onSelectAddress(addr.id)}
+                      className={
+                        'flex flex-col rounded-2xl border-[1.5px] p-4 text-left transition-all ' +
+                        (selectedAddressId === addr.id
+                          ? 'border-tle-pink bg-tle-pink/[0.03] ring-1 ring-tle-pink'
+                          : 'border-black/10 bg-white hover:border-black/20')
+                      }
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-tle-ink uppercase tracking-wider">{addr.name}</span>
+                        {selectedAddressId === addr.id && (
+                          <span className="material-symbols-outlined text-[18px] text-tle-pink">check_circle</span>
+                        )}
+                      </div>
+                      <p className="mt-2 line-clamp-1 text-[13px] font-medium text-tle-ink">{addr.full_name}</p>
+                      <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-tle-muted">{addr.street}, {addr.city}</p>
+                    </button>
+                  ))}
+                  {savedAddresses.length < 3 && (
+                    <button
+                      type="button"
+                      onClick={() => onSelectAddress('new')}
+                      className={
+                        'flex flex-col items-center justify-center rounded-2xl border-[1.5px] border-dashed p-4 text-center transition-all ' +
+                        (selectedAddressId === 'new'
+                          ? 'border-tle-pink bg-tle-pink/[0.03] ring-1 ring-tle-pink'
+                          : 'border-black/10 bg-white hover:border-black/20 hover:bg-tle-cream/30')
+                      }
+                    >
+                      <span className="material-symbols-outlined text-[24px] text-tle-muted">add_circle</span>
+                      <span className="mt-1 text-[11px] font-bold text-tle-muted uppercase tracking-wider">New Address</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {selectedAddressId === 'new' && (
+              <div className="mt-8 animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">Save address as (e.g. Home, Office) *</span>
+                  <input
+                    type="text"
+                    value={addressLabel}
+                    onChange={(e) => setAddressLabel(e.target.value)}
+                    className="w-full rounded-2xl border-[1.5px] border-black/10 bg-white px-4 py-3 text-sm text-tle-ink outline-none transition-colors placeholder:text-tle-faint focus:border-tle-pink"
+                    placeholder="Home / Work / My Place"
+                    required={shouldSaveAddress}
+                  />
+                </label>
+                <label className="mt-4 flex cursor-pointer items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={shouldSaveAddress}
+                    onChange={(e) => setShouldSaveAddress(e.target.checked)}
+                    className="size-4 rounded border-black/10 text-tle-pink focus:ring-tle-pink"
+                  />
+                  <span className="text-[13px] font-medium text-tle-ink">Save this address to my account</span>
+                </label>
+              </div>
+            )}
+
+            <div className={selectedAddressId !== 'new' ? 'pointer-events-none opacity-60' : ''}>
             {deliveryZones.length > 0 ? (
               <label className="mt-6 block">
                 <span className="mb-2 block text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">
@@ -798,6 +938,7 @@ export function CheckoutPage() {
             <p className="mt-4 rounded-xl border border-black/[0.06] bg-tle-cream/60 px-3 py-2 text-[11px] leading-relaxed text-tle-muted">
               Country: <span className="font-medium text-tle-ink">Nigeria</span> — no extra fields needed.
             </p>
+            </div>
 
               <button
                 type="submit"

@@ -1,8 +1,8 @@
 {
   "id": "tle-brand-store",
-  "name": "TLE Brand",
-  "short_name": "TLE Brand",
-  "description": "TLE Brand — beauty store & admin",
+  "name": "TOBILICIOUS BY LADY EMMA",
+  "short_name": "TOBILICIOUS",
+  "description": "TOBILICIOUS BY LADY EMMA — beauty store & admin",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

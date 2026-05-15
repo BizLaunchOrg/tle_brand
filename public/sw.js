@@ -20,7 +20,7 @@ self.addEventListener('push', function (event) {
       }
     }
   }
-  var title = data.title || 'TLE Brand'
+  var title = data.title || 'TOBILICIOUS BY LADY EMMA'
   var options = {
     body: data.body || '',
     icon: data.icon || undefined,

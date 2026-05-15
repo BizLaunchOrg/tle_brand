@@ -13,7 +13,7 @@ export function printLogoUrl(): string {
   return path
 }
 
-export const PRINT_LOGO_ALT = 'TLE logo'
+export const PRINT_LOGO_ALT = 'TOBILICIOUS BY LADY EMMA logo'
 
 export const PRINT_LOGO_CSS = `
   .brand-logo {

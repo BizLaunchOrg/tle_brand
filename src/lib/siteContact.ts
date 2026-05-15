@@ -14,7 +14,7 @@ export const SITE_ADDRESS = {
 
 /** Opens WhatsApp with this text prefilled (professional, from website). */
 export const WHATSAPP_WEBSITE_PREFILL =
-  "Hello TLE-BRAND, I'm reaching out from your website. I'd love to hear from you."
+  "Hello TOBILICIOUS BY LADY EMMA, I'm reaching out from your website. I'd love to hear from you."
 
 export function buildWhatsappUrl(message: string = WHATSAPP_WEBSITE_PREFILL): string {
   return `https://wa.me/${SITE_WHATSAPP_E164}?text=${encodeURIComponent(message)}`

@@ -113,7 +113,7 @@ export function AdminRecordSalePage() {
     const order: Partial<AdminOrderRow> = {
       user_id: user?.id || '',
       created_at: new Date(orderDate).toISOString(),
-      email: customerPhone ? `${customerPhone}@offline.sale` : `offline-${Date.now()}@tlebrand.com`,
+      email: customerPhone ? `${customerPhone}@offline.sale` : `offline-${Date.now()}@tobilicious.com`,
       shipping: {
         fullName: customerName,
         phone: customerPhone,

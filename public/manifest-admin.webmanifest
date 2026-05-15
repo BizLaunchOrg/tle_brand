@@ -1,7 +1,7 @@
 {
   "id": "tle-brand-admin",
-  "name": "TLE Brand — Admin",
-  "short_name": "TLE Admin",
+  "name": "TOBILICIOUS BY LADY EMMA — Admin",
+  "short_name": "TOBILICIOUS Admin",
   "description": "Merchant dashboard",
   "start_url": "./admin",
   "scope": "./",

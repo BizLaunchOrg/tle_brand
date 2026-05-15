@@ -10,7 +10,7 @@
  * Edge secrets (Project Settings → Edge Functions → Secrets):
  *   ORDER_EMAIL_WEBHOOK_SECRET — required (or set WEBHOOK_SECRET to the same value for one shared secret)
  *   RESEND_API_KEY — required, from https://resend.com/api-keys
- *   RESEND_FROM — e.g. "TLE-BRAND <orders@yourdomain.com>" (domain must be verified in Resend)
+ *   RESEND_FROM — e.g. "TOBILICIOUS BY LADY EMMA <orders@yourdomain.com>" (domain must be verified in Resend)
  *   PUBLIC_APP_URL — optional; e.g. https://your-store.vercel.app (also reads APP_URL / SITE_URL / STORE_URL)
  *   If PUBLIC_APP_URL is unset, shop_settings.public_app_url is used (same as admin-push-hook).
  *
@@ -201,7 +201,7 @@ function shellHtml(inner: string, publicUrl: string | null, ctaLabel: string, fo
 <body style="margin:0;background:#faf8f5;font-family:system-ui,-apple-system,Segoe UI,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px;">
     <table role="presentation" width="100%" style="max-width:520px;background:#ffffff;border:1px solid #18181812;border-radius:16px;padding:28px 24px 32px;">
-      <tr><td>${inner}${cta}<p style="margin:24px 0 0;font-size:11px;color:#c4b8b2;">TLE-BRAND · ${escapeHtml(foot)}</p></td></tr>
+      <tr><td>${inner}${cta}<p style="margin:24px 0 0;font-size:11px;color:#c4b8b2;">TOBILICIOUS BY LADY EMMA · ${escapeHtml(foot)}</p></td></tr>
     </table>
   </td></tr></table>
 </body></html>`
@@ -295,7 +295,7 @@ ${totalsBlock(record)}
 
 async function sendResend(to: string, subject: string, html: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const key = Deno.env.get('RESEND_API_KEY')?.trim()
-  const from = Deno.env.get('RESEND_FROM')?.trim() ?? 'TLE-BRAND <onboarding@resend.dev>'
+  const from = Deno.env.get('RESEND_FROM')?.trim() ?? 'TOBILICIOUS BY LADY EMMA <onboarding@resend.dev>'
   if (!key) return { ok: false, error: 'RESEND_API_KEY not set' }
 
   const replyTo = Deno.env.get('RESEND_REPLY_TO')?.trim()

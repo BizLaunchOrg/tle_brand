@@ -8,7 +8,7 @@ export function Footer() {
           <Link to="/" className="mb-3.5 inline-block leading-none no-underline">
             <img
               src="/tlelogo.PNG"
-              alt="TLE-BRAND"
+              alt="TOBILICIOUS BY LADY EMMA"
               className="h-10 w-auto max-w-[min(220px,55vw)] object-contain object-left"
               width={200}
               height={56}
@@ -67,11 +67,8 @@ export function Footer() {
           <div className="mb-5 text-[10px] font-bold tracking-[0.25em] text-white uppercase">Company</div>
           <ul className="flex flex-col gap-2.5">
             {[
-              ['About Us', '/about'],
+              ['About Us', '/#about'],
               ['Contact', '/contact'],
-              ['FAQ', '/'],
-              ['Privacy Policy', '/'],
-              ['Returns', '/'],
             ].map(([t, h]) => (
               <li key={t}>
                 <Link to={h} className="text-[13px] text-white/40 no-underline transition-colors hover:text-tle-light">
@@ -84,7 +81,7 @@ export function Footer() {
       </div>
       <div className="flex flex-wrap items-center justify-between gap-5">
         <span className="text-xs text-white/25">
-          © {new Date().getFullYear()} TLE-BRAND. All rights reserved.
+          © {new Date().getFullYear()} TOBILICIOUS BY LADY EMMA. All rights reserved.
         </span>
         <div className="flex gap-2.5">
           <a
@@ -94,7 +91,11 @@ export function Footer() {
             className="flex size-[38px] items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/40 no-underline transition-all hover:border-tle-pink hover:bg-tle-pink/10 hover:text-tle-light"
             aria-label="Instagram"
           >
-            <span className="material-symbols-outlined text-[20px] leading-none">photo_camera</span>
+            <img 
+              src="https://upload.wikimedia.org/wikipedia/commons/e/e7/Instagram_logo_2016.svg" 
+              alt="Instagram" 
+              className="size-5 opacity-40 hover:opacity-100 transition-opacity"
+            />
           </a>
         </div>
       </div>
