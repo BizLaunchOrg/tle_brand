@@ -216,9 +216,11 @@ export function CheckoutPage() {
   const [stateNg, setStateNg] = useState('')
 
   const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([])
-  const [selectedAddressId, setSelectedAddressId] = useState<string | 'new'>('new')
-  const [addressLabel, setAddressLabel] = useState('')
-  const [shouldSaveAddress, setShouldSaveAddress] = useState(false)
+  const [selectedAddressId, setSelectedAddressId] = useState('')
+  /** Label for the permanent address row (Home, Office, …). Shown when picking a saved card or before saving new. */
+  const [addressNickname, setAddressNickname] = useState('')
+  const [saveAddressBusy, setSaveAddressBusy] = useState(false)
+  const [addressUiMode, setAddressUiMode] = useState<'pick-saved' | 'edit-details'>('edit-details')
 
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -238,11 +240,17 @@ export function CheckoutPage() {
       if (addrs.length > 0) {
         setSelectedAddressId(addrs[0].id)
         applySavedAddress(addrs[0])
+        setAddressUiMode('pick-saved')
+      } else {
+        setSelectedAddressId('')
+        setAddressNickname('')
+        setAddressUiMode('edit-details')
       }
     })()
   }, [user])
 
   const applySavedAddress = (addr: UserAddress) => {
+    setAddressNickname(addr.name)
     setFullName(addr.full_name)
     setPhone(addr.phone)
     setStreet(addr.street)
@@ -251,21 +259,10 @@ export function CheckoutPage() {
     setStateNg(addr.state)
   }
 
-  const onSelectAddress = (id: string | 'new') => {
+  const onSelectSavedAddress = (id: string) => {
     setSelectedAddressId(id)
-    if (id === 'new') {
-      setFullName(user?.name ?? '')
-      setPhone('')
-      setStreet('')
-      setLandmark('')
-      setCity('')
-      setStateNg('')
-      setAddressLabel('')
-      setShouldSaveAddress(false)
-    } else {
-      const addr = savedAddresses.find(a => a.id === id)
-      if (addr) applySavedAddress(addr)
-    }
+    const addr = savedAddresses.find((a) => a.id === id)
+    if (addr) applySavedAddress(addr)
   }
 
   useEffect(() => {
@@ -308,8 +305,14 @@ export function CheckoutPage() {
     setEmail((e) => (e.trim() ? e : user.email))
   }, [user])
 
+  const hasValidShippingPick =
+    Boolean(selectedAddressId.trim()) &&
+    savedAddresses.length > 0 &&
+    savedAddresses.some((a) => a.id === selectedAddressId)
+
   const shippingComplete = useMemo(() => {
     if (!shopFees) return false
+    if (!hasValidShippingPick) return false
     if (deliveryZones.length > 0 && !deliveryZoneId.trim()) return false
     const phoneOk = phone.replace(/\D/g, '').length >= 7
     return Boolean(
@@ -322,6 +325,7 @@ export function CheckoutPage() {
     )
   }, [
     shopFees,
+    hasValidShippingPick,
     deliveryZones.length,
     deliveryZoneId,
     fullName,
@@ -589,33 +593,60 @@ export function CheckoutPage() {
       return
     }
 
-    if (selectedAddressId === 'new' && shouldSaveAddress) {
-      if (!addressLabel.trim()) {
-        setError('Please name this address (e.g., Home, Work) to save it.')
-        return
-      }
-      setBusy(true)
-      const res = await saveUserAddress({
-        name: addressLabel.trim(),
-        full_name: fullName.trim(),
-        phone: phone.trim(),
-        street: street.trim(),
-        landmark: landmark.trim() || null,
-        city: city.trim(),
-        state: stateNg.trim(),
-      })
-      setBusy(false)
-      if (!res.ok) {
-        toast.error('Could not save address: ' + res.message)
-      } else {
-        toast.success('Address saved for next time.')
-      }
-    }
-
     setPaymentProofFile(null)
     setPaymentConfirmed(false)
     setPhase('payment')
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const savePermanentAddress = async () => {
+    const label = addressNickname.trim()
+    const fn = fullName.trim()
+    const ph = phone.trim()
+    const st = street.trim()
+    const lm = landmark.trim()
+    const ct = city.trim()
+    const stt = stateNg.trim()
+    if (!label) {
+      toast.error('Add an address nickname (e.g. Home or Office).')
+      return
+    }
+    if (!fn) {
+      toast.error('Enter the recipient full name.')
+      return
+    }
+    if (ph.replace(/\D/g, '').length < 7) {
+      toast.error('Enter a valid phone number.')
+      return
+    }
+    if (!st || !ct || !stt) {
+      toast.error('Fill street, city, and state.')
+      return
+    }
+    setSaveAddressBusy(true)
+    const res = await saveUserAddress({
+      name: label,
+      full_name: fn,
+      phone: ph,
+      street: st,
+      landmark: lm || null,
+      city: ct,
+      state: stt,
+    })
+    setSaveAddressBusy(false)
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    const addrs = await fetchUserAddresses()
+    setSavedAddresses(addrs)
+    const created = addrs.find((a) => a.id === res.id)
+    if (created) {
+      setSelectedAddressId(created.id)
+      applySavedAddress(created)
+    }
+    toast.success('Permanent address saved.')
+    setAddressUiMode('pick-saved')
   }
 
   const confirmPaidOrder = async () => {
@@ -737,216 +768,340 @@ export function CheckoutPage() {
 
             {phase === 'shipping' ? (
               <>
-            <h2 className="font-sans text-lg font-semibold text-tle-ink">Where should we deliver?</h2>
-            <p className="mt-1 text-xs text-tle-muted">All deliveries are within Nigeria. * Required.</p>
+                <h2 className="font-sans text-xl font-semibold tracking-tight text-tle-ink">Delivery</h2>
 
-            {user && (savedAddresses.length > 0 || selectedAddressId === 'new') && (
-              <div className="mt-8">
-                <span className="mb-3 block text-[10px] font-bold tracking-[0.18em] text-tle-muted uppercase">Select shipping address</span>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {savedAddresses.map((addr) => (
-                    <button
-                      key={addr.id}
-                      type="button"
-                      onClick={() => onSelectAddress(addr.id)}
-                      className={
-                        'flex flex-col rounded-2xl border-[1.5px] p-4 text-left transition-all ' +
-                        (selectedAddressId === addr.id
-                          ? 'border-tle-pink bg-tle-pink/[0.03] ring-1 ring-tle-pink'
-                          : 'border-black/10 bg-white hover:border-black/20')
-                      }
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-bold text-tle-ink uppercase tracking-wider">{addr.name}</span>
-                        {selectedAddressId === addr.id && (
-                          <span className="material-symbols-outlined text-[18px] text-tle-pink">check_circle</span>
-                        )}
+                <div className="mt-8 rounded-[22px] border border-black/[0.07] bg-gradient-to-br from-white via-white to-tle-cream/40 p-5 sm:p-6">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-tle-gold">1 · Contact</p>
+                  <h3 className="mt-2 font-sans text-[15px] font-semibold text-tle-ink">Email</h3>
+                  <label className="mt-4 block">
+                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-tle-muted">
+                      Email address *
+                    </span>
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="mt-2 w-full cursor-text rounded-xl border border-black/12 bg-white px-4 py-3 text-[15px] leading-snug text-tle-ink shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none transition-[border-color,box-shadow] placeholder:text-black/35 focus:border-tle-pink focus:ring-[3px] focus:ring-tle-pink/12"
+                      required
+                    />
+                  </label>
+                </div>
+
+                {deliveryZones.length > 0 ? (
+                  <div className="mt-6 rounded-[22px] border border-black/[0.07] bg-gradient-to-br from-white via-white to-tle-cream/40 p-5 sm:p-6">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-tle-gold">2 · Delivery</p>
+                    <h3 className="mt-2 font-sans text-[15px] font-semibold text-tle-ink">Option</h3>
+                    <label className="mt-4 block">
+                      <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-tle-muted">
+                        Delivery or pickup *
+                      </span>
+                      <select
+                        value={deliveryZoneId}
+                        onChange={(e) => setDeliveryZoneId(e.target.value)}
+                        className="mt-2 w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[15px] leading-snug text-tle-ink shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none transition-[border-color,box-shadow] focus:border-tle-pink focus:ring-[3px] focus:ring-tle-pink/12"
+                        required
+                      >
+                        {deliveryZones.map((z) => (
+                          <option key={z.id} value={z.id}>
+                            {z.label} — {z.feeNgn === 0 ? 'FREE' : formatNaira(z.feeNgn)}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedZone?.description ? (
+                        <p
+                          className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50 px-3.5 py-3 text-[13px] font-semibold leading-relaxed text-emerald-950"
+                          role="note"
+                        >
+                          {selectedZone.description}
+                        </p>
+                      ) : null}
+                    </label>
+                  </div>
+                ) : null}
+
+                <div
+                  id="checkout-delivery-address"
+                  className="mt-6 rounded-[22px] border border-black/[0.07] bg-gradient-to-br from-white via-white to-tle-blush/30 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] sm:p-7"
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-tle-gold">
+                    {deliveryZones.length > 0 ? '3 · Delivery address' : '2 · Delivery address'}
+                  </p>
+                  <div className="mt-3 flex flex-col gap-4 border-b border-black/[0.06] pb-6 sm:flex-row sm:items-center sm:justify-between">
+                    <h3 className="font-sans text-[17px] font-semibold text-tle-ink">Delivery address</h3>
+                    {savedAddresses.length > 0 ? (
+                      <div
+                        className="flex shrink-0 rounded-full border border-black/10 bg-white/90 p-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                        role="tablist"
+                        aria-label="Address source"
+                      >
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={addressUiMode === 'pick-saved'}
+                          onClick={() => {
+                            setAddressUiMode('pick-saved')
+                            const ok = savedAddresses.some((a) => a.id === selectedAddressId)
+                            if (!ok && savedAddresses[0]) onSelectSavedAddress(savedAddresses[0].id)
+                          }}
+                          className={
+                            'cursor-pointer rounded-full px-4 py-2 text-[12px] font-semibold transition-colors sm:px-5 ' +
+                            (addressUiMode === 'pick-saved'
+                              ? 'bg-tle-charcoal text-white shadow-sm'
+                              : 'text-tle-muted hover:text-tle-ink')
+                          }
+                        >
+                          Saved addresses
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={addressUiMode === 'edit-details'}
+                          onClick={() => setAddressUiMode('edit-details')}
+                          className={
+                            'cursor-pointer rounded-full px-4 py-2 text-[12px] font-semibold transition-colors sm:px-5 ' +
+                            (addressUiMode === 'edit-details'
+                              ? 'bg-tle-charcoal text-white shadow-sm'
+                              : 'text-tle-muted hover:text-tle-ink')
+                          }
+                        >
+                          Type address
+                        </button>
                       </div>
-                      <p className="mt-2 line-clamp-1 text-[13px] font-medium text-tle-ink">{addr.full_name}</p>
-                      <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-tle-muted">{addr.street}, {addr.city}</p>
-                    </button>
-                  ))}
-                  {savedAddresses.length < 3 && (
-                    <button
-                      type="button"
-                      onClick={() => onSelectAddress('new')}
-                      className={
-                        'flex flex-col items-center justify-center rounded-2xl border-[1.5px] border-dashed p-4 text-center transition-all ' +
-                        (selectedAddressId === 'new'
-                          ? 'border-tle-pink bg-tle-pink/[0.03] ring-1 ring-tle-pink'
-                          : 'border-black/10 bg-white hover:border-black/20 hover:bg-tle-cream/30')
-                      }
-                    >
-                      <span className="material-symbols-outlined text-[24px] text-tle-muted">add_circle</span>
-                      <span className="mt-1 text-[11px] font-bold text-tle-muted uppercase tracking-wider">New Address</span>
-                    </button>
+                    ) : null}
+                  </div>
+
+                  {savedAddresses.length > 0 && addressUiMode === 'pick-saved' ? (
+                    <div className="mt-6 space-y-4">
+                      <ul className="flex list-none flex-col gap-4 p-0">
+                        {savedAddresses.map((addr) => {
+                          const selected = selectedAddressId === addr.id
+                          return (
+                            <li key={addr.id}>
+                              <div
+                                className={
+                                  'flex overflow-hidden rounded-2xl border bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-[box-shadow,border-color] ' +
+                                  (selected
+                                    ? 'border-tle-pink ring-2 ring-tle-pink/25'
+                                    : 'border-black/[0.08] hover:border-tle-pink/30')
+                                }
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectSavedAddress(addr.id)}
+                                  className="min-w-0 flex-1 cursor-pointer px-4 py-4 text-left transition-colors hover:bg-tle-cream/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-tle-pink sm:px-5 sm:py-5"
+                                >
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-sans text-[15px] font-bold capitalize tracking-tight text-tle-ink">
+                                      {addr.name}
+                                    </span>
+                                    {selected ? (
+                                      <span className="rounded-full bg-tle-blush px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-tle-pink">
+                                        Delivering here
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <p className="mt-3 text-[14px] font-semibold text-tle-ink">{addr.full_name}</p>
+                                  <p className="mt-2 flex items-center gap-2 text-[13px] text-tle-muted">
+                                    <span className="material-symbols-outlined text-[18px] leading-none text-tle-pink/80">
+                                      call
+                                    </span>
+                                    <span className="tabular-nums">{addr.phone}</span>
+                                  </p>
+                                  <p className="mt-3 text-[13px] leading-relaxed text-tle-ink">
+                                    {addr.street}
+                                    {addr.landmark ? (
+                                      <>
+                                        <span className="text-tle-muted"> · </span>
+                                        {addr.landmark}
+                                      </>
+                                    ) : null}
+                                    <br />
+                                    <span className="text-tle-muted">{addr.city}</span>, {addr.state}
+                                  </p>
+                                </button>
+                                <div className="flex w-[76px] shrink-0 flex-col border-l border-black/[0.06] bg-gradient-to-b from-white to-tle-cream/40">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setAddressUiMode('edit-details')
+                                      onSelectSavedAddress(addr.id)
+                                    }}
+                                    className="flex flex-1 cursor-pointer flex-col items-center justify-center gap-1 px-2 py-3 text-[10px] font-bold uppercase tracking-wide text-tle-pink transition-colors hover:bg-tle-pink/10"
+                                  >
+                                    <span className="material-symbols-outlined text-[22px] font-light">edit</span>
+                                    Edit
+                                  </button>
+                                </div>
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                      {savedAddresses.length < 3 ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddressUiMode('edit-details')
+                            setSelectedAddressId('')
+                            setAddressNickname('')
+                            setFullName(user?.name ?? '')
+                            setPhone('')
+                            setStreet('')
+                            setLandmark('')
+                            setCity('')
+                            setStateNg('')
+                          }}
+                          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-tle-pink/35 bg-white/70 py-4 text-[13px] font-bold tracking-wide text-tle-pink transition-colors hover:border-tle-pink hover:bg-tle-pink/[0.06]"
+                        >
+                          <span className="material-symbols-outlined text-[22px]">add_circle</span>
+                          Add new address
+                        </button>
+                      ) : (
+                        <p className="text-center text-[12px] text-tle-muted">Maximum of 3 saved addresses reached.</p>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {(savedAddresses.length === 0 || addressUiMode === 'edit-details') && (
+                    <div id="checkout-address-details" className={savedAddresses.length > 0 ? 'mt-8 space-y-5 border-t border-black/[0.06] pt-8' : 'mt-6 space-y-5'}>
+                      {savedAddresses.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setAddressUiMode('pick-saved')}
+                          className="flex cursor-pointer items-center gap-1 text-[13px] font-semibold text-tle-pink underline-offset-4 hover:underline"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                          Back to saved addresses
+                        </button>
+                      ) : null}
+
+                      <label className="block">
+                        <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-tle-muted">
+                          Address label *
+                        </span>
+                        <input
+                          type="text"
+                          autoComplete="off"
+                          value={addressNickname}
+                          onChange={(e) => setAddressNickname(e.target.value)}
+                          className="mt-2 w-full cursor-text rounded-xl border border-black/12 bg-white px-4 py-3 text-[15px] leading-snug text-tle-ink shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none transition-[border-color,box-shadow] placeholder:text-black/35 focus:border-tle-pink focus:ring-[3px] focus:ring-tle-pink/12"
+                          placeholder="Home"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-1 block text-[11px] font-medium text-tle-ink">
+                          Note to courier <span className="font-normal text-tle-muted">(optional)</span>
+                        </span>
+                        <input
+                          type="text"
+                          value={landmark}
+                          onChange={(e) => setLandmark(e.target.value)}
+                          className="mt-2 w-full cursor-text rounded-xl border border-black/12 bg-white px-4 py-3 text-[15px] leading-snug text-tle-ink shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none transition-[border-color,box-shadow] placeholder:text-black/35 focus:border-tle-pink focus:ring-[3px] focus:ring-tle-pink/12"
+                          placeholder="Gate code, landmark, rider instructions…"
+                        />
+                      </label>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <label className="block sm:col-span-2 lg:col-span-1">
+                          <span className="mb-1 block text-[11px] font-medium text-tle-ink">Recipient name *</span>
+                          <input
+                            type="text"
+                            autoComplete="name"
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                            className="mt-2 w-full cursor-text rounded-xl border border-black/12 bg-white px-4 py-3 text-[15px] leading-snug text-tle-ink shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none transition-[border-color,box-shadow] placeholder:text-black/35 focus:border-tle-pink focus:ring-[3px] focus:ring-tle-pink/12"
+                            placeholder="Full name"
+                            required
+                          />
+                        </label>
+                        <label className="block sm:col-span-2 lg:col-span-1">
+                          <span className="mb-1 block text-[11px] font-medium text-tle-ink">Phone *</span>
+                          <input
+                            type="tel"
+                            autoComplete="tel"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            className="mt-2 w-full cursor-text rounded-xl border border-black/12 bg-white px-4 py-3 text-[15px] leading-snug text-tle-ink shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none transition-[border-color,box-shadow] placeholder:text-black/35 focus:border-tle-pink focus:ring-[3px] focus:ring-tle-pink/12"
+                            placeholder="+234 …"
+                            required
+                          />
+                        </label>
+                      </div>
+
+                      <label className="block">
+                        <span className="mb-1 block text-[11px] font-medium text-tle-ink">Street address *</span>
+                        <input
+                          type="text"
+                          autoComplete="street-address"
+                          value={street}
+                          onChange={(e) => setStreet(e.target.value)}
+                          className="mt-2 w-full cursor-text rounded-xl border border-black/12 bg-white px-4 py-3 text-[15px] leading-snug text-tle-ink shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none transition-[border-color,box-shadow] placeholder:text-black/35 focus:border-tle-pink focus:ring-[3px] focus:ring-tle-pink/12"
+                          placeholder="House number, street, estate"
+                          required
+                        />
+                      </label>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-medium text-tle-ink">City / town *</span>
+                          <input
+                            type="text"
+                            autoComplete="address-level2"
+                            value={city}
+                            onChange={(e) => setCity(e.target.value)}
+                            className="mt-2 w-full cursor-text rounded-xl border border-black/12 bg-white px-4 py-3 text-[15px] leading-snug text-tle-ink shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none transition-[border-color,box-shadow] placeholder:text-black/35 focus:border-tle-pink focus:ring-[3px] focus:ring-tle-pink/12"
+                            placeholder="e.g. Ikeja"
+                            required
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-medium text-tle-ink">State *</span>
+                          <select
+                            value={stateNg}
+                            onChange={(e) => setStateNg(e.target.value)}
+                            className="mt-2 w-full cursor-pointer rounded-xl border border-black/12 bg-white px-4 py-3 text-[15px] leading-snug text-tle-ink shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none transition-[border-color,box-shadow] focus:border-tle-pink focus:ring-[3px] focus:ring-tle-pink/12"
+                            required
+                          >
+                            <option value="">Choose state</option>
+                            {NIGERIAN_STATES.map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+
+                      <p className="rounded-xl border border-black/[0.06] bg-white/80 px-3 py-2.5 text-[12px] text-tle-muted">
+                        Country: <span className="font-semibold text-tle-ink">Nigeria</span>
+                      </p>
+
+                      {savedAddresses.length >= 3 ? (
+                        <p className="text-[13px] text-tle-muted">Maximum of 3 addresses saved.</p>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={saveAddressBusy}
+                          onClick={() => void savePermanentAddress()}
+                          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-4 text-[13px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_8px_24px_rgba(4,120,87,0.28)] transition-[filter,transform] hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:min-w-[240px] sm:rounded-full sm:px-10 sm:py-3.5"
+                        >
+                          <span className="material-symbols-outlined text-[22px]">save</span>
+                          {saveAddressBusy ? 'Saving…' : 'Save permanent address'}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
-            )}
 
-            {selectedAddressId === 'new' && (
-              <div className="mt-8 animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="block">
-                  <span className="mb-2 block text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">Save address as (e.g. Home, Office) *</span>
-                  <input
-                    type="text"
-                    value={addressLabel}
-                    onChange={(e) => setAddressLabel(e.target.value)}
-                    className="w-full rounded-2xl border-[1.5px] border-black/10 bg-white px-4 py-3 text-sm text-tle-ink outline-none transition-colors placeholder:text-tle-faint focus:border-tle-pink"
-                    placeholder="Home / Work / My Place"
-                    required={shouldSaveAddress}
-                  />
-                </label>
-                <label className="mt-4 flex cursor-pointer items-center gap-2.5">
-                  <input
-                    type="checkbox"
-                    checked={shouldSaveAddress}
-                    onChange={(e) => setShouldSaveAddress(e.target.checked)}
-                    className="size-4 rounded border-black/10 text-tle-pink focus:ring-tle-pink"
-                  />
-                  <span className="text-[13px] font-medium text-tle-ink">Save this address to my account</span>
-                </label>
-              </div>
-            )}
-
-            <div className={selectedAddressId !== 'new' ? 'pointer-events-none opacity-60' : ''}>
-            {deliveryZones.length > 0 ? (
-              <label className="mt-6 block">
-                <span className="mb-2 block text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">
-                  Delivery or pickup *
-                </span>
-                <select
-                  value={deliveryZoneId}
-                  onChange={(e) => setDeliveryZoneId(e.target.value)}
-                  className="w-full cursor-pointer rounded-2xl border-[1.5px] border-black/10 bg-white px-4 py-3 text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
-                  required
+                <button
+                  type="submit"
+                  disabled={!shippingComplete || !shopFees}
+                  className="mt-10 w-full cursor-pointer rounded-full bg-tle-charcoal py-4 text-[12px] font-bold tracking-[0.12em] text-white uppercase shadow-[0_4px_14px_rgba(24,24,24,0.12)] transition-[background-color,transform] hover:bg-tle-pink active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 lg:hidden"
                 >
-                  {deliveryZones.map((z) => (
-                    <option key={z.id} value={z.id}>
-                      {z.label} — {z.feeNgn === 0 ? 'FREE' : formatNaira(z.feeNgn)}
-                    </option>
-                  ))}
-                </select>
-                {selectedZone?.description ? (
-                  <p
-                    className={
-                      'mt-3 rounded-2xl border border-emerald-200/90 bg-emerald-50 px-3.5 py-3 text-[13px] font-semibold leading-relaxed text-emerald-950'
-                    }
-                    role="note"
-                  >
-                    {selectedZone.description}
-                  </p>
-                ) : null}
-              </label>
-            ) : null}
-
-            <label className="mt-6 block">
-              <span className="mb-2 block text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">Full name *</span>
-              <input
-                type="text"
-                autoComplete="name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-2xl border-[1.5px] border-black/10 bg-white px-4 py-3 text-sm text-tle-ink outline-none transition-colors placeholder:text-tle-faint focus:border-tle-pink"
-                placeholder="Your full name"
-                required
-              />
-            </label>
-
-            <div className="mt-5 grid gap-5 sm:grid-cols-2">
-              <label className="block sm:col-span-2">
-                <span className="mb-2 block text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">Email *</span>
-                <input
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-2xl border-[1.5px] border-black/10 bg-white px-4 py-3 text-sm text-tle-ink outline-none transition-colors placeholder:text-tle-faint focus:border-tle-pink"
-                  required
-                />
-              </label>
-              <label className="block sm:col-span-2">
-                <span className="mb-2 block text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">Phone (WhatsApp ok) *</span>
-                <input
-                  type="tel"
-                  autoComplete="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-2xl border-[1.5px] border-black/10 bg-white px-4 py-3 text-sm text-tle-ink outline-none transition-colors placeholder:text-tle-faint focus:border-tle-pink"
-                  placeholder="0803 … or +234 …"
-                  required
-                />
-              </label>
-            </div>
-
-            <label className="mt-5 block">
-              <span className="mb-2 block text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">Street address *</span>
-              <input
-                type="text"
-                autoComplete="street-address"
-                value={street}
-                onChange={(e) => setStreet(e.target.value)}
-                className="w-full rounded-2xl border-[1.5px] border-black/10 bg-white px-4 py-3 text-sm text-tle-ink outline-none transition-colors placeholder:text-tle-faint focus:border-tle-pink"
-                placeholder="House number, street name, estate"
-                required
-              />
-            </label>
-
-            <label className="mt-5 block">
-              <span className="mb-2 block text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">Landmark (optional)</span>
-              <input
-                type="text"
-                value={landmark}
-                onChange={(e) => setLandmark(e.target.value)}
-                className="w-full rounded-2xl border-[1.5px] border-black/10 bg-white px-4 py-3 text-sm text-tle-ink outline-none transition-colors placeholder:text-tle-faint focus:border-tle-pink"
-                placeholder="e.g. Near Shoprite, bus stop…"
-              />
-            </label>
-
-            <div className="mt-5 grid gap-5 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-2 block text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">City / Town *</span>
-                <input
-                  type="text"
-                  autoComplete="address-level2"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full rounded-2xl border-[1.5px] border-black/10 bg-white px-4 py-3 text-sm text-tle-ink outline-none transition-colors placeholder:text-tle-faint focus:border-tle-pink"
-                  placeholder="e.g. Ikeja"
-                  required
-                />
-              </label>
-              <label className="block sm:col-span-2 sm:max-w-none">
-                <span className="mb-2 block text-[10px] font-semibold tracking-[0.18em] text-tle-muted uppercase">State *</span>
-                <select
-                  value={stateNg}
-                  onChange={(e) => setStateNg(e.target.value)}
-                  className="w-full rounded-2xl border-[1.5px] border-black/10 bg-white px-4 py-3 text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
-                  required
-                >
-                  <option value="">Choose your state</option>
-                  {NIGERIAN_STATES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <p className="mt-4 rounded-xl border border-black/[0.06] bg-tle-cream/60 px-3 py-2 text-[11px] leading-relaxed text-tle-muted">
-              Country: <span className="font-medium text-tle-ink">Nigeria</span> — no extra fields needed.
-            </p>
-            </div>
-
-              <button
-                type="submit"
-                disabled={!shippingComplete || !shopFees}
-                className="mt-8 w-full rounded-full bg-tle-charcoal py-3.5 text-[12px] font-bold tracking-[0.12em] text-white uppercase transition-colors hover:bg-tle-pink disabled:cursor-not-allowed disabled:opacity-60 lg:hidden"
-              >
-                Continue to payment · {formatNaira(totalNgn)}
-              </button>
+                  Continue to payment · {formatNaira(totalNgn)}
+                </button>
               </>
             ) : (
               <div className="mt-2">
@@ -1038,7 +1193,7 @@ export function CheckoutPage() {
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-tle-faint">
               {phase === 'shipping'
-                ? 'Fill in delivery details to continue to bank transfer.'
+                ? 'Continue when ready.'
                 : 'Upload your transfer screenshot, then place your order to get your receipt.'}
             </p>
 
@@ -1046,7 +1201,7 @@ export function CheckoutPage() {
               <button
                 type="submit"
                 disabled={!shippingComplete || !shopFees}
-                className="mt-6 hidden w-full rounded-full bg-tle-charcoal py-[18px] text-xs font-bold tracking-wide text-white uppercase transition-colors hover:bg-tle-pink disabled:cursor-not-allowed disabled:opacity-60 lg:block"
+                className="mt-6 hidden w-full cursor-pointer rounded-full bg-tle-charcoal py-[18px] text-xs font-bold tracking-wide text-white uppercase shadow-[0_4px_14px_rgba(24,24,24,0.12)] transition-colors hover:bg-tle-pink disabled:cursor-not-allowed disabled:opacity-55 lg:block"
               >
                 Continue to payment · {formatNaira(totalNgn)}
               </button>
@@ -1055,13 +1210,14 @@ export function CheckoutPage() {
                 type="button"
                 disabled={!canPlaceOrder}
                 onClick={() => void confirmPaidOrder()}
-                className="mt-6 hidden w-full rounded-full bg-tle-pink py-[18px] text-xs font-bold tracking-wide text-white uppercase transition-colors hover:bg-tle-deep disabled:cursor-not-allowed disabled:opacity-60 lg:block"
+                className="mt-6 hidden w-full cursor-pointer rounded-full bg-tle-pink py-[18px] text-xs font-bold tracking-wide text-white uppercase transition-colors hover:bg-tle-deep disabled:cursor-not-allowed disabled:opacity-55 lg:block"
               >
                 {busy ? 'Placing order…' : `Place order · ${formatNaira(totalNgn)}`}
               </button>
             )}
           </aside>
         </form>
+
       </div>
     </section>
   )
