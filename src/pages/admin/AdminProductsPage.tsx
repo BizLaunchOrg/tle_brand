@@ -223,7 +223,7 @@ export function AdminProductsPage() {
   const [galleryText, setGalleryText] = useState('')
   const [tagsText, setTagsText] = useState('')
   const [colorDrafts, setColorDrafts] = useState<ColorDraft[]>([])
-  const [jsonExtra, setJsonExtra] = useState('')
+  const [extraMergePaste, setExtraMergePaste] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploadBusy, setUploadBusy] = useState(false)
 
@@ -327,7 +327,7 @@ export function AdminProductsPage() {
     setGalleryText('')
     setTagsText('')
     setColorDrafts([])
-    setJsonExtra('')
+    setExtraMergePaste('')
     setEditorOpen(true)
   }
 
@@ -346,7 +346,7 @@ export function AdminProductsPage() {
     setGalleryText((p.gallery ?? []).join('\n'))
     setTagsText((p.tags ?? []).join(', '))
     setColorDrafts(colorsFromProduct(p))
-    setJsonExtra('')
+    setExtraMergePaste('')
     setEditorOpen(true)
   }
 
@@ -395,27 +395,27 @@ export function AdminProductsPage() {
 
   const mergedProduct = useMemo(() => {
     let p = productFromDraft(draft, galleryText, tagsText, colorDrafts)
-    if (jsonExtra.trim()) {
+    if (extraMergePaste.trim()) {
       try {
-        const parsed = JSON.parse(jsonExtra) as Record<string, unknown>
+        const parsed = JSON.parse(extraMergePaste) as Record<string, unknown>
         p = { ...p, ...parsed } as Product
       } catch {
         return p
       }
     }
     return p
-  }, [draft, galleryText, tagsText, colorDrafts, jsonExtra])
+  }, [draft, galleryText, tagsText, colorDrafts, extraMergePaste])
 
   const mergedPreviewUrls = useMemo(() => getDefaultImageUrls(mergedProduct).map(displayableImageUrl), [mergedProduct])
 
   const onSave = async () => {
     let p = productFromDraft(draft, galleryText, tagsText, colorDrafts)
-    if (jsonExtra.trim()) {
+    if (extraMergePaste.trim()) {
       try {
-        const parsed = JSON.parse(jsonExtra) as Record<string, unknown>
+        const parsed = JSON.parse(extraMergePaste) as Record<string, unknown>
         p = { ...p, ...parsed } as Product
       } catch {
-        toast.error('That extra data is not valid JSON. Remove it or fix the format.')
+        toast.error('That optional block could not be read. Remove it or fix the braces and commas.')
         return
       }
     }
@@ -1468,11 +1468,11 @@ export function AdminProductsPage() {
               </div>
 
               <div className="mt-4">
-                <label className={label}>Optional: paste extra JSON</label>
+                <label className={label}>Optional: merge extra fields</label>
                 <textarea
                   className={fieldBox(theme) + ' mt-1 min-h-[80px] resize-y font-mono text-[11px]'}
-                  value={jsonExtra}
-                  onChange={(e) => setJsonExtra(e.target.value)}
+                  value={extraMergePaste}
+                  onChange={(e) => setExtraMergePaste(e.target.value)}
                   placeholder="Leave empty unless you need this"
                 />
               </div>

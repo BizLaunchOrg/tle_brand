@@ -73,10 +73,10 @@ export async function subscribeAdminPush(): Promise<{ ok: true } | { ok: false; 
     applicationServerKey: urlBase64ToUint8Array(vapid) as BufferSource,
   })
 
-  const json = sub.toJSON()
-  const endpoint = json.endpoint
-  const p256dh = json.keys?.p256dh
-  const auth = json.keys?.auth
+  const subPlain = sub.toJSON()
+  const endpoint = subPlain.endpoint
+  const p256dh = subPlain.keys?.p256dh
+  const auth = subPlain.keys?.auth
   if (!endpoint || !p256dh || !auth) {
     await sub.unsubscribe().catch(() => {})
     return { ok: false, message: 'unavailable' }
