@@ -45,96 +45,118 @@ const MARQUEE_ITEMS = [
   "Makeup Studio",
 ] as const;
 
-const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
+/** High-heel silhouette (Material Symbols has no reliable heels glyph). */
+function HeroHeelIcon({ size = 54 }: { size?: number }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="currentColor"
+      className="block"
+      aria-hidden
+    >
+      <path d="M2 20.5h20v1H2v-1zm3.2-.5h8.8l2.4-8.6c.35-1.2 1.4-2 2.6-2h1.4c1.35 0 2.45 1.05 2.65 2.4l1.7 8.2h-1.6l-1.55-7.6c-.15-.55-.6-.9-1.15-.9h-1.4c-.55 0-1 .35-1.15.9l-2.35 7.6H5.2zm7.4-10.6c0-.7.55-1.25 1.25-1.25h.9c.7 0 1.25.55 1.25 1.25v.55h-3.4v-.55zM16.75 20l1.1-8.2.75-1.05.45 9.25h-2.3z" />
+    </svg>
+  );
+}
+
+type HeroFloatItem = {
+  id: string;
+  style: CSSProperties;
+  size?: number;
+} & ({ kind: "heel" } | { kind?: "symbol"; icon: string });
+
+/** Decorative hero icons — each `id` must be unique (no repeated glyphs). */
+const HERO_FLOAT: HeroFloatItem[] = [
   {
+    id: "diamond",
     style: {
-      left: "8%",
-      top: "18%",
+      left: "12%",
+      top: "16%",
       animationDuration: "8s",
       animationDelay: "0s",
     },
     icon: "diamond",
+    size: 56,
   },
   {
+    id: "cart",
     style: {
-      left: "84%",
-      top: "66%",
+      left: "82%",
+      top: "68%",
       animationDuration: "10s",
       animationDelay: "1.8s",
     },
-    icon: "shopping_bag",
+    icon: "shopping_cart",
+    size: 52,
   },
   {
+    id: "heels",
+    kind: "heel",
     style: {
-      left: "52%",
-      top: "32%",
+      left: "72%",
+      top: "10%",
+      animationDuration: "9s",
+      animationDelay: "3.4s",
+    },
+    size: 54,
+  },
+  {
+    id: "makeup",
+    style: {
+      left: "48%",
+      top: "34%",
       animationDuration: "7s",
-      animationDelay: "3.2s",
+      animationDelay: "2.2s",
     },
     icon: "face_retouching_natural",
+    size: 50,
   },
   {
+    id: "fashion",
     style: {
       left: "6%",
-      top: "78%",
+      top: "72%",
       animationDuration: "12s",
       animationDelay: "0.6s",
     },
-    icon: "styler",
-  },
-  {
-    style: {
-      left: "72%",
-      top: "12%",
-      animationDuration: "6s",
-      animationDelay: "2.4s",
-    },
     icon: "checkroom",
+    size: 52,
   },
   {
+    id: "brush",
     style: {
-      left: "86%",
-      top: "82%",
-      animationDuration: "14s",
-      animationDelay: "4.5s",
-    },
-    icon: "auto_awesome",
-  },
-  {
-    style: {
-      left: "42%",
-      top: "43%",
+      left: "88%",
+      top: "38%",
       animationDuration: "11s",
-      animationDelay: "1s",
+      animationDelay: "4.1s",
     },
-    icon: "workspace_premium",
+    icon: "brush",
+    size: 48,
   },
   {
+    id: "camera",
     style: {
-      left: "24%",
+      left: "28%",
       top: "8%",
       animationDuration: "9s",
       animationDelay: "5s",
     },
-    icon: "palette",
-  },
-  {
-    style: {
-      left: "62%",
-      top: "56%",
-      animationDuration: "9s",
-      animationDelay: "2.2s",
-    },
     icon: "photo_camera",
+    size: 50,
   },
   {
+    id: "spa",
     style: {
-      left: "34%",
-      top: "30%",
-      animationDuration: "8.6s",
-      animationDelay: "4.1s",
+      left: "58%",
+      top: "52%",
+      animationDuration: "13s",
+      animationDelay: "1.2s",
     },
-    icon: "brush",
+    icon: "spa",
+    size: 50,
   },
 ];
 
@@ -419,13 +441,28 @@ export function LandingPage() {
           id="home"
         >
           <div className="pointer-events-none absolute inset-y-0 right-[45%] left-0 z-[1] overflow-hidden max-lg:right-0 max-lg:bottom-[45%] max-lg:top-0">
-            {HERO_FLOAT.map((hi, idx) => (
+            {HERO_FLOAT.map((hi) => (
               <span
-                key={idx}
-                className="material-symbols-outlined animate-tle-float absolute text-tle-pink/[0.2]"
-                style={{ ...hi.style, fontSize: 40, lineHeight: 1 }}
+                key={hi.id}
+                className="animate-tle-float absolute text-tle-pink/35 sm:text-tle-pink/30"
+                style={hi.style}
+                aria-hidden
               >
-                {hi.icon}
+                {hi.kind === "heel" ? (
+                  <HeroHeelIcon size={hi.size ?? 54} />
+                ) : (
+                  <span
+                    className="material-symbols-outlined block"
+                    style={{
+                      fontSize: hi.size ?? 52,
+                      lineHeight: 1,
+                      fontVariationSettings:
+                        "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 48",
+                    }}
+                  >
+                    {hi.icon}
+                  </span>
+                )}
               </span>
             ))}
           </div>
