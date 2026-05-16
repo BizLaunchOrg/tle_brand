@@ -116,7 +116,7 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
       animationDuration: "9s",
       animationDelay: "5s",
     },
-    icon: "local_mall",
+    icon: "palette",
   },
   {
     style: {
@@ -125,7 +125,7 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
       animationDuration: "9s",
       animationDelay: "2.2s",
     },
-    icon: "diamond",
+    icon: "photo_camera",
   },
   {
     style: {
@@ -134,7 +134,7 @@ const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
       animationDuration: "8.6s",
       animationDelay: "4.1s",
     },
-    icon: "diamond",
+    icon: "brush",
   },
 ];
 
@@ -468,7 +468,7 @@ export function LandingPage() {
               >
                 Book a Makeup Session
                 <span className="material-symbols-outlined text-lg leading-none">
-                  calendar_month
+                  face_retouching_natural
                 </span>
               </Link>
             </div>
@@ -553,7 +553,7 @@ export function LandingPage() {
                 >
                   Book makeup + photoshoot
                   <span className="material-symbols-outlined text-[18px] leading-none">
-                    calendar_month
+                    photo_camera
                   </span>
                 </button>
               </div>
