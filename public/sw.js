@@ -23,7 +23,7 @@ self.addEventListener('push', function (event) {
   var title = data.title || 'TOBILICIOUS BY LADY EMMA'
   var options = {
     body: data.body || '',
-    icon: data.icon || undefined,
+    icon: data.icon || '/icon-192.png',
     data: { url: data.url || '/' },
     tag: data.tag || 'tle-admin',
   }

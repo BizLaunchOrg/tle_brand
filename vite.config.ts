@@ -21,8 +21,28 @@ export default defineConfig(({ mode }) => {
       {
         name: 'tle-manifest-link-base',
         transformIndexHtml(html) {
+          const siteUrl = (env.VITE_SITE_URL ?? '').trim().replace(/\/$/, '')
+          let out = html
+          if (/^https?:\/\//i.test(siteUrl)) {
+            const pathPrefix = base === '/' ? '' : base.replace(/\/$/, '')
+            const absImage = (path: string) => {
+              const rel = path.startsWith('/') ? path : `/${path}`
+              return `${siteUrl}${pathPrefix}${rel}`.replace(/([^:]\/)\/+/g, '$1')
+            }
+            out = out.replace(
+              /<meta property="og:image" content="([^"]+)" \/>/,
+              (_, p) =>
+                `<meta property="og:image" content="${/^https?:\/\//i.test(p) ? p : absImage(p)}" />`,
+            )
+            out = out.replace(
+              /<meta name="twitter:image" content="([^"]+)" \/>/,
+              (_, p) =>
+                `<meta name="twitter:image" content="${/^https?:\/\//i.test(p) ? p : absImage(p)}" />`,
+            )
+          }
+
           const storeManifest = `${base}manifest.webmanifest`.replace(/([^:]\/)\/+/g, '$1')
-          const withManifest = html.replace(/href="manifest\.webmanifest"/, `href="${storeManifest}"`)
+          const withManifest = out.replace(/href="manifest\.webmanifest"/, `href="${storeManifest}"`)
           const sync = `
     <script>
 (function () {
