@@ -9,6 +9,12 @@ export type ProductColorOption = {
   /** Photos for this option; falls back to product default images when omitted */
   images?: string[]
   price?: string
+  /** Admin: units for this finish (when set, overrides product-level stock for this option) */
+  stock?: number
+  /** Admin: seller set this option’s stock to 0 (Archive tab) */
+  manualStockZero?: boolean
+  /** Admin: this option sold through to 0 (Sold out tab) */
+  stockDepletedAt?: string
 }
 
 export type Product = {
@@ -44,21 +50,89 @@ export type Product = {
   stock?: number
   /** Admin: treat stock as unlimited on storefront / lists */
   stockUnlimited?: boolean
+  /** Admin: seller set stock to 0 — shows on shop as Sold out; listed under Archive */
+  manualStockZero?: boolean
+  /** Admin: stock reached 0 from orders — listed under Sold out tab */
+  stockDepletedAt?: string
 }
 
-/**
- * Max units customers can add for this product when inventory is tracked.
- * `stockUnlimited` or missing `stock` → no client cap (999 per line).
- */
-export function getProductPurchasableMaxUnits(p: Product): number {
+function finiteStock(n: unknown): number | null {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return null
+  return Math.max(0, Math.floor(n))
+}
+
+/** Product uses per-option stock when any color option has a numeric `stock` field. */
+export function productUsesVariantStock(p: Product): boolean {
+  return Boolean(p.colorOptions?.some((o) => finiteStock(o.stock) !== null))
+}
+
+/** Max units for one line (product or variant). Unlimited / untracked → 999. */
+export function getProductPurchasableMaxUnits(p: Product, variantId?: string): number {
   if (p.stockUnlimited === true) return 999
-  if (typeof p.stock !== 'number' || !Number.isFinite(p.stock)) return 999
-  return Math.max(0, Math.floor(p.stock))
+  const opt = getActiveColorOption(p, variantId)
+  if (productUsesVariantStock(p)) {
+    if (opt && finiteStock(opt.stock) !== null) return finiteStock(opt.stock)!
+    if (opt) return 0
+    const totals = (p.colorOptions ?? []).map((o) => finiteStock(o.stock)).filter((n): n is number => n !== null)
+    if (totals.length) return Math.max(0, ...totals)
+  }
+  const n = finiteStock(p.stock)
+  if (n === null) return 999
+  return n
 }
 
-/** Tracked stock is zero (or negative) — show unavailable; block add to cart. */
+export function isVariantOutOfStock(p: Product, variantId: string | undefined): boolean {
+  if (p.stockUnlimited === true) return false
+  return getProductPurchasableMaxUnits(p, variantId) <= 0
+}
+
+/** No purchasable quantity for any variant (or single-SKU product). */
 export function isProductOutOfStock(p: Product): boolean {
+  if (p.stockUnlimited === true) return false
+  if (productUsesVariantStock(p)) {
+    const opts = p.colorOptions ?? []
+    if (!opts.length) return false
+    return opts.every((o) => isVariantOutOfStock(p, o.id))
+  }
   return getProductPurchasableMaxUnits(p) <= 0
+}
+
+/** Seller set stock to 0 in admin (Archive). */
+export function isProductManuallyArchived(p: Product): boolean {
+  if (p.manualStockZero === true) return true
+  if (productUsesVariantStock(p)) {
+    return (p.colorOptions ?? []).some((o) => o.manualStockZero === true && isVariantOutOfStock(p, o.id))
+  }
+  return isProductOutOfStock(p) && !p.stockDepletedAt
+}
+
+/** Stock hit 0 from checkout / offline sale (Sold out tab). */
+export function isProductSoldThrough(p: Product): boolean {
+  if (typeof p.stockDepletedAt === 'string' && p.stockDepletedAt.trim()) return true
+  return (p.colorOptions ?? []).some((o) => typeof o.stockDepletedAt === 'string' && o.stockDepletedAt.trim())
+}
+
+/** Admin table / card stock summary (includes per-colour breakdown). */
+export function adminProductStockSummary(p: Product): string {
+  if (p.stockUnlimited === true) return '∞'
+  if (productUsesVariantStock(p)) {
+    return (p.colorOptions ?? [])
+      .map((o) => `${o.label}: ${adminVariantStockLabel(p, o)}`)
+      .join(' · ')
+  }
+  const n = finiteStock(p.stock)
+  return n === null ? '—' : String(n)
+}
+
+/** Admin list label for variant rows. */
+export function adminVariantStockLabel(p: Product, opt: ProductColorOption): string {
+  if (p.stockUnlimited === true) return '∞'
+  const n = finiteStock(opt.stock)
+  if (n === null) {
+    const fallback = finiteStock(p.stock)
+    return fallback === null ? '—' : String(fallback)
+  }
+  return String(n)
 }
 
 /**

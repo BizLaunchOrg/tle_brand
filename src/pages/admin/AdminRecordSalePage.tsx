@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { fetchCatalogProducts, type CatalogProductRow } from '../../lib/adminCatalog'
 import { insertOfflineOrder, type AdminOrderRow } from '../../lib/adminOrders'
-import { useAdminTheme } from './AdminThemeContext'
+import { useAdminTheme } from './AdminThemeContext.tsx'
+import { AdminOfflineProductForm } from './AdminOfflineProductForm.tsx'
 import { ad, adminFont } from './adminUi'
 import { parseProductPriceNgn } from '../../data/products'
 import { useAuth } from '../../context/AuthContext'
@@ -23,17 +24,19 @@ interface SelectedProduct {
   price: number
 }
 
+type SaleView = 'form' | 'products' | 'add_product'
+
 export function AdminRecordSalePage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { theme } = useAdminTheme()
-  const [view, setView] = useState<'form' | 'products'>('form')
+  const [view, setView] = useState<SaleView>('form')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [catalog, setCatalog] = useState<CatalogProductRow[]>([])
   const [search, setSearch] = useState('')
+  const [justAddedCatalogId, setJustAddedCatalogId] = useState<string | null>(null)
 
-  // Form State
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0])
   const [source, setSource] = useState('physical')
   const [customerName, setCustomerName] = useState('')
@@ -55,32 +58,51 @@ export function AdminRecordSalePage() {
   const filteredCatalog = useMemo(() => {
     const q = search.toLowerCase().trim()
     if (!q) return catalog
-    return catalog.filter(c => 
-      c.payload.name.toLowerCase().includes(q) || 
-      c.slug.toLowerCase().includes(q)
+    return catalog.filter(
+      (c) => c.payload.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q),
     )
   }, [catalog, search])
 
   const totalAmount = useMemo(() => {
-    return selectedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0)
+    return selectedItems.reduce((acc, item) => acc + item.price * item.quantity, 0)
   }, [selectedItems])
 
+  const addCatalogRowToSale = useCallback((row: CatalogProductRow) => {
+    const price = parseProductPriceNgn(row.payload.price)
+    setSelectedItems((prev) => {
+      const existing = prev.find((item) => item.id === row.id)
+      if (existing) return prev
+      return [
+        ...prev,
+        {
+          id: row.id,
+          variantId: row.payload.colorOptions?.[0]?.id || '',
+          quantity: 1,
+          price,
+        },
+      ]
+    })
+  }, [])
+
+  const handleNewProductSaved = (row: CatalogProductRow) => {
+    setCatalog((prev) => [row, ...prev.filter((r) => r.id !== row.id)])
+    setJustAddedCatalogId(row.id)
+    addCatalogRowToSale(row)
+    setView('form')
+    toast.success(`${row.payload.name} added to this sale`)
+  }
+
   const toggleProduct = (prod: CatalogProductRow) => {
-    const existing = selectedItems.find(item => item.id === prod.id)
+    const existing = selectedItems.find((item) => item.id === prod.id)
     if (existing) {
-      setSelectedItems(prev => prev.filter(item => item.id !== prod.id))
+      setSelectedItems((prev) => prev.filter((item) => item.id !== prod.id))
     } else {
-      setSelectedItems(prev => [...prev, {
-        id: prod.id,
-        variantId: prod.payload.colorOptions?.[0]?.id || '',
-        quantity: 1,
-        price: parseProductPriceNgn(prod.payload.price)
-      }])
+      addCatalogRowToSale(prod)
     }
   }
 
   const updateItem = (id: string, updates: Partial<SelectedProduct>) => {
-    setSelectedItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item))
+    setSelectedItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)))
   }
 
   const handleSubmit = async () => {
@@ -89,26 +111,28 @@ export function AdminRecordSalePage() {
       return
     }
     if (selectedItems.length === 0) {
-      toast.error('Select at least one product')
+      toast.error('Select or add at least one product')
       return
     }
 
     setSubmitting(true)
 
-    const lineItems = selectedItems.map(item => {
-      const p = catalog.find(c => c.id === item.id)?.payload
-      if (!p) return null
-      const variant = p.colorOptions?.find(v => v.id === item.variantId)
-      return {
-        id: p.slug,
-        slug: p.slug,
-        name: p.name,
-        quantity: item.quantity,
-        price: item.price,
-        variantId: item.variantId,
-        variantLabel: variant?.label || '',
-      }
-    }).filter(Boolean)
+    const lineItems = selectedItems
+      .map((item) => {
+        const p = catalog.find((c) => c.id === item.id)?.payload
+        if (!p) return null
+        const variant = p.colorOptions?.find((v) => v.id === item.variantId)
+        return {
+          id: p.slug,
+          slug: p.slug,
+          name: p.name,
+          quantity: item.quantity,
+          price: item.price,
+          variantId: item.variantId,
+          variantLabel: variant?.label || '',
+        }
+      })
+      .filter(Boolean)
 
     const order: Partial<AdminOrderRow> = {
       user_id: user?.id || '',
@@ -148,7 +172,7 @@ export function AdminRecordSalePage() {
   const inputCls = ad(
     theme,
     'w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-emerald-500',
-    'w-full rounded-xl border border-neutral-700 bg-neutral-900 px-4 py-3 text-[15px] outline-none focus:border-emerald-500 text-white'
+    'w-full rounded-xl border border-neutral-700 bg-neutral-900 px-4 py-3 text-[15px] outline-none focus:border-emerald-500 text-white',
   )
   const labelCls = 'mb-1.5 block text-[11px] font-bold uppercase tracking-wider ' + muted
 
@@ -161,19 +185,47 @@ export function AdminRecordSalePage() {
     )
   }
 
+  if (view === 'add_product') {
+    return (
+      <AdminOfflineProductForm
+        theme={theme}
+        onCancel={() => setView(justAddedCatalogId ? 'form' : 'products')}
+        onSaved={handleNewProductSaved}
+      />
+    )
+  }
+
   if (view === 'products') {
     return (
       <div className={adminFont() + ' min-h-screen ' + panel}>
         <div className={'sticky top-0 z-10 flex items-center justify-between border-b px-4 py-3 ' + panel + ' ' + border}>
-          <button onClick={() => setView('form')} className="flex items-center gap-1 text-emerald-600 font-bold">
+          <button type="button" onClick={() => setView('form')} className="flex items-center gap-1 font-bold text-emerald-600">
             <span className="material-symbols-outlined">chevron_left</span>
             Back
           </button>
-          <h2 className="text-lg font-bold">Select Products</h2>
-          <button onClick={() => setView('form')} className="text-emerald-600 font-bold">Done</button>
+          <h2 className="text-lg font-bold">Select products</h2>
+          <button type="button" onClick={() => setView('form')} className="font-bold text-emerald-600">
+            Done
+          </button>
         </div>
 
         <div className="p-4 pb-32">
+          <button
+            type="button"
+            onClick={() => setView('add_product')}
+            className={
+              'mb-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 py-3.5 text-[14px] font-bold transition-all ' +
+              (justAddedCatalogId
+                ? ad(theme, 'border-emerald-400 bg-emerald-50 text-emerald-800', 'border-emerald-700 bg-emerald-950/40 text-emerald-100')
+                : ad(theme, 'border-dashed border-emerald-400 bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100', 'border-dashed border-emerald-600 bg-emerald-950/30 text-emerald-200 hover:bg-emerald-950/50'))
+            }
+          >
+            <span className="material-symbols-outlined text-[22px]">
+              {justAddedCatalogId ? 'check_circle' : 'add_box'}
+            </span>
+            {justAddedCatalogId ? 'Product added — add another?' : 'Add new product'}
+          </button>
+
           <div className="relative mb-6">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-stone-400">search</span>
             <input
@@ -181,39 +233,49 @@ export function AdminRecordSalePage() {
               placeholder="Search products..."
               className={inputCls + ' pl-10'}
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
           <div className="space-y-0 divide-y">
-            {filteredCatalog.map(prod => {
-              const selected = selectedItems.find(item => item.id === prod.id)
+            {filteredCatalog.map((prod) => {
+              const selected = selectedItems.find((item) => item.id === prod.id)
               const p = prod.payload
+              const justAdded = prod.id === justAddedCatalogId
               return (
-                <div 
-                  key={prod.id} 
+                <div
+                  key={prod.id}
                   onClick={() => toggleProduct(prod)}
-                  className={'flex items-center gap-4 py-4 transition-all active:bg-stone-100 ' + 
-                    (selected ? 'bg-emerald-50/30' : '')}
+                  className={
+                    'flex cursor-pointer items-center gap-4 py-4 transition-all active:bg-stone-100 ' +
+                    (selected ? 'bg-emerald-50/30' : '') +
+                    (justAdded ? ' ring-2 ring-inset ring-emerald-400' : '')
+                  }
                 >
-                  <div className={'flex size-6 shrink-0 items-center justify-center rounded border-2 transition-colors ' + 
-                    (selected ? 'border-emerald-600 bg-emerald-600' : 'border-stone-300')}>
-                    {selected && <span className="material-symbols-outlined text-white text-[18px] font-bold">check</span>}
+                  <div
+                    className={
+                      'flex size-6 shrink-0 items-center justify-center rounded border-2 transition-colors ' +
+                      (selected ? 'border-emerald-600 bg-emerald-600' : 'border-stone-300')
+                    }
+                  >
+                    {selected && <span className="material-symbols-outlined text-[18px] font-bold text-white">check</span>}
                   </div>
 
-                  <div className="relative size-14 shrink-0 overflow-hidden rounded-xl bg-stone-100 border">
+                  <div className="relative size-14 shrink-0 overflow-hidden rounded-xl border bg-stone-100">
                     <img src={p.img} alt="" className="size-full object-cover" />
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-[15px] truncate">{p.name}</h3>
-                    <p className={muted + ' text-[12px] mt-0.5'}>
-                      {p.colorOptions?.length || 0} variations • {p.stockUnlimited ? 'In Stock' : (p.stock || 0) + ' in Stock'}
+                    <h3 className="truncate text-[15px] font-bold">{p.name}</h3>
+                    <p className={muted + ' mt-0.5 text-[12px]'}>
+                      {justAdded ? 'Just added Â· ' : ''}
+                      {p.colorOptions?.length || 0} variations â€¢{' '}
+                      {p.stockUnlimited ? 'In stock' : `${p.stock ?? 0} in stock`}
                     </p>
                   </div>
 
-                  <div className="text-right shrink-0">
-                    <p className="font-bold text-[15px]">₦{parseProductPriceNgn(p.price).toLocaleString()}</p>
+                  <div className="shrink-0 text-right">
+                    <p className="text-[15px] font-bold">â‚¦{parseProductPriceNgn(p.price).toLocaleString()}</p>
                   </div>
                 </div>
               )
@@ -223,11 +285,12 @@ export function AdminRecordSalePage() {
 
         <div className={'fixed bottom-0 left-0 right-0 z-20 border-t p-4 ' + panel + ' ' + border}>
           <div className="mx-auto max-w-2xl">
-            <button 
+            <button
+              type="button"
               onClick={() => setView('form')}
-              className="w-full rounded-2xl bg-emerald-700 py-4 text-white font-bold text-lg shadow-lg active:scale-[0.98] transition-all"
+              className="w-full rounded-2xl bg-emerald-700 py-4 text-lg font-bold text-white shadow-lg transition-all active:scale-[0.98]"
             >
-              Done
+              Done ({selectedItems.length} selected)
             </button>
           </div>
         </div>
@@ -238,48 +301,42 @@ export function AdminRecordSalePage() {
   return (
     <div className={adminFont() + ' min-h-screen pb-32 ' + ad(theme, 'bg-stone-50', 'bg-black')}>
       <div className={'sticky top-0 z-10 flex items-center justify-between border-b px-4 py-3 ' + panel + ' ' + border}>
-        <button onClick={() => navigate('/admin/orders')} className="flex items-center gap-1 text-emerald-600 font-bold">
+        <button type="button" onClick={() => navigate('/admin/orders')} className="flex items-center gap-1 font-bold text-emerald-600">
           <span className="material-symbols-outlined">chevron_left</span>
           Back
         </button>
         <h2 className="text-lg font-bold">Record a sale</h2>
-        <button onClick={handleSubmit} disabled={submitting} className="text-emerald-600 font-bold disabled:opacity-50">
+        <button type="button" onClick={handleSubmit} disabled={submitting} className="font-bold text-emerald-600 disabled:opacity-50">
           {submitting ? 'Saving...' : 'Save'}
         </button>
       </div>
 
-      <div className="mx-auto max-w-2xl p-4 space-y-6">
-        <div className={'rounded-3xl border p-6 space-y-6 ' + panel + ' ' + border}>
+      <div className="mx-auto max-w-2xl space-y-6 p-4">
+        <div className={'space-y-6 rounded-3xl border p-6 ' + panel + ' ' + border}>
           <div>
             <label className={labelCls}>Order Date</label>
-            <input 
-              type="date" 
-              className={inputCls} 
-              value={orderDate}
-              onChange={e => setOrderDate(e.target.value)}
-            />
+            <input type="date" className={inputCls} value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
           </div>
 
           <div className="flex flex-col gap-4">
             <div className="flex-1">
               <label className={labelCls}>Customer Name *</label>
-              <input 
-                type="text" 
-                className={inputCls} 
-                placeholder="Full Name" 
+              <input
+                type="text"
+                className={inputCls}
+                placeholder="Full Name"
                 value={customerName}
-                onChange={e => setCustomerName(e.target.value)}
+                onChange={(e) => setCustomerName(e.target.value)}
               />
             </div>
-
             <div className="flex-1">
               <label className={labelCls}>Phone Number (Optional)</label>
-              <input 
-                type="tel" 
-                className={inputCls} 
-                placeholder="080..." 
+              <input
+                type="tel"
+                className={inputCls}
+                placeholder="080..."
                 value={customerPhone}
-                onChange={e => setCustomerPhone(e.target.value)}
+                onChange={(e) => setCustomerPhone(e.target.value)}
               />
             </div>
           </div>
@@ -287,15 +344,20 @@ export function AdminRecordSalePage() {
           <div>
             <label className={labelCls}>Select Sales Channel</label>
             <div className="grid grid-cols-3 gap-3">
-              {SOURCES.map(s => (
+              {SOURCES.map((s) => (
                 <button
                   key={s.id}
+                  type="button"
                   onClick={() => setSource(s.id)}
                   className={
                     'flex flex-col items-center gap-2 rounded-2xl border p-3 transition-all ' +
-                    (source === s.id 
-                      ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500' 
-                      : ad(theme, 'border-stone-100 bg-stone-50 hover:bg-stone-100', 'border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800'))
+                    (source === s.id
+                      ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500'
+                      : ad(
+                          theme,
+                          'border-stone-100 bg-stone-50 hover:bg-stone-100',
+                          'border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800',
+                        ))
                   }
                 >
                   {s.icon.startsWith('material:') ? (
@@ -312,85 +374,102 @@ export function AdminRecordSalePage() {
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <label className={labelCls + ' mb-0'}>Products</label>
-              <button 
-                onClick={() => setView('products')}
-                className="flex items-center gap-1 text-[13px] font-bold text-emerald-600"
-              >
-                <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                Select Products
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setView('add_product')}
+                  className="flex items-center gap-1 text-[13px] font-bold text-emerald-600"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add_box</span>
+                  {justAddedCatalogId ? 'Product added ✓' : 'Add new product'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView('products')}
+                  className="flex items-center gap-1 text-[13px] font-bold text-emerald-600"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                  Select products
+                </button>
+              </div>
             </div>
-            
+
             {selectedItems.length > 0 ? (
               <div className="space-y-3">
-                {selectedItems.map(item => {
-                  const prod = catalog.find(c => c.id === item.id)?.payload
+                {selectedItems.map((item) => {
+                  const prod = catalog.find((c) => c.id === item.id)?.payload
                   if (!prod) return null
                   return (
-                    <div key={item.id} className={'rounded-2xl border p-4 ' + border + ' ' + ad(theme, 'bg-stone-50/50', 'bg-neutral-900/30')}>
-                      <div className="flex gap-3 mb-4">
-                        <img src={prod.img} className="size-12 rounded-lg object-cover" />
+                    <div
+                      key={item.id}
+                      className={'rounded-2xl border p-4 ' + border + ' ' + ad(theme, 'bg-stone-50/50', 'bg-neutral-900/30')}
+                    >
+                      <div className="mb-4 flex gap-3">
+                        <img src={prod.img} alt="" className="size-12 rounded-lg object-cover" />
                         <div className="min-w-0 flex-1">
-                          <p className="font-bold truncate">{prod.name}</p>
-                          <p className={muted + ' text-[12px]'}>₦{item.price.toLocaleString()}</p>
+                          <p className="truncate font-bold">{prod.name}</p>
+                          <p className={muted + ' text-[12px]'}>â‚¦{item.price.toLocaleString()}</p>
                         </div>
-                        <button 
-                          onClick={() => setSelectedItems(prev => prev.filter(i => i.id !== item.id))}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedItems((prev) => prev.filter((i) => i.id !== item.id))}
                           className="text-rose-500"
                         >
                           <span className="material-symbols-outlined">delete</span>
                         </button>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-3">
                         {prod.colorOptions && prod.colorOptions.length > 0 && (
                           <div className="col-span-2 sm:col-span-1">
-                            <label className="text-[10px] font-bold uppercase text-stone-400 mb-1 block">Variant</label>
-                            <select 
+                            <label className="mb-1 block text-[10px] font-bold uppercase text-stone-400">Variant</label>
+                            <select
                               className={inputCls + ' py-1.5 text-[13px]'}
                               value={item.variantId}
-                              onChange={e => updateItem(item.id, { variantId: e.target.value })}
+                              onChange={(e) => updateItem(item.id, { variantId: e.target.value })}
                             >
-                              {prod.colorOptions.map(v => (
-                                <option key={v.id} value={v.id}>{v.label}</option>
+                              {prod.colorOptions.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {v.label}
+                                </option>
                               ))}
                             </select>
                           </div>
                         )}
                         <div className="col-span-1">
-                          <label className="text-[10px] font-bold uppercase text-stone-400 mb-1 block">Qty</label>
-                          <input 
-                            type="number" 
-                            min="1" 
+                          <label className="mb-1 block text-[10px] font-bold uppercase text-stone-400">Qty</label>
+                          <input
+                            type="number"
+                            min="1"
                             className={inputCls + ' py-1.5 text-[13px]'}
                             value={item.quantity}
-                            onChange={e => updateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                            onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
                           />
                         </div>
                         <div className="col-span-1">
-                          <label className="text-[10px] font-bold uppercase text-stone-400 mb-1 block">Price</label>
-                          <input 
-                            type="number" 
+                          <label className="mb-1 block text-[10px] font-bold uppercase text-stone-400">Price</label>
+                          <input
+                            type="number"
                             className={inputCls + ' py-1.5 text-[13px]'}
                             value={item.price}
-                            onChange={e => updateItem(item.id, { price: parseInt(e.target.value) || 0 })}
+                            onChange={(e) => updateItem(item.id, { price: parseInt(e.target.value) || 0 })}
                           />
                         </div>
                       </div>
                     </div>
                   )
                 })}
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-emerald-600 text-white font-bold">
+                <div className="flex items-center justify-between rounded-2xl bg-emerald-600 p-4 font-bold text-white">
                   <span>Total Amount</span>
-                  <span>₦{totalAmount.toLocaleString()}</span>
+                  <span>â‚¦{totalAmount.toLocaleString()}</span>
                 </div>
               </div>
             ) : (
               <div className={'flex flex-col items-center justify-center rounded-2xl border border-dashed py-8 ' + border + ' ' + muted}>
-                <span className="material-symbols-outlined text-4xl mb-2">shopping_cart</span>
-                <p className="text-[13px]">No products selected yet</p>
+                <span className="material-symbols-outlined mb-2 text-4xl">shopping_cart</span>
+                <p className="text-center text-[13px]">No products yet â€” add a new product or select from your catalog</p>
               </div>
             )}
           </div>
@@ -402,16 +481,19 @@ export function AdminRecordSalePage() {
                 { id: 'unpaid', label: 'UNPAID' },
                 { id: 'paid', label: 'PAID' },
                 { id: 'partially_paid', label: 'PARTIALLY PAID' },
-              ].map(st => (
+              ].map((st) => (
                 <button
                   key={st.id}
-                  onClick={() => setPaymentStatus(st.id as any)}
-                  className={'flex-1 rounded-xl py-3 text-[11px] font-bold transition-all ' + 
-                    (paymentStatus === st.id 
-                      ? 'bg-rose-50 text-rose-600 ring-1 ring-rose-500' 
-                      : ad(theme, 'bg-stone-100 text-stone-500', 'bg-neutral-800 text-neutral-400'))}
+                  type="button"
+                  onClick={() => setPaymentStatus(st.id as 'unpaid' | 'paid' | 'partially_paid')}
+                  className={
+                    'flex-1 rounded-xl py-3 text-[11px] font-bold transition-all ' +
+                    (paymentStatus === st.id
+                      ? 'bg-rose-50 text-rose-600 ring-1 ring-rose-500'
+                      : ad(theme, 'bg-stone-100 text-stone-500', 'bg-neutral-800 text-neutral-400'))
+                  }
                 >
-                  {paymentStatus === st.id && '✓ '} {st.label}
+                  {paymentStatus === st.id && 'âœ“ '} {st.label}
                 </button>
               ))}
             </div>
@@ -419,11 +501,7 @@ export function AdminRecordSalePage() {
 
           <div>
             <label className={labelCls}>Delivery Status</label>
-            <select
-              className={inputCls}
-              value={deliveryStatus}
-              onChange={e => setDeliveryStatus(e.target.value as any)}
-            >
+            <select className={inputCls} value={deliveryStatus} onChange={(e) => setDeliveryStatus(e.target.value as typeof deliveryStatus)}>
               <option value="pending">Pending</option>
               <option value="processing">Processing</option>
               <option value="delivered">Delivered</option>
@@ -432,21 +510,21 @@ export function AdminRecordSalePage() {
 
           <div>
             <label className={labelCls}>Delivery Address (Optional)</label>
-            <textarea 
-              className={inputCls + ' h-20 resize-none'} 
+            <textarea
+              className={inputCls + ' h-20 resize-none'}
               placeholder="Street, City, State..."
               value={address}
-              onChange={e => setAddress(e.target.value)}
+              onChange={(e) => setAddress(e.target.value)}
             />
           </div>
 
           <div>
             <label className={labelCls}>Notes (Optional)</label>
-            <textarea 
-              className={inputCls + ' h-24 resize-none'} 
+            <textarea
+              className={inputCls + ' h-24 resize-none'}
               placeholder="Any extra details..."
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={(e) => setNotes(e.target.value)}
             />
           </div>
         </div>
@@ -454,10 +532,11 @@ export function AdminRecordSalePage() {
 
       <div className={'fixed bottom-0 left-0 right-0 z-20 border-t p-4 ' + panel + ' ' + border}>
         <div className="mx-auto max-w-2xl">
-          <button 
+          <button
+            type="button"
             onClick={handleSubmit}
             disabled={submitting || selectedItems.length === 0}
-            className="w-full rounded-2xl bg-emerald-700 py-4 text-white font-bold text-lg shadow-lg active:scale-[0.98] transition-all disabled:opacity-50"
+            className="w-full rounded-2xl bg-emerald-700 py-4 text-lg font-bold text-white shadow-lg transition-all active:scale-[0.98] disabled:opacity-50"
           >
             {submitting ? 'Recording sale...' : 'Record sale'}
           </button>

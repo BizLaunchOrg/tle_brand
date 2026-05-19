@@ -21,17 +21,24 @@ export async function fetchCatalogProducts(): Promise<CatalogProductRow[]> {
   return data as CatalogProductRow[]
 }
 
-export async function insertCatalogProduct(product: Product): Promise<{ ok: true } | { ok: false; message: string }> {
+export async function insertCatalogProduct(
+  product: Product,
+): Promise<{ ok: true; row: CatalogProductRow } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) return { ok: false, message: 'Not configured.' }
-  const { error } = await getSupabase().from('catalog_products').insert({
-    slug: product.slug,
-    payload: product,
-  })
+  const { data, error } = await getSupabase()
+    .from('catalog_products')
+    .insert({
+      slug: product.slug,
+      payload: product,
+    })
+    .select('id, slug, payload, created_at, updated_at')
+    .single()
   if (error) {
     if (error.code === '23505') return { ok: false, message: 'That slug already exists in staging.' }
     return { ok: false, message: 'Could not save product.' }
   }
-  return { ok: true }
+  if (!data) return { ok: false, message: 'Could not save product.' }
+  return { ok: true, row: data as CatalogProductRow }
 }
 
 export async function deleteCatalogProduct(id: string): Promise<boolean> {

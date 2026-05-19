@@ -44,7 +44,7 @@ export function CartDrawer() {
           ) : (
             cartItems.map((item) => {
               const lineKey = cartLineKey(item.slug, item.variantId)
-              const maxUnits = getProductPurchasableMaxUnits(item)
+              const maxUnits = getProductPurchasableMaxUnits(item, item.variantId)
               const atMax = item.quantity >= maxUnits
               const lineTotalNgn = parseProductPriceNgn(item.price) * item.quantity
               return (
