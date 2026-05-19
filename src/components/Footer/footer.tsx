@@ -68,7 +68,6 @@ export function Footer() {
               [
                 { label: 'Book a session', to: '/', hash: '#booking-form' },
                 { label: 'Photoshoot packages', to: '/', hash: '#photoshoot-promo' },
-                { label: 'Makeup & glam', to: '/makeup' },
               ] satisfies FooterLinkItem[]
             ).map((item) => (
               <li key={item.label}>

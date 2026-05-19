@@ -110,7 +110,7 @@ export function ProductDetailPage() {
   const lineQty = lineQuantityInCart(lineKey)
   const atCartMax = maxUnits < 999 && lineQty >= maxUnits
   const addDisabled = outOfStock || atCartMax
-  const addButtonLabel = outOfStock ? 'Out of stock' : atCartMax ? 'Maximum in cart' : inCart ? 'Added — add another' : 'Add to cart'
+  const addButtonLabel = outOfStock ? 'Sold out' : atCartMax ? 'Maximum in cart' : inCart ? 'Added — add another' : 'Add to cart'
 
   return (
     <section className="min-h-0 flex-1 bg-tle-cream/60 px-4 pb-20 pt-28 sm:px-6 md:px-10 md:pt-32 lg:px-16">
@@ -186,7 +186,7 @@ export function ProductDetailPage() {
               ) : null}
               {outOfStock ? (
                 <span className="pointer-events-none absolute bottom-4 left-4 rounded-lg border border-white/25 bg-black/55 px-3 py-1 text-[10px] font-bold tracking-wide text-white uppercase backdrop-blur-sm sm:text-[11px]">
-                  Unavailable
+                  Sold out
                 </span>
               ) : null}
               {product.badge?.trim() ? (
@@ -299,11 +299,8 @@ export function ProductDetailPage() {
             ) : null}
 
             <div className="mt-10 flex flex-col gap-3">
-              {!outOfStock && maxUnits < 5 && maxUnits >= 1 ? (
-                <p className="text-[13px] font-medium text-amber-900/90">Only {maxUnits} left in stock.</p>
-              ) : null}
               {outOfStock ? (
-                <p className="text-[13px] leading-relaxed text-tle-muted">Unavailable to order right now.</p>
+                <p className="text-[13px] font-medium text-tle-muted">Sold out</p>
               ) : null}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
               <button

@@ -62,7 +62,7 @@ export function FavoritesDrawer() {
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {unavailable ? (
                       <span className="rounded-full border border-black/10 bg-zinc-50 px-4 py-2 text-[10px] font-semibold tracking-wide text-zinc-500 uppercase">
-                        Out of stock
+                        Sold out
                       </span>
                     ) : (
                       <button
