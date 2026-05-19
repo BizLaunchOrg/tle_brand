@@ -10,6 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "catalog:push": "node scripts/catalog-push-from-json.mjs",
+    "reset:storage": "node scripts/reset-operational-data.mjs",
+    "reset:operational": "node scripts/reset-operational-data.mjs --db",
     "vapid:keys": "npx --yes web-push@3.6.7 generate-vapid-keys"
   },
   "dependencies": {

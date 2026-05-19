@@ -8,6 +8,7 @@ import {
   getGalleryUrls,
   getProductPurchasableMaxUnits,
   isProductOutOfStock,
+  isVariantOutOfStock,
   parseProductPriceNgn,
   productDescriptionPlainText,
   productSalePill,
@@ -106,8 +107,10 @@ export function ProductDetailPage() {
       ? { id: colorId, label: selectedVariant.label }
       : undefined
 
-  const outOfStock = isProductOutOfStock(product)
-  const maxUnits = getProductPurchasableMaxUnits(product)
+  const variantOutOfStock = isVariantOutOfStock(product, colorId)
+  const fullyOutOfStock = isProductOutOfStock(product)
+  const outOfStock = variantOutOfStock
+  const maxUnits = getProductPurchasableMaxUnits(product, colorId)
   const lineQty = lineQuantityInCart(lineKey)
   const atCartMax = maxUnits < 999 && lineQty >= maxUnits
   const addDisabled = outOfStock || atCartMax
@@ -185,7 +188,7 @@ export function ProductDetailPage() {
                   {saleLabel}
                 </span>
               ) : null}
-              {outOfStock ? (
+              {fullyOutOfStock ? (
                 <span className="pointer-events-none absolute bottom-4 left-4 rounded-lg border border-white/25 bg-black/55 px-3 py-1 text-[10px] font-bold tracking-wide text-white uppercase backdrop-blur-sm sm:text-[11px]">
                   Sold out
                 </span>
@@ -262,6 +265,7 @@ export function ProductDetailPage() {
                 <div className="flex flex-wrap gap-3">
                   {product.colorOptions.map((opt) => {
                     const selected = colorId === opt.id
+                    const optOos = isVariantOutOfStock(product, opt.id)
                     return (
                       <button
                         key={opt.id}
@@ -269,18 +273,23 @@ export function ProductDetailPage() {
                         onClick={() => setPickedColorId(opt.id)}
                         aria-pressed={selected}
                         className={`flex items-center gap-2.5 rounded-full border px-3 py-2 text-left text-sm font-medium transition-all ${
-                          selected
-                            ? 'border-tle-charcoal bg-tle-blush text-tle-ink shadow-sm'
-                            : 'border-black/10 bg-white text-tle-ink hover:border-tle-pink/40'
+                          optOos
+                            ? 'cursor-default border-black/10 bg-zinc-50 text-zinc-400'
+                            : selected
+                              ? 'border-tle-charcoal bg-tle-blush text-tle-ink shadow-sm'
+                              : 'border-black/10 bg-white text-tle-ink hover:border-tle-pink/40'
                         }`}
                       >
                         <span
                           className="size-7 shrink-0 rounded-full border border-black/10 shadow-inner"
-                          style={{ backgroundColor: opt.swatch }}
+                          style={{ backgroundColor: opt.swatch, opacity: optOos ? 0.45 : 1 }}
                           aria-hidden
                         />
-                        <span className="min-w-0 flex-1">{opt.label}</span>
-                        {opt.price ? (
+                        <span className="min-w-0 flex-1">
+                          {opt.label}
+                          {optOos ? <span className="ml-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400">Sold out</span> : null}
+                        </span>
+                        {opt.price && !optOos ? (
                           <span className="shrink-0 font-bold tabular-nums text-emerald-700">{formatProductPriceLabel(opt.price)}</span>
                         ) : null}
                       </button>

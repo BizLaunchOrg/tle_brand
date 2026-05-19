@@ -14,7 +14,7 @@ import {
   getDisplayPrice,
   getGalleryUrls,
   getProductPurchasableMaxUnits,
-  isProductOutOfStock,
+  isVariantOutOfStock,
   parseProductPriceNgn,
   PRODUCTS,
   type Product,
@@ -94,14 +94,14 @@ function hydrateCart(lines: PersistedCartLine[], products: Product[]): CartItem[
   for (const line of lines) {
     const p = productBySlug(products, line.slug)
     if (!p) continue
-    const max = getProductPurchasableMaxUnits(p)
-    if (max < 1) continue
-    const qty = Math.min(max, Math.min(999, Math.max(1, Math.floor(Number(line.quantity)) || 1)))
     let variant: CartVariant | undefined
     if (line.variantId) {
       const opt = p.colorOptions?.find((c) => c.id === line.variantId)
       if (opt) variant = { id: opt.id, label: opt.label }
     }
+    const max = getProductPurchasableMaxUnits(p, variant?.id)
+    if (max < 1) continue
+    const qty = Math.min(max, Math.min(999, Math.max(1, Math.floor(Number(line.quantity)) || 1)))
     out.push({ ...buildCartLine(p, variant), quantity: qty })
   }
   return out
@@ -234,8 +234,8 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
   const addToCart = useCallback(
     (product: Product, variant?: CartVariant) => {
       const live = productBySlug(shopProducts, product.slug) ?? product
-      if (isProductOutOfStock(live)) return
-      const max = getProductPurchasableMaxUnits(live)
+      if (isVariantOutOfStock(live, variant?.id)) return
+      const max = getProductPurchasableMaxUnits(live, variant?.id)
       const lineKey = cartLineKey(live.slug, variant?.id)
       setCartItems((prev) => {
         const existing = prev.find((item) => cartLineKey(item.slug, item.variantId) === lineKey)
@@ -258,7 +258,7 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
         prev.map((item) => {
           if (cartLineKey(item.slug, item.variantId) !== lineKey) return item
           const live = productBySlug(shopProducts, item.slug)
-          const max = getProductPurchasableMaxUnits(live ?? item)
+          const max = getProductPurchasableMaxUnits(live ?? item, item.variantId)
           if (item.quantity >= max) return item
           return { ...item, quantity: item.quantity + 1 }
         }),

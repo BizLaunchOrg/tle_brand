@@ -3,8 +3,11 @@ import { toast } from 'react-hot-toast'
 import {
   displayableImageUrl,
   getDefaultImageUrls,
+  adminProductStockSummary,
   formatProductPriceLabel,
+  isProductManuallyArchived,
   isProductOutOfStock,
+  isProductSoldThrough,
   parseProductPriceNgn,
   type Product,
   type ProductColorOption,
@@ -22,9 +25,11 @@ import { uploadProductImageFile } from '../../lib/adminProductMedia.ts'
 import {
   computeInventoryValueNgn,
   computeSoldUnitsFromOrders,
-  countExplicitOutOfStock,
+  countManuallyArchived,
+  countSoldThrough,
   adminStockAdClasses,
 } from '../../lib/adminProductStats.ts'
+import { NairaAmountInput } from './NairaAmountInput.tsx'
 import {
   deleteCatalogCategory,
   fetchCatalogCategories,
@@ -35,7 +40,14 @@ import { openProductMarginPrintReport } from '../../lib/adminMarginReport.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { ad, adminConfirmDelete, adminFont } from './adminUi.ts'
 
-type ColorDraft = { id: string; label: string; swatch: string; price: string; imagesText: string }
+type ColorDraft = {
+  id: string
+  label: string
+  swatch: string
+  price: string
+  stock: string
+  imagesText: string
+}
 
 /** #RGB or #RRGGBB for HTML colour picker (requires 6-digit hex). */
 function swatchForColorInput(hex: string): string {
@@ -76,6 +88,7 @@ function colorsFromProduct(p: Product): ColorDraft[] {
     label: c.label,
     swatch: c.swatch,
     price: c.price ?? '',
+    stock: typeof c.stock === 'number' ? String(c.stock) : '',
     imagesText: (c.images ?? []).join('\n'),
   }))
 }
@@ -113,6 +126,18 @@ function productFromDraft(
       const optN = parseProductPriceNgn(optRaw)
       opt.price = optN > 0 ? formatProductPriceLabel(optRaw) : optRaw
     }
+    const optStockRaw = c.stock.trim()
+    if (optStockRaw !== '') {
+      const optStock = Math.max(0, Math.floor(Number(optStockRaw)) || 0)
+      opt.stock = optStock
+      if (optStock === 0) {
+        opt.manualStockZero = true
+        delete opt.stockDepletedAt
+      } else {
+        delete opt.manualStockZero
+        delete opt.stockDepletedAt
+      }
+    }
     colorOptions.push(opt)
   }
 
@@ -127,8 +152,11 @@ function productFromDraft(
     tags: tags.length ? tags : undefined,
     colorOptions: colorOptions.length ? colorOptions : undefined,
   }
-  if (core.cp?.trim()) (p as Product).cp = core.cp.trim()
-  else delete (p as { cp?: string }).cp
+  const cpTrim = core.cp?.trim() ?? ''
+  if (cpTrim) {
+    const cpN = parseProductPriceNgn(cpTrim)
+    ;(p as Product).cp = cpN > 0 ? formatProductPriceLabel(cpTrim) : cpTrim
+  } else delete (p as { cp?: string }).cp
 
   const compareRaw = typeof core.compareAt === 'string' ? core.compareAt.trim() : ''
   const saleN = parseProductPriceNgn(p.price)
@@ -145,11 +173,24 @@ function productFromDraft(
   if (core.stockUnlimited === true) {
     ;(p as Product).stockUnlimited = true
     delete (p as { stock?: number }).stock
+    delete (p as { manualStockZero?: boolean }).manualStockZero
+    delete (p as { stockDepletedAt?: string }).stockDepletedAt
   } else {
     delete (p as { stockUnlimited?: boolean }).stockUnlimited
     if (typeof core.stock === 'number' && Number.isFinite(core.stock) && core.stock >= 0) {
-      ;(p as Product).stock = Math.floor(core.stock)
-    } else delete (p as { stock?: number }).stock
+      const n = Math.floor(core.stock)
+      ;(p as Product).stock = n
+      if (n === 0) {
+        ;(p as Product).manualStockZero = true
+        delete (p as { stockDepletedAt?: string }).stockDepletedAt
+      } else {
+        delete (p as { manualStockZero?: boolean }).manualStockZero
+        delete (p as { stockDepletedAt?: string }).stockDepletedAt
+      }
+    } else {
+      delete (p as { stock?: number }).stock
+      delete (p as { manualStockZero?: boolean }).manualStockZero
+    }
   }
   if (p.published !== false) delete (p as { published?: boolean }).published
   else (p as Product).published = false
@@ -220,7 +261,7 @@ export function AdminProductsPage() {
   const [newPresetName, setNewPresetName] = useState('')
   const [presetBusy, setPresetBusy] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [mainTab, setMainTab] = useState<'inventory' | 'collections' | 'archive'>('inventory')
+  const [mainTab, setMainTab] = useState<'inventory' | 'sold_out' | 'collections' | 'archive'>('inventory')
   const [collectionsOpen, setCollectionsOpen] = useState<Set<string>>(() => new Set())
   const collectionsDefaultedRef = useRef(false)
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all')
@@ -279,10 +320,13 @@ export function AdminProductsPage() {
     return rows.filter((row) => {
       const p = row.payload
       const isOos = isProductOutOfStock(p)
+      const archived = isProductManuallyArchived(p)
+      const soldThrough = isProductSoldThrough(p)
 
-      // Archive tab shows only OOS, Inventory tab shows only in-stock
       if (mainTab === 'archive') {
-        if (!isOos) return false
+        if (!archived) return false
+      } else if (mainTab === 'sold_out') {
+        if (!soldThrough || !isOos) return false
       } else if (mainTab === 'inventory') {
         if (isOos) return false
       }
@@ -301,8 +345,9 @@ export function AdminProductsPage() {
   const stats = useMemo(() => {
     const inv = computeInventoryValueNgn(rows)
     const sold = computeSoldUnitsFromOrders(orders)
-    const oos = countExplicitOutOfStock(rows)
-    return { inv, sold, oos }
+    const archived = countManuallyArchived(rows)
+    const soldThrough = countSoldThrough(rows)
+    return { inv, sold, archived, soldThrough }
   }, [rows, orders])
 
   const collectionsGrouped = useMemo(() => {
@@ -623,21 +668,26 @@ export function AdminProductsPage() {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className={'rounded-2xl border p-4 ' + ad(theme, 'border-stone-200 bg-white', 'border-neutral-700 bg-neutral-900/40')}>
           <p className={label}>Total inventory value</p>
           <p className={'mt-2 text-xl font-bold tabular-nums ' + ad(theme, 'text-stone-900', 'text-white')}>{formatNaira(stats.inv)}</p>
-          <p className={muted + ' mt-1 text-[12px]'}>Price × stock (set stock on each product).</p>
+          <p className={muted + ' mt-1 text-[12px]'}>Price × stock (per product or per colour).</p>
         </div>
         <div className={'rounded-2xl border p-4 ' + ad(theme, 'border-stone-200 bg-white', 'border-neutral-700 bg-neutral-900/40')}>
           <p className={label}>Units in orders</p>
           <p className={'mt-2 text-xl font-bold tabular-nums ' + ad(theme, 'text-stone-900', 'text-white')}>{stats.sold.toLocaleString()}</p>
-          <p className={muted + ' mt-1 text-[12px]'}>Sum of line quantities across orders.</p>
+          <p className={muted + ' mt-1 text-[12px]'}>Stock decreases when orders are placed.</p>
         </div>
         <div className={'rounded-2xl border p-4 ' + ad(theme, 'border-stone-200 bg-white', 'border-neutral-700 bg-neutral-900/40')}>
-          <p className={label}>Archived products</p>
-          <p className={'mt-2 text-xl font-bold tabular-nums ' + ad(theme, 'text-stone-900', 'text-white')}>{stats.oos}</p>
-          <p className={muted + ' mt-1 text-[12px]'}>Tracked quantity at 0 — hidden from storefront.</p>
+          <p className={label}>Sold out (from sales)</p>
+          <p className={'mt-2 text-xl font-bold tabular-nums ' + ad(theme, 'text-red-700', 'text-red-300')}>{stats.soldThrough}</p>
+          <p className={muted + ' mt-1 text-[12px]'}>Reached 0 via checkout — restock in Sold out tab.</p>
+        </div>
+        <div className={'rounded-2xl border p-4 ' + ad(theme, 'border-stone-200 bg-white', 'border-neutral-700 bg-neutral-900/40')}>
+          <p className={label}>Archived (you set 0)</p>
+          <p className={'mt-2 text-xl font-bold tabular-nums ' + ad(theme, 'text-stone-900', 'text-white')}>{stats.archived}</p>
+          <p className={muted + ' mt-1 text-[12px]'}>Still on shop as Sold out until you raise stock.</p>
         </div>
       </div>
 
@@ -654,6 +704,24 @@ export function AdminProductsPage() {
             }
           >
             Inventory
+          </button>
+          <button
+            type="button"
+            onClick={() => setMainTab('sold_out')}
+            className={
+              'relative rounded-lg px-4 py-2 text-[13px] font-bold transition ' +
+              (mainTab === 'sold_out'
+                ? ad(theme, 'bg-red-600 text-white', 'bg-red-600 text-white')
+                : ad(theme, 'text-stone-600 hover:bg-stone-50', 'text-neutral-400 hover:bg-neutral-800/60'))
+            }
+          >
+            Sold out
+            {stats.soldThrough > 0 ? (
+              <span
+                className="absolute -top-0.5 -right-0.5 size-2.5 animate-pulse rounded-full bg-red-500 ring-2 ring-white"
+                aria-hidden
+              />
+            ) : null}
           </button>
           <button
             type="button"
@@ -681,7 +749,7 @@ export function AdminProductsPage() {
           </button>
         </div>
 
-        {(mainTab === 'inventory' || mainTab === 'archive') ? (
+        {(mainTab === 'inventory' || mainTab === 'sold_out' || mainTab === 'archive') ? (
           <>
             <div className={'flex flex-col gap-3 border-b px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4 ' + ad(theme, 'border-stone-100 bg-stone-50/50', 'border-neutral-800 bg-neutral-950/30')}>
               <div className="flex flex-wrap gap-2">
@@ -736,9 +804,15 @@ export function AdminProductsPage() {
                     </button>
                   </>
                 )}
+                {mainTab === 'sold_out' && (
+                  <div className={'flex items-center gap-2 rounded-lg bg-red-100 px-3 py-1.5 text-[12px] font-bold text-red-900 ' + ad(theme, '', 'bg-red-950/40 text-red-200')}>
+                    <span className="size-2 shrink-0 animate-pulse rounded-full bg-red-500" aria-hidden />
+                    Sold through — increase stock to sell again
+                  </div>
+                )}
                 {mainTab === 'archive' && (
                   <div className={'flex items-center rounded-lg bg-rose-100 px-3 py-1.5 text-[12px] font-bold text-rose-900 ' + ad(theme, '', 'bg-rose-950/40 text-rose-200')}>
-                    Archived (Stock: 0)
+                    You set stock to 0 — still visible on shop as Sold out
                   </div>
                 )}
               </div>
@@ -782,12 +856,7 @@ export function AdminProductsPage() {
                 filteredRows.map((row) => {
                   const p = row.payload
                   const thumb = getDefaultImageUrls(p)[0]
-                  const stockLabel =
-                    p.stockUnlimited === true
-                      ? 'Unlimited'
-                      : typeof p.stock === 'number'
-                        ? String(p.stock)
-                        : '—'
+                  const stockLabel = adminProductStockSummary(p)
                   const stockCls = ad(theme, ...adminStockAdClasses(p))
                   const pub = isPublishedPayload(p)
                   const genderLabel = p.gender === 'unisex' ? 'unisex' : p.gender
@@ -905,12 +974,7 @@ export function AdminProductsPage() {
                     filteredRows.map((row) => {
                       const p = row.payload
                       const thumb = getDefaultImageUrls(p)[0]
-                      const stockLabel =
-                        p.stockUnlimited === true
-                          ? '∞'
-                          : typeof p.stock === 'number'
-                            ? String(p.stock)
-                            : '—'
+                      const stockLabel = adminProductStockSummary(p)
                       const stockCls = ad(theme, ...adminStockAdClasses(p))
                       const pub = isPublishedPayload(p)
                       const genderLabel = p.gender === 'unisex' ? 'unisex' : p.gender
@@ -1204,24 +1268,24 @@ export function AdminProductsPage() {
                 </div>
                 <div>
                   <label className={label}>CP — cost price (optional)</label>
-                  <input
-                    className={fieldBox(theme)}
+                  <NairaAmountInput
+                    theme={theme}
                     value={draft.cp ?? ''}
-                    onChange={(e) => setDraft((d) => ({ ...d, cp: e.target.value || undefined }))}
-                    placeholder="What you paid / unit"
+                    onChange={(v) => setDraft((d) => ({ ...d, cp: v || undefined }))}
+                    placeholder="0"
                   />
                 </div>
                 <div>
                   <label className={label}>SP — selling price (shop)</label>
-                  <input className={fieldBox(theme)} value={draft.price} onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))} placeholder="₦12,000" />
+                  <NairaAmountInput theme={theme} value={draft.price} onChange={(v) => setDraft((d) => ({ ...d, price: v }))} placeholder="12,000" />
                 </div>
                 <div>
                   <label className={label}>Compare-at (optional)</label>
-                  <input
-                    className={fieldBox(theme)}
+                  <NairaAmountInput
+                    theme={theme}
                     value={draft.compareAt ?? ''}
-                    onChange={(e) => setDraft((d) => ({ ...d, compareAt: e.target.value || undefined }))}
-                    placeholder="Higher “was” price — auto sale badge if above SP"
+                    onChange={(v) => setDraft((d) => ({ ...d, compareAt: v || undefined }))}
+                    placeholder="15,000"
                   />
                 </div>
                 {parseProductPriceNgn(draft.price) > 0 && parseProductPriceNgn(draft.cp) >= 0 ? (
@@ -1250,7 +1314,9 @@ export function AdminProductsPage() {
                       else setDraft((d) => ({ ...d, stock: Math.max(0, Math.floor(Number(v)) || 0) }))
                     }}
                   />
-                  <p className={muted + ' mt-1 text-[12px]'}>0 = sold out on the shop. Leave empty if you are not counting units.</p>
+                  <p className={muted + ' mt-1 text-[12px]'}>
+                    For single-SKU products. 0 = archived (shop shows Sold out). Use per-colour stock below when you have Gold / Silver etc.
+                  </p>
                 </div>
                 <div className="flex flex-col justify-end gap-2">
                   <label className={'flex cursor-pointer items-center gap-2 text-[13px] font-medium ' + ad(theme, 'text-stone-800', 'text-neutral-100')}>
@@ -1319,7 +1385,7 @@ export function AdminProductsPage() {
                     onClick={() =>
                       setColorDrafts((c) => [
                         ...c,
-                        { id: nextColorOptionId(c), label: '', swatch: '#8b7355', price: '', imagesText: '' },
+                        { id: nextColorOptionId(c), label: '', swatch: '#8b7355', price: '', stock: '', imagesText: '' },
                       ])
                     }
                     className={
@@ -1396,12 +1462,28 @@ export function AdminProductsPage() {
                           </div>
                           <div>
                             <label className={label}>Price override (optional)</label>
+                            <NairaAmountInput
+                              theme={theme}
+                              value={c.price}
+                              onChange={(v) => setColorDrafts((a) => a.map((x, i) => (i === idx ? { ...x, price: v } : x)))}
+                              placeholder="Same as main"
+                            />
+                          </div>
+                          <div>
+                            <label className={label}>In stock (this colour)</label>
                             <input
                               className={fieldBox(theme)}
-                              placeholder="Blank = main selling price"
-                              value={c.price}
-                              onChange={(e) => setColorDrafts((a) => a.map((x, i) => (i === idx ? { ...x, price: e.target.value } : x)))}
+                              type="number"
+                              min={0}
+                              step={1}
+                              placeholder="e.g. 7"
+                              disabled={draft.stockUnlimited === true}
+                              value={c.stock}
+                              onChange={(e) =>
+                                setColorDrafts((a) => a.map((x, i) => (i === idx ? { ...x, stock: e.target.value } : x)))
+                              }
                             />
+                            <p className={muted + ' mt-1 text-[11px]'}>Admin only. 0 = sold out for this finish on the shop.</p>
                           </div>
                         </div>
                         <div className="mt-3">
