@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
 import {
   cartLineKey,
+  formatProductPriceLabel,
   getDisplayPrice,
   getGalleryUrls,
   getProductPurchasableMaxUnits,
@@ -236,7 +237,7 @@ export function ProductDetailPage() {
             <p className="mt-4 flex flex-col gap-1">
               {showCompareAt ? (
                 <span className="font-sans text-lg font-semibold tabular-nums text-tle-muted line-through decoration-tle-muted/80">
-                  {product.compareAt}
+                  {formatProductPriceLabel(product.compareAt)}
                 </span>
               ) : null}
               <span className="font-sans text-[clamp(1.5rem,3vw,2rem)] font-bold tabular-nums text-emerald-700">{displayPrice}</span>
@@ -280,7 +281,7 @@ export function ProductDetailPage() {
                         />
                         <span className="min-w-0 flex-1">{opt.label}</span>
                         {opt.price ? (
-                          <span className="shrink-0 font-bold tabular-nums text-emerald-700">{opt.price}</span>
+                          <span className="shrink-0 font-bold tabular-nums text-emerald-700">{formatProductPriceLabel(opt.price)}</span>
                         ) : null}
                       </button>
                     )
@@ -379,7 +380,7 @@ export function ProductDetailPage() {
                     <p className="line-clamp-2 font-sans text-sm font-semibold text-tle-ink group-hover:text-tle-pink">
                       {p.name}
                     </p>
-                    <p className="mt-1 font-sans text-sm font-bold tabular-nums text-emerald-700">{p.price}</p>
+                    <p className="mt-1 font-sans text-sm font-bold tabular-nums text-emerald-700">{formatProductPriceLabel(p.price)}</p>
                   </div>
                 </Link>
               ))}
