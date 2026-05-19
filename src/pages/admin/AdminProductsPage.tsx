@@ -3,6 +3,7 @@ import { toast } from 'react-hot-toast'
 import {
   displayableImageUrl,
   getDefaultImageUrls,
+  formatProductPriceLabel,
   isProductOutOfStock,
   parseProductPriceNgn,
   type Product,
@@ -107,13 +108,21 @@ function productFromDraft(
       .map((s) => s.trim())
       .filter(Boolean)
     if (imgs.length) opt.images = imgs
-    if (c.price.trim()) opt.price = c.price.trim()
+    if (c.price.trim()) {
+      const optRaw = c.price.trim()
+      const optN = parseProductPriceNgn(optRaw)
+      opt.price = optN > 0 ? formatProductPriceLabel(optRaw) : optRaw
+    }
     colorOptions.push(opt)
   }
+
+  const priceTrim = core.price.trim()
+  const priceN = parseProductPriceNgn(priceTrim)
 
   const p: Product = {
     ...core,
     slug: core.slug.trim().replace(/\s+/g, '-'),
+    price: priceN > 0 ? formatProductPriceLabel(priceTrim) : priceTrim,
     gallery: gallery.length ? gallery : undefined,
     tags: tags.length ? tags : undefined,
     colorOptions: colorOptions.length ? colorOptions : undefined,
@@ -124,7 +133,9 @@ function productFromDraft(
   const compareRaw = typeof core.compareAt === 'string' ? core.compareAt.trim() : ''
   const saleN = parseProductPriceNgn(p.price)
   const compN = parseProductPriceNgn(compareRaw)
-  if (compareRaw && compN > saleN && saleN > 0) (p as Product).compareAt = compareRaw
+  if (compareRaw && compN > saleN && saleN > 0) {
+    ;(p as Product).compareAt = compN > 0 ? formatProductPriceLabel(compareRaw) : compareRaw
+  }
   else delete (p as { compareAt?: string }).compareAt
 
   delete (p as { promo?: string }).promo

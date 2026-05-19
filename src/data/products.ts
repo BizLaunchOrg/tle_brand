@@ -89,6 +89,17 @@ export function parseProductPriceNgn(price: string | number | undefined): number
   return Number.isFinite(n) ? Math.round(n) : 0
 }
 
+/** Storefront/admin label: always prefix ₦ when a numeric amount is present. */
+export function formatProductPriceLabel(price: string | number | undefined): string {
+  if (price === null || price === undefined) return ''
+  const raw = String(price).trim()
+  if (!raw) return ''
+  const n = parseProductPriceNgn(raw)
+  if (n > 0) return `₦${n.toLocaleString()}`
+  if (/₦/i.test(raw)) return raw
+  return raw
+}
+
 /** For her / for him lists include unisex pieces; the Unisex tab lists only pieces marked unisex. */
 export function productMatchesGender(p: Product, filter: 'all' | ProductGender): boolean {
   if (filter === 'all') return true
@@ -191,7 +202,7 @@ export function getGalleryUrls(product: Product, colorId?: string): string[] {
 
 export function getDisplayPrice(product: Product, colorId?: string): string {
   const opt = getActiveColorOption(product, colorId)
-  return opt?.price ?? product.price
+  return formatProductPriceLabel(opt?.price ?? product.price)
 }
 
 /** First color/finish when quick-adding from grids (shop / landing cards) */

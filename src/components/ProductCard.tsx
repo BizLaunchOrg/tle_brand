@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   displayableImageUrl,
+  formatProductPriceLabel,
   getDefaultImageUrls,
   isProductOutOfStock,
   productSalePill,
@@ -108,7 +109,7 @@ export function ProductCard({
           {name}
         </h3>
 
-        <p className="mt-1 font-sans text-base font-bold tabular-nums text-emerald-700 sm:text-xl">{price}</p>
+        <p className="mt-1 font-sans text-base font-bold tabular-nums text-emerald-700 sm:text-xl">{formatProductPriceLabel(price)}</p>
       </Link>
 
       <div className="mt-3.5 flex items-stretch gap-2 sm:mt-5">
