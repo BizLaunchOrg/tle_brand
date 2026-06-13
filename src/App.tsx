@@ -33,13 +33,16 @@ function App() {
       <ShopProductsProvider>
       <Toaster position="top-right" reverseOrder={false} />
       <Routes>
+        {/* Public auth callbacks — outside storefront layout */}
+        <Route path="/auth/confirm" element={<AuthConfirmPage />} />
+        <Route path="/admin/auth/confirm" element={<AuthConfirmPage />} />
+
         <Route path="/" element={<MainLayout />}>
           <Route index element={<LandingPage />} />
           <Route path="shop" element={<ShopPage />} />
           <Route path="checkout" element={<CheckoutPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="signup" element={<SignupPage />} />
-          <Route path="auth/confirm" element={<AuthConfirmPage />} />
           <Route path="product/:slug" element={<ProductDetailPage />} />
           <Route path="makeup" element={<MakeupPage />} />
           <Route path="contact" element={<ContactPage />} />
