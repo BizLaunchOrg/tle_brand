@@ -55,7 +55,11 @@ export function AuthConfirmPage() {
       }
 
       setState('success')
-      setMessage('Email confirmed successfully. Redirecting you to sign in...')
+      if (rawType === 'email_change') {
+        setMessage('Email updated. Redirecting you back to settings…')
+      } else {
+        setMessage('Email confirmed successfully. Redirecting you to sign in…')
+      }
       window.setTimeout(() => {
         navigate(nextPath, {
           replace: true,
@@ -84,7 +88,7 @@ export function AuthConfirmPage() {
         </div>
 
         <h1 className="font-sans text-[clamp(1.5rem,4vw,2rem)] font-semibold text-tle-ink">
-          {state === 'verifying' ? 'Confirming your email' : state === 'success' ? 'Email confirmed' : 'Confirmation failed'}
+          {state === 'verifying' ? 'Confirming your email' : state === 'success' ? (rawType === 'email_change' ? 'Email updated' : 'Email confirmed') : 'Confirmation failed'}
         </h1>
 
         <p
