@@ -184,15 +184,9 @@ export function Navbar() {
         >
           {user ? (
             <>
-              <div className="max-w-[180px] leading-tight lg:max-w-[220px]">
+              <div className="max-w-[200px] leading-tight lg:max-w-[240px]">
                 <p
                   className={`truncate text-[12px] font-semibold ${showSolidNav ? 'text-white' : 'text-tle-ink'}`}
-                  title={user.name}
-                >
-                  {user.name}
-                </p>
-                <p
-                  className={`truncate text-[10px] ${showSolidNav ? 'text-white/80' : 'text-tle-muted'}`}
                   title={user.email}
                 >
                   {user.email}

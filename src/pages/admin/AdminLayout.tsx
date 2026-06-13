@@ -5,6 +5,7 @@ import { ScrollToTop } from '../../components/ScrollToTop.tsx'
 import { useAuth } from '../../context/AuthContext'
 import { copyTextToClipboard, getPublicStorefrontShareUrl, getPublicStorefrontUrl } from '../../lib/storefrontUrl.ts'
 import { AdminThemeProvider, useAdminTheme } from './AdminThemeContext.tsx'
+import { AdminHeaderDropdown, AdminDropdownButton, AdminDropdownLink } from './AdminHeaderDropdown.tsx'
 import { ad, adminFont, adminInitialsFromEmail, adminProfileLabel } from './adminUi.ts'
 import {
   getAdminBrowserNotifyEnabled,
@@ -156,6 +157,8 @@ function AdminLayoutInner() {
   const location = useLocation()
   const [orderAlertCount, setOrderAlertCount] = useState(0)
   const [makeupAlertCount, setMakeupAlertCount] = useState(0)
+  const [storeMenuOpen, setStoreMenuOpen] = useState(false)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const storeShareUrl = getPublicStorefrontShareUrl()
   const storeHost = getPublicStorefrontUrl().replace(/^https?:\/\//, '')
 
@@ -280,7 +283,7 @@ function AdminLayoutInner() {
     <div className={shell}>
       <ScrollToTop />
       <div className="flex min-h-svh">
-        <aside className={`sticky top-0 hidden h-svh w-[248px] shrink-0 flex-col border-r lg:flex ${sidebar}`}>
+        <aside className={`sticky top-0 hidden h-svh w-[248px] shrink-0 flex-col overflow-hidden border-r lg:flex ${sidebar}`}>
           <div className="px-4 pt-6 pb-5">
             <Link to="/admin" className="flex items-center gap-2.5 no-underline">
               <span className="flex size-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-900/25">
@@ -326,7 +329,8 @@ function AdminLayoutInner() {
               ) : null}
             </Link>
           </div>
-          <nav className="flex flex-1 flex-col gap-0.5 px-3">
+          <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 [-ms-overflow-style:auto] [scrollbar-width:thin]">
+            <div className="flex flex-col gap-0.5">
             <NavItem to="/admin" end label="Dashboard" theme={theme} icon="dashboard" />
             <NavItem to="/admin/customers" label="Customers" theme={theme} icon="group" />
             <NavItem to="/admin/makeup-bookings" label="Makeup requests" theme={theme} icon="face_retouching_natural" badge={makeupAlertCount} />
@@ -336,9 +340,10 @@ function AdminLayoutInner() {
             <NavItem to="/admin/transactions" label="Transactions" theme={theme} icon="account_balance_wallet" badge={orderAlertCount} />
             <div className={ad(theme, 'my-2 mx-1 h-px bg-stone-100', 'my-2 mx-1 h-px bg-neutral-800')} />
             <NavItem to="/admin/account" label="Account" theme={theme} icon="person" />
+            </div>
           </nav>
 
-          <div className={ad(theme, 'mt-auto border-t border-stone-100 px-4 py-4', 'mt-auto border-t border-neutral-800 px-4 py-4')}>
+          <div className={ad(theme, 'shrink-0 border-t border-stone-100 px-4 py-4', 'shrink-0 border-t border-neutral-800 px-4 py-4')}>
             <div className="flex items-center gap-2.5">
               <span
                 className={ad(
@@ -464,21 +469,48 @@ function AdminLayoutInner() {
             )}
           >
             <div className="flex items-center gap-3">
-              <button type="button" onClick={() => void copyStoreLink()} className={shareBtnCls}>
-                Share store
-              </button>
-              <button
-                type="button"
-                className={ad(
-                  theme,
-                  'flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2 text-left text-[12px] font-semibold text-stone-800 hover:bg-stone-100',
-                  'flex items-center gap-2 rounded-xl border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-left text-[12px] font-semibold text-neutral-100 hover:bg-neutral-800',
-                )}
+              <AdminHeaderDropdown
+                theme={theme}
+                icon="storefront"
+                label="Main store"
+                open={storeMenuOpen}
+                onToggle={() => {
+                  setStoreMenuOpen((o) => !o)
+                  setProfileMenuOpen(false)
+                }}
+                onClose={() => setStoreMenuOpen(false)}
               >
-                <span className="material-symbols-outlined text-[18px] font-light text-emerald-600">location_on</span>
-                Main store
-                <span className="material-symbols-outlined text-[16px] opacity-60">expand_more</span>
-              </button>
+                <AdminDropdownLink
+                  theme={theme}
+                  to="/"
+                  icon="home"
+                  label="View website (customer site)"
+                  onSelect={() => setStoreMenuOpen(false)}
+                />
+                <AdminDropdownLink
+                  theme={theme}
+                  to="/shop"
+                  icon="shopping_bag"
+                  label="Open shop"
+                  onSelect={() => setStoreMenuOpen(false)}
+                />
+                <AdminDropdownLink
+                  theme={theme}
+                  to="/makeup"
+                  icon="face_retouching_natural"
+                  label="Makeup booking page"
+                  onSelect={() => setStoreMenuOpen(false)}
+                />
+                <AdminDropdownButton
+                  theme={theme}
+                  icon="link"
+                  label="Copy store link"
+                  onClick={() => {
+                    void copyStoreLink()
+                    setStoreMenuOpen(false)
+                  }}
+                />
+              </AdminHeaderDropdown>
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -493,27 +525,56 @@ function AdminLayoutInner() {
               >
                 <span className="material-symbols-outlined text-[22px] font-light">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>
               </button>
-              <div
-                className={ad(
-                  theme,
-                  'flex items-center gap-2 rounded-full border border-stone-200 py-1 pl-1 pr-3',
-                  'flex items-center gap-2 rounded-full border border-neutral-700 py-1 pl-1 pr-3',
-                )}
+              <AdminHeaderDropdown
+                theme={theme}
+                align="right"
+                open={profileMenuOpen}
+                onToggle={() => {
+                  setProfileMenuOpen((o) => !o)
+                  setStoreMenuOpen(false)
+                }}
+                onClose={() => setProfileMenuOpen(false)}
+                label={
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={ad(
+                        theme,
+                        'flex size-8 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-900',
+                        'flex size-8 items-center justify-center rounded-full bg-emerald-900/50 text-[11px] font-bold text-emerald-200',
+                      )}
+                    >
+                      {initials}
+                    </span>
+                    <span
+                      className={ad(
+                        theme,
+                        'max-w-[160px] truncate text-[12px] font-semibold text-stone-800',
+                        'max-w-[160px] truncate text-[12px] font-semibold text-neutral-200',
+                      )}
+                    >
+                      {profileLabel}
+                    </span>
+                  </span>
+                }
               >
-                <span
-                  className={ad(
-                    theme,
-                    'flex size-8 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-900',
-                    'flex size-8 items-center justify-center rounded-full bg-emerald-900/50 text-[11px] font-bold text-emerald-200',
-                  )}
-                >
-                  {initials}
-                </span>
-                <span className={ad(theme, 'max-w-[180px] truncate text-[12px] font-semibold text-stone-800', 'max-w-[180px] truncate text-[12px] font-semibold text-neutral-200')}>
-                  {profileLabel}
-                </span>
-                <span className="material-symbols-outlined text-[18px] text-stone-400">expand_more</span>
-              </div>
+                <AdminDropdownLink
+                  theme={theme}
+                  to="/admin/account"
+                  icon="settings"
+                  label="Settings"
+                  onSelect={() => setProfileMenuOpen(false)}
+                />
+                <AdminDropdownButton
+                  theme={theme}
+                  icon="logout"
+                  label="Sign out"
+                  danger
+                  onClick={() => {
+                    setProfileMenuOpen(false)
+                    void logout()
+                  }}
+                />
+              </AdminHeaderDropdown>
             </div>
           </header>
 
