@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { ScrollToTop } from '../../components/ScrollToTop.tsx'
 import { useAuth } from '../../context/AuthContext'
+import { copyTextToClipboard, getPublicStorefrontShareUrl, getPublicStorefrontUrl } from '../../lib/storefrontUrl.ts'
 import { AdminThemeProvider, useAdminTheme } from './AdminThemeContext.tsx'
-import { ad, adminFont } from './adminUi.ts'
+import { ad, adminFont, adminInitialsFromEmail, adminProfileLabel } from './adminUi.ts'
 import {
   getAdminBrowserNotifyEnabled,
   markBookingNotified,
@@ -154,7 +156,8 @@ function AdminLayoutInner() {
   const location = useLocation()
   const [orderAlertCount, setOrderAlertCount] = useState(0)
   const [makeupAlertCount, setMakeupAlertCount] = useState(0)
-  const storeOrigin = typeof window !== 'undefined' ? window.location.origin : ''
+  const storeShareUrl = getPublicStorefrontShareUrl()
+  const storeHost = getPublicStorefrontUrl().replace(/^https?:\/\//, '')
 
   const shell = [
     adminFont(),
@@ -170,21 +173,20 @@ function AdminLayoutInner() {
   const mainPad =
     'min-w-0 flex-1 px-4 py-5 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-6 lg:px-8 lg:py-8 lg:pb-10'
 
-  const initials = (user?.name || user?.email || '?')
-    .split(/\s+/)
-    .map((s) => s[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
+  const initials = adminInitialsFromEmail(user?.email)
+  const profileLabel = adminProfileLabel(user?.email)
 
   const copyStoreLink = async () => {
-    try {
-      await navigator.clipboard.writeText(storeOrigin)
-    } catch {
-      /* ignore */
-    }
+    const ok = await copyTextToClipboard(storeShareUrl)
+    if (ok) toast.success('Store link copied — share with customers')
+    else toast.error('Could not copy link. Try again.')
   }
 
+  const shareBtnCls = ad(
+    theme,
+    'rounded-full border border-stone-200 px-3 py-1.5 text-[11px] font-semibold text-stone-700 hover:bg-stone-50',
+    'rounded-full border border-neutral-700 px-3 py-1.5 text-[11px] font-semibold text-neutral-200 hover:bg-neutral-800/60',
+  )
   /**
    * PWA “Add to Home Screen” reads the linked manifest. `index.html` already swaps to the admin
    * manifest when the first load is under `/admin`; this effect keeps the link correct after SPA
@@ -398,7 +400,7 @@ function AdminLayoutInner() {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className={ad(theme, 'truncate text-[11px] font-medium text-stone-500', 'truncate text-[11px] font-medium text-neutral-500')}>
-                  {storeOrigin.replace(/^https?:\/\//, '')}
+                  {storeHost}
                 </p>
                 <Link
                   to="/admin"
@@ -422,16 +424,8 @@ function AdminLayoutInner() {
                 >
                   Push alerts
                 </Link>
-                <button
-                  type="button"
-                  onClick={() => void copyStoreLink()}
-                  className={ad(
-                    theme,
-                    'rounded-full border border-stone-200 px-3 py-1.5 text-[11px] font-semibold text-stone-700 hover:bg-stone-50',
-                    'rounded-full border border-neutral-700 px-3 py-1.5 text-[11px] font-semibold text-neutral-200 hover:bg-neutral-800/60',
-                  )}
-                >
-                  Share
+                <button type="button" onClick={() => void copyStoreLink()} className={shareBtnCls}>
+                  Share store
                 </button>
               </div>
             </div>
@@ -470,6 +464,9 @@ function AdminLayoutInner() {
             )}
           >
             <div className="flex items-center gap-3">
+              <button type="button" onClick={() => void copyStoreLink()} className={shareBtnCls}>
+                Share store
+              </button>
               <button
                 type="button"
                 className={ad(
@@ -512,8 +509,8 @@ function AdminLayoutInner() {
                 >
                   {initials}
                 </span>
-                <span className={ad(theme, 'max-w-[140px] truncate text-[12px] font-semibold text-stone-800', 'max-w-[140px] truncate text-[12px] font-semibold text-neutral-200')}>
-                  {user?.name || 'Merchant'}
+                <span className={ad(theme, 'max-w-[180px] truncate text-[12px] font-semibold text-stone-800', 'max-w-[180px] truncate text-[12px] font-semibold text-neutral-200')}>
+                  {profileLabel}
                 </span>
                 <span className="material-symbols-outlined text-[18px] text-stone-400">expand_more</span>
               </div>

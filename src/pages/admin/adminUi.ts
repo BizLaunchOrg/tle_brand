@@ -16,3 +16,22 @@ export function adminConfirmDelete(itemLabel?: string): boolean {
   const suffix = label ? ` “${label}”` : ' this item'
   return window.confirm(`Are you sure you want to delete${suffix}? This cannot be undone.`)
 }
+
+/** Admin avatar initials from the current sign-in email (updates after email change). */
+export function adminInitialsFromEmail(email: string | null | undefined): string {
+  if (!email) return '?'
+  const local = email.split('@')[0]?.replace(/[._+-]+/g, ' ').trim() ?? ''
+  const parts = local.split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase()
+  if (local.length >= 2) return local.slice(0, 2).toUpperCase()
+  return (local[0] ?? '?').toUpperCase()
+}
+
+/** Short label for admin chrome — prefer live email over stale profile name. */
+export function adminProfileLabel(email: string | null | undefined): string {
+  if (!email) return 'Merchant'
+  const at = email.indexOf('@')
+  if (at <= 0) return email
+  const local = email.slice(0, at)
+  return local.length > 22 ? `${local.slice(0, 20)}…` : local
+}
