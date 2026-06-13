@@ -39,6 +39,16 @@ export function AdminAccountPage() {
   }, [user?.email])
 
   useEffect(() => {
+    if (!isSupabaseConfigured()) return
+    void getSupabase().auth.refreshSession()
+  }, [])
+
+  useEffect(() => {
+    const noticeFromConfirm = (location.state as { authNotice?: string } | null)?.authNotice
+    if (noticeFromConfirm) setNotice(noticeFromConfirm)
+  }, [location.state])
+
+  useEffect(() => {
     setNotifyEnabled(getAdminBrowserNotifyEnabled())
   }, [])
 
@@ -160,7 +170,9 @@ export function AdminAccountPage() {
       setError(mapSupabaseAuthError(err, 'account_email'))
       return
     }
-    setNotice('Check your inbox (old and new address) and tap the confirmation link to finish the change.')
+    setNotice(
+      'For security, Supabase emails both your current and new address. Open the link in the new email to finish — the old-address email is only a heads-up.',
+    )
   }
 
   const onPassword = async (e: FormEvent) => {
@@ -261,6 +273,11 @@ export function AdminAccountPage() {
         </div>
 
         <p className={titleSm + ' mt-10 mb-2 px-1'}>Sign-in</p>
+        {user?.email ? (
+          <p className={rowSub + ' mb-2 px-1'}>
+            Signed in as <span className="font-medium text-inherit">{user.email}</span>
+          </p>
+        ) : null}
         <div className={listCard}>
           <form onSubmit={onEmail} className={'border-b px-5 py-5 ' + ad(theme, 'border-stone-100', 'border-neutral-800/80')}>
             <label className="block">

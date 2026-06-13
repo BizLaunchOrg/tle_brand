@@ -99,6 +99,7 @@ export function AuthConfirmPage() {
           finishError('This confirmation link is invalid or has expired. Please request a new one.')
           return
         }
+        await supabase.auth.refreshSession()
         stripHashFromUrl()
         finishSuccess(searchParams.get('type'))
         return
@@ -114,6 +115,7 @@ export function AuthConfirmPage() {
           finishError('This confirmation link is invalid or has expired. Please request a new one.')
           return
         }
+        await supabase.auth.refreshSession()
         finishSuccess(rawType)
         return
       }
@@ -134,6 +136,7 @@ export function AuthConfirmPage() {
           finishError('This confirmation link is invalid or has expired. Please request a new one.')
           return
         }
+        await supabase.auth.refreshSession()
         stripHashFromUrl()
         finishSuccess(hashType)
         return

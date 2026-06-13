@@ -110,9 +110,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (cancelled) return
-      const su = session?.user ?? null
+      let su = session?.user ?? null
+      if (event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+        const { data } = await supabase.auth.getUser()
+        su = data.user ?? su
+      }
       setUser(mapSupabaseUser(su))
       void runAdminCheck(su)
     })
