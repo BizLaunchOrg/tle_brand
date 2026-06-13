@@ -27,11 +27,17 @@ export function adminInitialsFromEmail(email: string | null | undefined): string
   return (local[0] ?? '?').toUpperCase()
 }
 
-/** Short label for admin chrome — prefer live email over stale profile name. */
+/** First name for dashboard greeting — from sign-in email, not old signup metadata. */
+export function adminGreetingName(email: string | null | undefined): string {
+  if (!email) return 'there'
+  const local = (email.split('@')[0] ?? '').replace(/[._+-]+/g, ' ').trim()
+  if (!local) return 'there'
+  const first = local.split(/\s+/)[0] ?? local
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase()
+}
+
+/** Nav / sidebar label — always the live sign-in email. */
 export function adminProfileLabel(email: string | null | undefined): string {
-  if (!email) return 'Merchant'
-  const at = email.indexOf('@')
-  if (at <= 0) return email
-  const local = email.slice(0, at)
-  return local.length > 22 ? `${local.slice(0, 20)}…` : local
+  if (!email) return 'Account'
+  return email.length > 28 ? `${email.slice(0, 26)}…` : email
 }
