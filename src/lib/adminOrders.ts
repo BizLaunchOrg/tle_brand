@@ -178,7 +178,6 @@ export async function insertOfflineOrder(order: Partial<AdminOrderRow>): Promise
     .single()
 
   if (error) {
-    console.error('Offline order insert error:', error)
     if (error.message.includes('row-level security')) {
       return { ok: false, message: 'Permission denied. Make sure you are logged in as an admin.' }
     }

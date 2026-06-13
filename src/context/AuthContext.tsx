@@ -10,6 +10,7 @@ import {
 } from 'react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { resolveAdminAccess } from '../lib/adminAccess'
+import { getSignupRedirectUrl } from '../lib/authRedirect.ts'
 import { getSupabase } from '../lib/supabaseClient'
 import { isSupabaseConfigured, mapSupabaseAuthError } from '../lib/mapSupabaseAuthError'
 
@@ -58,21 +59,6 @@ function mapSupabaseUser(user: SupabaseUser | null): AuthUser | null {
     id: user.id,
     email: user.email,
     name: getDisplayName(user),
-  }
-}
-
-function getSignupRedirectUrl() {
-  const fallback = `${window.location.origin}/login`
-  const configured = import.meta.env.VITE_AUTH_REDIRECT_URL?.trim()
-  if (!configured) return fallback
-
-  const firstCandidate = configured.split(',')[0]?.trim()
-  if (!firstCandidate) return fallback
-
-  try {
-    return new URL(firstCandidate).toString()
-  } catch {
-    return fallback
   }
 }
 

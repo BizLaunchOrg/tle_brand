@@ -3,6 +3,7 @@
 type AuthErrorLike = {
   message: string
   status?: number
+  code?: string
 }
 
 export function mapSupabaseAuthError(
@@ -12,6 +13,7 @@ export function mapSupabaseAuthError(
   const raw = (error.message || '').trim()
   const msg = raw.toLowerCase()
   const status = error.status
+  const code = (error.code || '').toLowerCase()
 
   if (
     status === 0 ||
@@ -23,7 +25,12 @@ export function mapSupabaseAuthError(
     return 'Unable to reach the server. Check your connection and try again.'
   }
 
-  if (msg.includes('too many requests') || msg.includes('rate limit') || msg.includes('email rate limit')) {
+  if (
+    msg.includes('too many requests') ||
+    msg.includes('rate limit') ||
+    msg.includes('email rate limit') ||
+    code.includes('over_email_send_rate_limit')
+  ) {
     return 'Too many attempts. Please wait a few minutes and try again.'
   }
 
@@ -35,16 +42,47 @@ export function mapSupabaseAuthError(
       return 'Enter a different email address than your current one.'
     }
     if (
+      code === 'email_exists' ||
       msg.includes('already registered') ||
       msg.includes('already been registered') ||
       msg.includes('user already exists') ||
       msg.includes('email address is already registered') ||
-      msg.includes('already been taken')
+      msg.includes('already been taken') ||
+      msg.includes('email address is already')
     ) {
       return 'That email is already in use. Try another address.'
     }
     if (msg.includes('invalid email') || msg.includes('invalid format') || msg.includes('validate email')) {
       return 'Enter a valid email address.'
+    }
+    if (
+      msg.includes('redirect') ||
+      msg.includes('not allowed') ||
+      msg.includes('url configuration') ||
+      code.includes('redirect')
+    ) {
+      return 'Email could not be sent — the site redirect URL may need to be added in Supabase (Authentication → URL Configuration). Contact support if this keeps happening.'
+    }
+    if (
+      msg.includes('error sending') ||
+      msg.includes('confirmation email') ||
+      msg.includes('smtp') ||
+      msg.includes('mail') ||
+      msg.includes('email provider')
+    ) {
+      return 'Could not send the confirmation email. Check that the new address is correct, or try again in a few minutes.'
+    }
+    if (
+      msg.includes('session') ||
+      msg.includes('jwt') ||
+      msg.includes('not authenticated') ||
+      msg.includes('login required') ||
+      code.includes('session_not_found')
+    ) {
+      return 'Your session expired. Sign out, sign in again, then update your email.'
+    }
+    if (msg.includes('reauthenticate') || msg.includes('recent login') || code.includes('reauthentication')) {
+      return 'For security, sign out, sign in again with your password, then update your email.'
     }
     if (status !== undefined && status >= 500) {
       return 'The service is temporarily unavailable. Please try again later.'

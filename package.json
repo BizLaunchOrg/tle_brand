@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build && node scripts/copy-spa-fallback.mjs",
     "icons:generate": "node scripts/generate-icons.mjs",
+    "email:preview": "npx --yes serve email-templates -p 4179",
     "lint": "eslint .",
     "preview": "vite preview",
     "catalog:push": "node scripts/catalog-push-from-json.mjs",

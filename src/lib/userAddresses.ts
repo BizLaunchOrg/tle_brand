@@ -21,10 +21,7 @@ export async function fetchUserAddresses(): Promise<UserAddress[]> {
     .select('*')
     .order('created_at', { ascending: false })
   
-  if (error) {
-    console.error('Error fetching addresses:', error)
-    return []
-  }
+  if (error) return []
   return data as UserAddress[]
 }
 

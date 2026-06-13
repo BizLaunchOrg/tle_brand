@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { getSupabase } from '../../lib/supabaseClient'
+import { getEmailChangeRedirectUrl } from '../../lib/authRedirect.ts'
 import { isSupabaseConfigured, mapSupabaseAuthError } from '../../lib/mapSupabaseAuthError'
 import { useAuth } from '../../context/AuthContext'
 import { useAdminTheme } from './AdminThemeContext.tsx'
@@ -139,18 +140,27 @@ export function AdminAccountPage() {
       return
     }
     const next = email.trim().toLowerCase()
-    if (!next || next === user?.email) {
+    if (!next || next === user?.email?.toLowerCase()) {
       setNotice('No change.')
       return
     }
+    const supabase = getSupabase()
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (!sessionData.session) {
+      setError('Your session expired. Sign out, sign in again, then update your email.')
+      return
+    }
     setBusyEmail(true)
-    const { error: err } = await getSupabase().auth.updateUser({ email: next })
+    const { error: err } = await supabase.auth.updateUser(
+      { email: next },
+      { emailRedirectTo: getEmailChangeRedirectUrl('/admin/account') },
+    )
     setBusyEmail(false)
     if (err) {
       setError(mapSupabaseAuthError(err, 'account_email'))
       return
     }
-    setNotice('Confirm the new address from your inbox.')
+    setNotice('Check your inbox (old and new address) and tap the confirmation link to finish the change.')
   }
 
   const onPassword = async (e: FormEvent) => {
