@@ -15,7 +15,7 @@ import { fetchOrdersForAdmin } from '../../lib/adminOrders.ts'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { AdminRangeTabs, adminDeliveryPillClass } from './adminRangeTabs.tsx'
-import { ad, adminFont } from './adminUi.ts'
+import { ad, adminFont, adminGreetingName } from './adminUi.ts'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
@@ -200,7 +200,7 @@ export function AdminDashboardPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className={ad(theme, 'text-xl font-bold tracking-tight text-stone-900', 'text-xl font-bold tracking-tight text-neutral-50')}>
-              Hi {user?.name?.split(' ')[0] || 'there'}
+              Hi {adminGreetingName(user?.email)}
             </h1>
             <p className={muted + ' mt-0.5 text-[13px]'}>Here is how your store is performing.</p>
           </div>
@@ -397,7 +397,7 @@ export function AdminDashboardPage() {
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div>
             <h1 className={ad(theme, 'text-3xl font-bold tracking-tight text-stone-900', 'text-3xl font-bold tracking-tight text-neutral-50')}>
-              Hi {user?.name?.split(' ')[0] || 'there'}
+              Hi {adminGreetingName(user?.email)}
             </h1>
             <p className={muted + ' mt-2 max-w-xl text-[15px] leading-relaxed'}>
               Business overview from checkout. Use the period filter for a quick pulse; yearly figures use the year selector below.
