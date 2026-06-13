@@ -29,7 +29,7 @@ export function getSignupRedirectUrl(): string {
  */
 export function getEmailChangeRedirectUrl(nextPath = '/admin/account'): string {
   const safeNext = nextPath.startsWith('/') ? nextPath : '/admin/account'
-  const confirmPath = `/auth/confirm?next=${encodeURIComponent(safeNext)}`
+  const confirmPath = `/admin/auth/confirm?next=${encodeURIComponent(safeNext)}`
 
   if (typeof window !== 'undefined') {
     return `${window.location.origin}${confirmPath}`
