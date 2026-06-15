@@ -39,7 +39,7 @@ function pickVariantForLine(
   if (options.length === 0) return ''
   const used = new Set(existingForProduct.map((l) => l.variantId))
   const next = options.find((o) => !used.has(o.id))
-  return (next ?? options[0]).id
+  return (next ?? options[0])?.id ?? ''
 }
 
 function linePriceForVariant(payload: CatalogProductRow['payload'], variantId: string): number {
@@ -73,18 +73,22 @@ export function AdminRecordSalePage() {
 
   useEffect(() => {
     void (async () => {
-      const p = await fetchCatalogProducts()
-      setCatalog(p)
-      setLoading(false)
+      try {
+        const p = await fetchCatalogProducts()
+        setCatalog(p)
+      } finally {
+        setLoading(false)
+      }
     })()
   }, [])
 
   const filteredCatalog = useMemo(() => {
     const q = search.toLowerCase().trim()
     if (!q) return catalog
-    return catalog.filter(
-      (c) => c.payload.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q),
-    )
+    return catalog.filter((c) => {
+      const name = c.payload?.name?.toLowerCase() ?? ''
+      return name.includes(q) || c.slug.toLowerCase().includes(q)
+    })
   }, [catalog, search])
 
   const totalAmount = useMemo(() => {
@@ -109,39 +113,9 @@ export function AdminRecordSalePage() {
     })
   }, [])
 
-  const duplicateLine = useCallback(
-    (lineId: string) => {
-      setSelectedItems((prev) => {
-        const source = prev.find((item) => item.lineId === lineId)
-        if (!source) return prev
-        const row = catalog.find((c) => c.id === source.id)
-        if (!row) return prev
-        const existingForProduct = prev.filter((item) => item.id === source.id)
-        const variantId = pickVariantForLine(row.payload, existingForProduct)
-        const price = linePriceForVariant(row.payload, variantId)
-        return [
-          ...prev,
-          {
-            lineId: newLineId(),
-            id: source.id,
-            variantId,
-            quantity: source.quantity,
-            price,
-          },
-        ]
-      })
-    },
-    [catalog],
-  )
-
   const removeLine = useCallback((lineId: string) => {
     setSelectedItems((prev) => prev.filter((item) => item.lineId !== lineId))
   }, [])
-
-  const lineCountForProduct = useCallback(
-    (catalogId: string) => selectedItems.filter((item) => item.id === catalogId).length,
-    [selectedItems],
-  )
   const handleNewProductSaved = (row: CatalogProductRow) => {
     setCatalog((prev) => [row, ...prev.filter((r) => r.id !== row.id)])
     setJustAddedCatalogId(row.id)
@@ -152,6 +126,10 @@ export function AdminRecordSalePage() {
 
   const addProductFromPicker = (prod: CatalogProductRow) => {
     addCatalogRowToSale(prod)
+  }
+
+  const removeProductLines = (catalogId: string) => {
+    setSelectedItems((prev) => prev.filter((item) => item.id !== catalogId))
   }
 
   const updateItem = (lineId: string, updates: Partial<SelectedProduct>) => {
@@ -300,56 +278,65 @@ export function AdminRecordSalePage() {
           </div>
 
           <div className="space-y-0 divide-y">
+            {filteredCatalog.length === 0 ? (
+              <p className={'py-10 text-center text-[14px] ' + muted}>
+                {catalog.length === 0 ? 'No products in your catalog yet.' : 'No products match your search.'}
+              </p>
+            ) : null}
             {filteredCatalog.map((prod) => {
-              const lineCount = lineCountForProduct(prod.id)
+              const lineCount = selectedItems.filter((item) => item.id === prod.id).length
               const p = prod.payload
+              if (!p) return null
               const justAdded = prod.id === justAddedCatalogId
               return (
                 <div
                   key={prod.id}
+                  onClick={() => addProductFromPicker(prod)}
                   className={
-                    'flex items-center gap-4 py-4 transition-all ' +
+                    'flex cursor-pointer items-center gap-4 py-4 transition-all active:bg-stone-100 ' +
+                    (lineCount > 0 ? 'bg-emerald-50/30' : '') +
                     (justAdded ? ' ring-2 ring-inset ring-emerald-400' : '')
                   }
                 >
-                  <button
-                    type="button"
-                    onClick={() => addProductFromPicker(prod)}
+                  <div
                     className={
-                      'flex min-w-0 flex-1 cursor-pointer items-center gap-4 text-left active:bg-stone-100 ' +
-                      ad(theme, '', 'active:bg-neutral-900/40')
+                      'flex size-6 shrink-0 items-center justify-center rounded border-2 transition-colors ' +
+                      (lineCount > 0 ? 'border-emerald-600 bg-emerald-600' : 'border-stone-300')
                     }
                   >
-                    <div
-                      className={
-                        'flex size-6 shrink-0 items-center justify-center rounded border-2 transition-colors ' +
-                        (lineCount > 0 ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-stone-300')
-                      }
-                    >
-                      {lineCount > 0 ? (
-                        <span className="text-[11px] font-bold">{lineCount}</span>
-                      ) : (
-                        <span className="material-symbols-outlined text-[18px]">add</span>
-                      )}
-                    </div>
+                    {lineCount > 0 ? (
+                      <span className="text-[11px] font-bold text-white">{lineCount}</span>
+                    ) : null}
+                  </div>
 
-                    <div className="relative size-14 shrink-0 overflow-hidden rounded-xl border bg-stone-100">
-                      <img src={p.img} alt="" className="size-full object-cover" />
-                    </div>
+                  <div className="relative size-14 shrink-0 overflow-hidden rounded-xl border bg-stone-100">
+                    <img src={p.img} alt="" className="size-full object-cover" />
+                  </div>
 
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-[15px] font-bold">{p.name}</h3>
-                      <p className={muted + ' mt-0.5 text-[12px]'}>
-                        {justAdded ? 'Just added · ' : ''}
-                        Tap to add{lineCount > 0 ? ' again' : ''} · {p.colorOptions?.length || 0} variations ·{' '}
-                        {p.stockUnlimited ? 'In stock' : `${p.stock ?? 0} in stock`}
-                      </p>
-                    </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-[15px] font-bold">{p.name}</h3>
+                    <p className={muted + ' mt-0.5 text-[12px]'}>
+                      {justAdded ? 'Just added · ' : ''}
+                      Tap to add{lineCount > 0 ? ' again' : ''} · {p.colorOptions?.length || 0} variations ·{' '}
+                      {p.stockUnlimited ? 'In stock' : `${p.stock ?? 0} in stock`}
+                    </p>
+                  </div>
 
-                    <div className="shrink-0 text-right">
-                      <p className="text-[15px] font-bold">₦{parseProductPriceNgn(p.price).toLocaleString()}</p>
-                    </div>
-                  </button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <p className="text-[15px] font-bold">₦{parseProductPriceNgn(p.price).toLocaleString()}</p>
+                    {lineCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeProductLines(prod.id)
+                        }}
+                        className="rounded-lg px-2 py-1 text-[11px] font-bold text-rose-600"
+                      >
+                        Clear
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               )
             })}
@@ -471,11 +458,9 @@ export function AdminRecordSalePage() {
 
             {selectedItems.length > 0 ? (
               <div className="space-y-3">
-                {selectedItems.map((item, lineIndex) => {
+                {selectedItems.map((item) => {
                   const prod = catalog.find((c) => c.id === item.id)?.payload
                   if (!prod) return null
-                  const variantLabel =
-                    prod.colorOptions?.find((v) => v.id === item.variantId)?.label || 'Default'
                   return (
                     <div
                       key={item.lineId}
@@ -485,17 +470,12 @@ export function AdminRecordSalePage() {
                         <img src={prod.img} alt="" className="size-12 rounded-lg object-cover" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-bold">{prod.name}</p>
-                          <p className={muted + ' text-[12px]'}>
-                            Line {lineIndex + 1}
-                            {prod.colorOptions && prod.colorOptions.length > 0 ? ` · ${variantLabel}` : ''} · ₦
-                            {item.price.toLocaleString()} each
-                          </p>
+                          <p className={muted + ' text-[12px]'}>₦{item.price.toLocaleString()}</p>
                         </div>
                         <button
                           type="button"
                           onClick={() => removeLine(item.lineId)}
                           className="text-rose-500"
-                          aria-label="Remove line"
                         >
                           <span className="material-symbols-outlined">delete</span>
                         </button>
@@ -504,9 +484,7 @@ export function AdminRecordSalePage() {
                       <div className="grid grid-cols-2 gap-3">
                         {prod.colorOptions && prod.colorOptions.length > 0 && (
                           <div className="col-span-2 sm:col-span-1">
-                            <label className="mb-1 block text-[10px] font-bold uppercase text-stone-400">
-                              Colour / style
-                            </label>
+                            <label className="mb-1 block text-[10px] font-bold uppercase text-stone-400">Variant</label>
                             <select
                               className={inputCls + ' py-1.5 text-[13px]'}
                               value={item.variantId}
@@ -544,20 +522,6 @@ export function AdminRecordSalePage() {
                           />
                         </div>
                       </div>
-
-                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-dashed pt-3 border-stone-200/80">
-                        <p className={muted + ' text-[12px]'}>
-                          Line total: ₦{(item.price * item.quantity).toLocaleString()}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => duplicateLine(item.lineId)}
-                          className="flex items-center gap-1 text-[12px] font-bold text-emerald-600"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">add</span>
-                          Add another colour / line
-                        </button>
-                      </div>
                     </div>
                   )
                 })}
@@ -569,10 +533,7 @@ export function AdminRecordSalePage() {
             ) : (
               <div className={'flex flex-col items-center justify-center rounded-2xl border border-dashed py-8 ' + border + ' ' + muted}>
                 <span className="material-symbols-outlined mb-2 text-4xl">shopping_cart</span>
-                <p className="text-center text-[13px]">
-                  No products yet — add a new product or select from your catalog. Tap the same product again for another
-                  colour or style.
-                </p>
+                <p className="text-center text-[13px]">No products yet — add a new product or select from your catalog</p>
               </div>
             )}
           </div>
