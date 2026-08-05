@@ -337,6 +337,7 @@ function AdminLayoutInner() {
             <NavItem to="/admin/makeup-hours" label="Makeup hours" theme={theme} icon="schedule" />
             <NavItem to="/admin/orders" label="Orders" theme={theme} icon="receipt_long" badge={orderAlertCount} />
             <NavItem to="/admin/products" label="Products" theme={theme} icon="inventory_2" />
+            <NavItem to="/admin/appearance" label="Appearance" theme={theme} icon="palette" />
             <NavItem to="/admin/transactions" label="Transactions" theme={theme} icon="account_balance_wallet" badge={orderAlertCount} />
             <div className={ad(theme, 'my-2 mx-1 h-px bg-stone-100', 'my-2 mx-1 h-px bg-neutral-800')} />
             <NavItem to="/admin/account" label="Account" theme={theme} icon="person" />
@@ -593,6 +594,7 @@ function AdminLayoutInner() {
             <MobileNavItem to="/admin" end label="Home" icon="home" theme={theme} />
             <MobileNavItem to="/admin/orders" label="Orders" icon="receipt_long" theme={theme} dot={orderAlertCount > 0} />
             <MobileNavItem to="/admin/products" label="Stock" icon="inventory_2" theme={theme} />
+            <MobileNavItem to="/admin/appearance" label="Appearance" icon="palette" theme={theme} />
             <MobileNavItem to="/admin/customers" label="People" icon="group" theme={theme} />
             <MobileNavItem to="/admin/makeup-bookings" label="Makeup" icon="face_retouching_natural" theme={theme} dot={makeupAlertCount > 0} />
             <MobileNavItem to="/admin/transactions" label="Wallet" icon="account_balance_wallet" theme={theme} dot={orderAlertCount > 0} />
