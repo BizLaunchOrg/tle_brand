@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useAdminTheme } from './AdminThemeContext'
 import { ad } from './adminUi'
-import { AVAILABLE_COLORS, SiteColor, getSiteColor, setSiteColor, applySiteColor } from '../../lib/siteAppearance'
+import { AVAILABLE_COLORS, getSiteColor, setSiteColor, applySiteColor } from '../../lib/siteAppearance'
+import type { SiteColor } from '../../lib/siteAppearance'
 
 export function AdminAppearancePage() {
   const { theme } = useAdminTheme()

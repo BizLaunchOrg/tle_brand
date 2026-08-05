@@ -9,11 +9,12 @@ const baseUrl = import.meta.env.BASE_URL
 const routerBasename =
   baseUrl === '/' || baseUrl === '' ? undefined : baseUrl.replace(/\/$/, '')
 
+// Apply persisted site color before mounting app UI
+applySiteColor()
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter basename={routerBasename}>
-      {/* Apply persisted site color before mounting app UI */}
-      {applySiteColor()}
       <App />
     </BrowserRouter>
   </StrictMode>,
