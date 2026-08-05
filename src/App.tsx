@@ -26,6 +26,7 @@ import { AdminAccountCheckoutPage } from './pages/admin/AdminAccountCheckoutPage
 import { AdminCustomersPage } from './pages/admin/AdminCustomersPage.tsx'
 import { AdminMakeupBookingsPage } from './pages/admin/AdminMakeupBookingsPage.tsx'
 import { AdminMakeupHoursPage } from './pages/admin/AdminMakeupHoursPage.tsx'
+import { AdminAppearancePage } from './pages/admin/AdminAppearancePage.tsx'
 
 function App() {
   return (
@@ -62,6 +63,7 @@ function App() {
             <Route path="makeup-bookings" element={<AdminMakeupBookingsPage />} />
             <Route path="makeup-hours" element={<AdminMakeupHoursPage />} />
             <Route path="transactions" element={<AdminTransactionsPage />} />
+            <Route path="appearance" element={<AdminAppearancePage />} />
             <Route path="account" element={<AdminAccountPage />} />
             <Route path="account/checkout" element={<AdminAccountCheckoutPage />} />
           </Route>
