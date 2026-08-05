@@ -18,10 +18,34 @@ const SOURCES = [
 ]
 
 interface SelectedProduct {
+  lineId: string
   id: string
   variantId: string
   quantity: number
   price: number
+}
+
+function newLineId() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `line-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+}
+
+function pickVariantForLine(
+  payload: CatalogProductRow['payload'],
+  existingForProduct: SelectedProduct[],
+): string {
+  const options = payload.colorOptions ?? []
+  if (options.length === 0) return ''
+  const used = new Set(existingForProduct.map((l) => l.variantId))
+  const next = options.find((o) => !used.has(o.id))
+  return (next ?? options[0])?.id ?? ''
+}
+
+function linePriceForVariant(payload: CatalogProductRow['payload'], variantId: string): number {
+  const opt = payload.colorOptions?.find((o) => o.id === variantId)
+  if (opt?.price) return parseProductPriceNgn(opt.price)
+  return parseProductPriceNgn(payload.price)
 }
 
 type SaleView = 'form' | 'products' | 'add_product'
@@ -49,18 +73,22 @@ export function AdminRecordSalePage() {
 
   useEffect(() => {
     void (async () => {
-      const p = await fetchCatalogProducts()
-      setCatalog(p)
-      setLoading(false)
+      try {
+        const p = await fetchCatalogProducts()
+        setCatalog(p)
+      } finally {
+        setLoading(false)
+      }
     })()
   }, [])
 
   const filteredCatalog = useMemo(() => {
     const q = search.toLowerCase().trim()
     if (!q) return catalog
-    return catalog.filter(
-      (c) => c.payload.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q),
-    )
+    return catalog.filter((c) => {
+      const name = c.payload?.name?.toLowerCase() ?? ''
+      return name.includes(q) || c.slug.toLowerCase().includes(q)
+    })
   }, [catalog, search])
 
   const totalAmount = useMemo(() => {
@@ -68,15 +96,16 @@ export function AdminRecordSalePage() {
   }, [selectedItems])
 
   const addCatalogRowToSale = useCallback((row: CatalogProductRow) => {
-    const price = parseProductPriceNgn(row.payload.price)
     setSelectedItems((prev) => {
-      const existing = prev.find((item) => item.id === row.id)
-      if (existing) return prev
+      const existingForProduct = prev.filter((item) => item.id === row.id)
+      const variantId = pickVariantForLine(row.payload, existingForProduct)
+      const price = linePriceForVariant(row.payload, variantId)
       return [
         ...prev,
         {
+          lineId: newLineId(),
           id: row.id,
-          variantId: row.payload.colorOptions?.[0]?.id || '',
+          variantId,
           quantity: 1,
           price,
         },
@@ -84,6 +113,9 @@ export function AdminRecordSalePage() {
     })
   }, [])
 
+  const removeLine = useCallback((lineId: string) => {
+    setSelectedItems((prev) => prev.filter((item) => item.lineId !== lineId))
+  }, [])
   const handleNewProductSaved = (row: CatalogProductRow) => {
     setCatalog((prev) => [row, ...prev.filter((r) => r.id !== row.id)])
     setJustAddedCatalogId(row.id)
@@ -92,19 +124,27 @@ export function AdminRecordSalePage() {
     toast.success(`${row.payload.name} added to this sale`)
   }
 
-  const toggleProduct = (prod: CatalogProductRow) => {
-    const existing = selectedItems.find((item) => item.id === prod.id)
-    if (existing) {
-      setSelectedItems((prev) => prev.filter((item) => item.id !== prod.id))
-    } else {
-      addCatalogRowToSale(prod)
-    }
+  const addProductFromPicker = (prod: CatalogProductRow) => {
+    addCatalogRowToSale(prod)
   }
 
-  const updateItem = (id: string, updates: Partial<SelectedProduct>) => {
-    setSelectedItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)))
+  const removeProductLines = (catalogId: string) => {
+    setSelectedItems((prev) => prev.filter((item) => item.id !== catalogId))
   }
 
+  const updateItem = (lineId: string, updates: Partial<SelectedProduct>) => {
+    setSelectedItems((prev) =>
+      prev.map((item) => {
+        if (item.lineId !== lineId) return item
+        const next = { ...item, ...updates }
+        if (updates.variantId && updates.variantId !== item.variantId) {
+          const row = catalog.find((c) => c.id === item.id)
+          if (row) next.price = linePriceForVariant(row.payload, updates.variantId)
+        }
+        return next
+      }),
+    )
+  }
   const handleSubmit = async () => {
     if (!customerName) {
       toast.error('Enter customer name')
@@ -238,27 +278,35 @@ export function AdminRecordSalePage() {
           </div>
 
           <div className="space-y-0 divide-y">
+            {filteredCatalog.length === 0 ? (
+              <p className={'py-10 text-center text-[14px] ' + muted}>
+                {catalog.length === 0 ? 'No products in your catalog yet.' : 'No products match your search.'}
+              </p>
+            ) : null}
             {filteredCatalog.map((prod) => {
-              const selected = selectedItems.find((item) => item.id === prod.id)
+              const lineCount = selectedItems.filter((item) => item.id === prod.id).length
               const p = prod.payload
+              if (!p) return null
               const justAdded = prod.id === justAddedCatalogId
               return (
                 <div
                   key={prod.id}
-                  onClick={() => toggleProduct(prod)}
+                  onClick={() => addProductFromPicker(prod)}
                   className={
                     'flex cursor-pointer items-center gap-4 py-4 transition-all active:bg-stone-100 ' +
-                    (selected ? 'bg-emerald-50/30' : '') +
+                    (lineCount > 0 ? 'bg-emerald-50/30' : '') +
                     (justAdded ? ' ring-2 ring-inset ring-emerald-400' : '')
                   }
                 >
                   <div
                     className={
                       'flex size-6 shrink-0 items-center justify-center rounded border-2 transition-colors ' +
-                      (selected ? 'border-emerald-600 bg-emerald-600' : 'border-stone-300')
+                      (lineCount > 0 ? 'border-emerald-600 bg-emerald-600' : 'border-stone-300')
                     }
                   >
-                    {selected && <span className="material-symbols-outlined text-[18px] font-bold text-white">check</span>}
+                    {lineCount > 0 ? (
+                      <span className="text-[11px] font-bold text-white">{lineCount}</span>
+                    ) : null}
                   </div>
 
                   <div className="relative size-14 shrink-0 overflow-hidden rounded-xl border bg-stone-100">
@@ -268,14 +316,26 @@ export function AdminRecordSalePage() {
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate text-[15px] font-bold">{p.name}</h3>
                     <p className={muted + ' mt-0.5 text-[12px]'}>
-                      {justAdded ? 'Just added Â· ' : ''}
-                      {p.colorOptions?.length || 0} variations â€¢{' '}
+                      {justAdded ? 'Just added · ' : ''}
+                      Tap to add{lineCount > 0 ? ' again' : ''} · {p.colorOptions?.length || 0} variations ·{' '}
                       {p.stockUnlimited ? 'In stock' : `${p.stock ?? 0} in stock`}
                     </p>
                   </div>
 
-                  <div className="shrink-0 text-right">
-                    <p className="text-[15px] font-bold">â‚¦{parseProductPriceNgn(p.price).toLocaleString()}</p>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <p className="text-[15px] font-bold">₦{parseProductPriceNgn(p.price).toLocaleString()}</p>
+                    {lineCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeProductLines(prod.id)
+                        }}
+                        className="rounded-lg px-2 py-1 text-[11px] font-bold text-rose-600"
+                      >
+                        Clear
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               )
@@ -290,7 +350,7 @@ export function AdminRecordSalePage() {
               onClick={() => setView('form')}
               className="w-full rounded-2xl bg-emerald-700 py-4 text-lg font-bold text-white shadow-lg transition-all active:scale-[0.98]"
             >
-              Done ({selectedItems.length} selected)
+              Done ({selectedItems.length} line{selectedItems.length === 1 ? '' : 's'})
             </button>
           </div>
         </div>
@@ -403,18 +463,18 @@ export function AdminRecordSalePage() {
                   if (!prod) return null
                   return (
                     <div
-                      key={item.id}
+                      key={item.lineId}
                       className={'rounded-2xl border p-4 ' + border + ' ' + ad(theme, 'bg-stone-50/50', 'bg-neutral-900/30')}
                     >
                       <div className="mb-4 flex gap-3">
                         <img src={prod.img} alt="" className="size-12 rounded-lg object-cover" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-bold">{prod.name}</p>
-                          <p className={muted + ' text-[12px]'}>â‚¦{item.price.toLocaleString()}</p>
+                          <p className={muted + ' text-[12px]'}>₦{item.price.toLocaleString()}</p>
                         </div>
                         <button
                           type="button"
-                          onClick={() => setSelectedItems((prev) => prev.filter((i) => i.id !== item.id))}
+                          onClick={() => removeLine(item.lineId)}
                           className="text-rose-500"
                         >
                           <span className="material-symbols-outlined">delete</span>
@@ -428,7 +488,7 @@ export function AdminRecordSalePage() {
                             <select
                               className={inputCls + ' py-1.5 text-[13px]'}
                               value={item.variantId}
-                              onChange={(e) => updateItem(item.id, { variantId: e.target.value })}
+                              onChange={(e) => updateItem(item.lineId, { variantId: e.target.value })}
                             >
                               {prod.colorOptions.map((v) => (
                                 <option key={v.id} value={v.id}>
@@ -445,7 +505,9 @@ export function AdminRecordSalePage() {
                             min="1"
                             className={inputCls + ' py-1.5 text-[13px]'}
                             value={item.quantity}
-                            onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                            onChange={(e) =>
+                              updateItem(item.lineId, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })
+                            }
                           />
                         </div>
                         <div className="col-span-1">
@@ -454,7 +516,9 @@ export function AdminRecordSalePage() {
                             type="number"
                             className={inputCls + ' py-1.5 text-[13px]'}
                             value={item.price}
-                            onChange={(e) => updateItem(item.id, { price: parseInt(e.target.value) || 0 })}
+                            onChange={(e) =>
+                              updateItem(item.lineId, { price: Math.max(0, parseInt(e.target.value, 10) || 0) })
+                            }
                           />
                         </div>
                       </div>
@@ -463,13 +527,13 @@ export function AdminRecordSalePage() {
                 })}
                 <div className="flex items-center justify-between rounded-2xl bg-emerald-600 p-4 font-bold text-white">
                   <span>Total Amount</span>
-                  <span>â‚¦{totalAmount.toLocaleString()}</span>
+                  <span>₦{totalAmount.toLocaleString()}</span>
                 </div>
               </div>
             ) : (
               <div className={'flex flex-col items-center justify-center rounded-2xl border border-dashed py-8 ' + border + ' ' + muted}>
                 <span className="material-symbols-outlined mb-2 text-4xl">shopping_cart</span>
-                <p className="text-center text-[13px]">No products yet â€” add a new product or select from your catalog</p>
+                <p className="text-center text-[13px]">No products yet — add a new product or select from your catalog</p>
               </div>
             )}
           </div>
@@ -493,7 +557,7 @@ export function AdminRecordSalePage() {
                       : ad(theme, 'bg-stone-100 text-stone-500', 'bg-neutral-800 text-neutral-400'))
                   }
                 >
-                  {paymentStatus === st.id && 'âœ“ '} {st.label}
+                  {paymentStatus === st.id && '✓ '} {st.label}
                 </button>
               ))}
             </div>

@@ -15,6 +15,7 @@ import { fetchOrdersForAdmin } from '../../lib/adminOrders.ts'
 import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { AdminRangeTabs, adminDeliveryPillClass } from './adminRangeTabs.tsx'
+import { fetchVisitorStatsForRange, type VisitorStats } from '../../lib/adminVisitorStats.ts'
 import { ad, adminFont, adminGreetingName } from './adminUi.ts'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
@@ -35,7 +36,7 @@ function completedCount(orders: AdminOrderRow[]) {
   return orders.filter((o) => orderIsSettledComplete(o)).length
 }
 
-type OverviewTint = 'emerald' | 'sky' | 'amber' | 'rose'
+type OverviewTint = 'emerald' | 'sky' | 'amber' | 'rose' | 'violet'
 
 function overviewShell(tint: OverviewTint, theme: 'light' | 'dark') {
   const map: Record<OverviewTint, [string, string]> = {
@@ -43,6 +44,7 @@ function overviewShell(tint: OverviewTint, theme: 'light' | 'dark') {
     sky: ['border-sky-100/80 bg-sky-50/90', 'border-sky-900/30 bg-sky-950/25'],
     amber: ['border-amber-100/80 bg-amber-50/90', 'border-amber-900/25 bg-amber-950/20'],
     rose: ['border-rose-100/80 bg-rose-50/90', 'border-rose-900/25 bg-rose-950/20'],
+    violet: ['border-violet-100/80 bg-violet-50/90', 'border-violet-900/30 bg-violet-950/25'],
   }
   const [L, D] = map[tint]
   return ad(theme, L, D)
@@ -87,6 +89,7 @@ export function AdminDashboardPage() {
   const { user } = useAuth()
   const { theme } = useAdminTheme()
   const [orders, setOrders] = useState<AdminOrderRow[]>([])
+  const [visitorStats, setVisitorStats] = useState<VisitorStats>({ uniqueVisitors: 0, pageViews: 0 })
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState<DateRangeFilter>('today')
   const [yearSel, setYearSel] = useState(() => new Date().getFullYear())
@@ -104,6 +107,17 @@ export function AdminDashboardPage() {
       on = false
     }
   }, [])
+
+  useEffect(() => {
+    let on = true
+    void (async () => {
+      const stats = await fetchVisitorStatsForRange(range)
+      if (on) setVisitorStats(stats)
+    })()
+    return () => {
+      on = false
+    }
+  }, [range])
 
   const inRange = useMemo(() => filterOrdersByRange(orders, range), [orders, range])
   const rangeStats = useMemo(() => countAndRevenue(inRange), [inRange])
@@ -184,6 +198,14 @@ export function AdminDashboardPage() {
       tint: 'amber' as const,
     },
     {
+      label: 'Visitors',
+      value: visitorStats.uniqueVisitors.toLocaleString(),
+      hint: `Unique storefront · ${rangeLabel}`,
+      icon: 'visibility' as const,
+      iconColor: 'bg-violet-600',
+      tint: 'violet' as const,
+    },
+    {
       label: 'Completed',
       value: String(completedInRange),
       hint: 'Orders in period',
@@ -218,6 +240,10 @@ export function AdminDashboardPage() {
             {formatNaira(rangeStats.revenue)}
           </p>
           <p className={muted + ' mt-1 text-[12px]'}>{rangeStats.count} orders in this period</p>
+          <p className={muted + ' mt-1 text-[12px]'}>
+            {visitorStats.uniqueVisitors.toLocaleString()} unique visitors ·{' '}
+            {visitorStats.pageViews.toLocaleString()} page views ({rangeLabel.toLowerCase()})
+          </p>
           <p className={muted + ' mt-2 text-[12px]'}>
             <Link to="/admin/customers" className={link}>
               Customer directory ({buyersAllTime.toLocaleString()} total) →
@@ -414,7 +440,7 @@ export function AdminDashboardPage() {
         <p className={ad(theme, 'mt-8 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500', 'mt-8 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500')}>
           Business overview
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <div className="mt-3 grid grid-cols-2 gap-4 xl:grid-cols-5">
           {overviewMobile.map((s) => (
             <OverviewCard key={s.label + '-d'} {...s} theme={theme} />
           ))}
