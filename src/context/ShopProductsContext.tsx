@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
+import { useAuth } from './AuthContext.tsx'
 import { PRODUCTS, type Product } from '../data/products.ts'
 import { fetchStorefrontCatalogProducts } from '../lib/storefrontCatalog.ts'
 
@@ -7,6 +8,7 @@ const ShopProductsContext = createContext<Product[]>(PRODUCTS)
 
 export function ShopProductsProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
+  const { user, authReady } = useAuth()
   const [remote, setRemote] = useState<Product[] | null>(null)
 
   useEffect(() => {
@@ -22,7 +24,8 @@ export function ShopProductsProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [pathname])
+    // Re-run when pathname changes or auth state updates so newly-signed-up users see products without a full refresh.
+  }, [pathname, user?.id, authReady])
 
   const value = useMemo(() => (remote?.length ? remote : PRODUCTS), [remote])
 

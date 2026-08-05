@@ -6,11 +6,13 @@ import { FavoritesDrawer } from './FavoritesDrawer.tsx'
 import { FloatingActions } from './FloatingActions.tsx'
 import { Navbar } from './Navbar/navbar.tsx'
 import { Footer } from './Footer/footer.tsx'
+import { StoreVisitTracker } from './StoreVisitTracker.tsx'
 
 export function MainLayout() {
   return (
     <CartDrawerProvider>
       <ScrollToTop />
+      <StoreVisitTracker />
       <div className="flex min-h-svh flex-col bg-white font-sans text-tle-ink antialiased">
         <Navbar />
         <main className="flex w-full flex-1 flex-col">
