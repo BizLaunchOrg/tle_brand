@@ -29,31 +29,55 @@ export function applySiteColor(): void {
   if (typeof document === 'undefined') return
   const to = getSiteColor()
   const tokens = AVAILABLE_COLORS
-
+  // Apply to existing nodes
   const walk = (el: Element) => {
     const cls = (el.getAttribute('class') || '').trim()
-    if (cls) {
-      const parts = cls.split(/\s+/)
-      let changed = false
-      for (let i = 0; i < parts.length; i++) {
-        const p = parts[i]
-        for (const t of tokens) {
-          if (p.includes(t) && t !== to) {
-            parts[i] = p.replace(new RegExp(t, 'g'), to)
-            changed = true
-            break
-          }
+    if (!cls) return
+    const parts = cls.split(/\s+/)
+    let changed = false
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i]
+      for (const t of tokens) {
+        if (p.includes(t) && t !== to) {
+          parts[i] = p.replace(new RegExp(t, 'g'), to)
+          changed = true
+          break
         }
       }
-      if (changed) el.setAttribute('class', parts.join(' '))
     }
-    // inline styles or data attributes not handled — Tailwind classes covered.
+    if (changed) el.setAttribute('class', parts.join(' '))
   }
 
   const all = Array.from(document.querySelectorAll('[class]'))
   for (const el of all) walk(el)
 
-  // Update logo / meta in case any text needs swapping (no-op here).
+  // Ensure future DOM additions get the same treatment (SPA navigation / react mounts)
+  ;(applySiteColor as any)._observer ??= new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (m.type === 'attributes' && m.target instanceof Element && m.attributeName === 'class') {
+        walk(m.target as Element)
+      }
+      if (m.addedNodes && m.addedNodes.length) {
+        m.addedNodes.forEach((n) => {
+          if (n instanceof Element) {
+            walk(n)
+            // also walk descendants
+            n.querySelectorAll('[class]').forEach((el) => walk(el))
+          }
+        })
+      }
+    }
+  })
+
+  ;(applySiteColor as any)._observer.disconnect()
+  ;(applySiteColor as any)._observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+
+  // Mark document element with current color (useful for CSS fallbacks)
+  try {
+    document.documentElement.setAttribute('data-tle-color', to)
+  } catch {
+    /* ignore */
+  }
 }
 
 // Also run once on import as a no-op guard (will be invoked explicitly in main.tsx)
