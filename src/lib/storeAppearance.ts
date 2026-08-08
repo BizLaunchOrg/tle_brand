@@ -187,6 +187,17 @@ export function normalizeColorRoles(
   }
 }
 
+/** Drop duplicate color sets (same main + accent + dark). Keeps first of each. */
+export function dedupeColorHistory(list: BrandColorRoles[]): BrandColorRoles[] {
+  const out: BrandColorRoles[] = []
+  for (const roles of list) {
+    const next = normalizeColorRoles(roles)
+    if (out.some((r) => rolesEqual(r, next))) continue
+    out.push(next)
+  }
+  return out.slice(-MAX_COLOR_HISTORY)
+}
+
 /** Oldest → newest. Always at least the current store colors. */
 export function normalizeColorHistory(raw: unknown, current: BrandColorRoles): BrandColorRoles[] {
   const list: BrandColorRoles[] = []
@@ -196,25 +207,33 @@ export function normalizeColorHistory(raw: unknown, current: BrandColorRoles): B
       list.push(normalizeColorRoles(item, current))
     }
   }
-  if (!list.length) list.push({ ...current })
-  const deduped: BrandColorRoles[] = []
-  for (const roles of list) {
-    const prev = deduped[deduped.length - 1]
-    if (prev && rolesEqual(prev, roles)) continue
-    deduped.push(roles)
-  }
-  const last = deduped[deduped.length - 1]
-  if (!last || !rolesEqual(last, current)) deduped.push({ ...current })
-  return deduped.slice(-MAX_COLOR_HISTORY)
+  const cur = normalizeColorRoles(current)
+  if (!list.length) return [{ ...cur }]
+  // Global dedupe, then ensure current look is newest once (move, don’t duplicate).
+  const withoutCurrent = dedupeColorHistory(list).filter((r) => !rolesEqual(r, cur))
+  return [...withoutCurrent, cur].slice(-MAX_COLOR_HISTORY)
 }
 
-/** Append a saved color setting on successful save (skip if same as newest). */
+/**
+ * Save a color setting into history.
+ * If that exact set already exists, move it to newest — never add a duplicate.
+ */
 export function rememberColorSetting(history: BrandColorRoles[], roles: BrandColorRoles): BrandColorRoles[] {
   const normalized = normalizeColorRoles(roles)
-  const base = history.length ? [...history] : [{ ...normalized }]
-  const last = base[base.length - 1]
-  if (last && rolesEqual(last, normalized)) return base.slice(-MAX_COLOR_HISTORY)
-  return [...base, normalized].slice(-MAX_COLOR_HISTORY)
+  const without = (history.length ? history : []).filter((r) => !rolesEqual(normalizeColorRoles(r), normalized))
+  return [...without, normalized].slice(-MAX_COLOR_HISTORY)
+}
+
+/** Remove one saved color set. Keeps at least one entry (falls back to current/defaults). */
+export function removeColorSetting(
+  history: BrandColorRoles[],
+  index: number,
+  fallback: BrandColorRoles = DEFAULT_COLOR_ROLES,
+): BrandColorRoles[] {
+  if (history.length <= 1) return history.length ? [...history] : [{ ...fallback }]
+  if (index < 0 || index >= history.length) return [...history]
+  const next = history.filter((_, i) => i !== index)
+  return next.length ? next : [{ ...fallback }]
 }
 
 function normalizeColors(raw: unknown): BrandColors {

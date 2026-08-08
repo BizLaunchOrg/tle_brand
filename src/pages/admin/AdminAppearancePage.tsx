@@ -6,6 +6,7 @@ import {
   DEFAULT_COLOR_ROLES,
   DEFAULT_STORE_APPEARANCE,
   fetchStoreAppearance,
+  removeColorSetting,
   rolesEqual,
   rolesFromBrandColors,
   saveStoreAppearance,
@@ -14,7 +15,7 @@ import {
   type StoreAppearance,
 } from '../../lib/storeAppearance.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { ad, adminFont } from './adminUi.ts'
+import { ad, adminConfirmDelete, adminFont } from './adminUi.ts'
 
 type ColorRoleKey = keyof BrandColorRoles
 
@@ -145,6 +146,35 @@ export function AdminAppearancePage() {
     setIsNewDraft(true)
     applyRoles({ ...DEFAULT_COLOR_ROLES })
     toast.success('New color set — change the three colors below, then save')
+  }
+
+  const deleteCurrentSet = () => {
+    if (isNewDraft) {
+      const last = history[historyLen - 1]
+      if (!last) return
+      setIsNewDraft(false)
+      setHistoryIndex(historyLen - 1)
+      applyRoles(last)
+      toast.success('New draft discarded')
+      return
+    }
+    if (historyLen <= 1) {
+      toast.error('Keep at least one color set')
+      return
+    }
+    if (!adminConfirmDelete('this color set')) return
+    const removedIndex = historyIndex
+    const nextHistory = removeColorSetting(history, removedIndex, DEFAULT_COLOR_ROLES)
+    const nextIndex = Math.min(removedIndex, nextHistory.length - 1)
+    const nextRoles = nextHistory[nextIndex] ?? DEFAULT_COLOR_ROLES
+    setDraft((d) => ({
+      ...d,
+      colorHistory: nextHistory,
+      colors: brandColorsFromRoles(nextRoles),
+    }))
+    setHistoryIndex(Math.max(0, nextIndex))
+    setIsNewDraft(false)
+    toast.success('Color set removed — save appearance to keep this change')
   }
 
   const onUploadBanner = async (file: File | null) => {
@@ -381,6 +411,21 @@ export function AdminAppearancePage() {
           <button type="button" className={linkBtn} onClick={goNext} disabled={!canGoNext}>
             Next
             <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+          </button>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-0.5">
+          <p className={muted + ' text-[11px]'}>
+            Same three colors are never saved twice.
+          </p>
+          <button
+            type="button"
+            onClick={deleteCurrentSet}
+            disabled={!isNewDraft && historyLen <= 1}
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-rose-600 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-stone-400 disabled:no-underline"
+          >
+            <span className="material-symbols-outlined text-[16px]">delete</span>
+            {isNewDraft ? 'Discard new colors' : 'Delete this set'}
           </button>
         </div>
 
