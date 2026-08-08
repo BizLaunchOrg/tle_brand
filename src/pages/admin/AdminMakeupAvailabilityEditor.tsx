@@ -15,7 +15,7 @@ import {
 } from '../../lib/makeupAvailability.ts'
 import { formatBookingDateLabel, isoFromCalendarDay } from '../../lib/makeupBookingDates.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { ad, adminFont } from './adminUi.ts'
+import { ad, adminConfirmDelete, adminFont } from './adminUi.ts'
 
 const WD = [
   { v: 0, l: 'Sun' },
@@ -126,6 +126,7 @@ export function AdminMakeupAvailabilityEditor() {
   }
 
   const onDeleteWeekly = async (id: string) => {
+    if (!adminConfirmDelete('this weekly availability rule')) return
     setMsg(null)
     const res = await deleteAvailabilityRule(id)
     if (res.ok === false) {

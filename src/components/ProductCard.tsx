@@ -101,18 +101,19 @@ export function ProductCard({
       ) : null}
 
       <Link to={`/product/${slug}`} className="group mt-2.5 block text-left no-underline sm:mt-3.5">
-        <p className="text-[9px] font-medium tracking-[0.12em] text-zinc-400 uppercase sm:text-[11px]">
-          {cat.replace(/\s+/g, ' ').toUpperCase()}
+        <p className="min-h-[1.1em] text-[9px] font-medium tracking-[0.12em] text-zinc-400 uppercase sm:text-[11px]">
+          {cat.replace(/\s+/g, ' ').toUpperCase() || '\u00a0'}
         </p>
 
-        <h3 className="mt-1 line-clamp-2 min-h-[2.4em] font-sans text-[13px] font-bold leading-snug text-zinc-900 group-hover:text-zinc-700 sm:min-h-0 sm:text-base">
+        <h3 className="mt-1 line-clamp-2 min-h-[2.6em] font-sans text-[13px] font-bold leading-snug text-zinc-900 group-hover:text-zinc-700 sm:min-h-[2.75em] sm:text-base">
           {name}
         </h3>
 
         <p className="mt-1 font-sans text-base font-bold tabular-nums text-emerald-700 sm:text-xl">{formatProductPriceLabel(price)}</p>
       </Link>
 
-      <div className="mt-3.5 flex items-stretch gap-2 sm:mt-5">
+      {/* Keep CTA row pinned to the card bottom across uneven content (thumbs / titles). */}
+      <div className="mt-auto flex items-stretch gap-2 pt-3.5 sm:pt-5">
         {outOfStock ? (
           <button
             type="button"

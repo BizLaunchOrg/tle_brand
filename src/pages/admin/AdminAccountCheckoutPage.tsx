@@ -10,7 +10,7 @@ import {
   type DeliveryZone,
 } from '../../lib/shopSettings.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { ad, adminFont } from './adminUi.ts'
+import { ad, adminConfirmDelete, adminFont } from './adminUi.ts'
 
 const newEmptyZone = (): DeliveryZone => ({
   id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `z_${Date.now()}`,
@@ -299,6 +299,7 @@ export function AdminAccountCheckoutPage() {
                                 type="button"
                                 className={btnDanger}
                                 onClick={() => {
+                                  if (!adminConfirmDelete(z.label.trim() || 'this delivery option')) return
                                   setDeliveryZones((rows) => rows.filter((r) => r.id !== z.id))
                                   setExpandedId((id) => (id === z.id ? null : id))
                                 }}

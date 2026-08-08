@@ -13,7 +13,7 @@ import {
 } from '../../lib/adminProductDraft.ts'
 import { uploadProductImageFile } from '../../lib/adminProductMedia.ts'
 import { NairaAmountInput } from './NairaAmountInput.tsx'
-import { ad, adminFont } from './adminUi.ts'
+import { ad, adminConfirmDelete, adminFont } from './adminUi.ts'
 
 type AdminOfflineProductFormProps = {
   theme: 'light' | 'dark'
@@ -231,7 +231,14 @@ export function AdminOfflineProductForm({ theme, onCancel, onSaved }: AdminOffli
                       onChange={(e) => setColorDrafts((a) => a.map((x, i) => (i === idx ? { ...x, swatch: e.target.value } : x)))}
                     />
                   </div>
-                  <button type="button" className="mt-2 text-[12px] font-bold text-rose-600" onClick={() => setColorDrafts((a) => a.filter((_, i) => i !== idx))}>
+                  <button
+                    type="button"
+                    className="mt-2 text-[12px] font-bold text-rose-600"
+                    onClick={() => {
+                      if (!adminConfirmDelete(c.label.trim() || 'this colour option')) return
+                      setColorDrafts((a) => a.filter((_, i) => i !== idx))
+                    }}
+                  >
                     Remove
                   </button>
                 </div>

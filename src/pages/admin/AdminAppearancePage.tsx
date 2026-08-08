@@ -149,6 +149,11 @@ export function AdminAppearancePage() {
   }
 
   const deleteCurrentSet = () => {
+    if (!isNewDraft && historyLen <= 1) {
+      toast.error('Keep at least one color set')
+      return
+    }
+    if (!adminConfirmDelete(isNewDraft ? 'these new colors' : 'this color set')) return
     if (isNewDraft) {
       const last = history[historyLen - 1]
       if (!last) return
@@ -158,11 +163,6 @@ export function AdminAppearancePage() {
       toast.success('New draft discarded')
       return
     }
-    if (historyLen <= 1) {
-      toast.error('Keep at least one color set')
-      return
-    }
-    if (!adminConfirmDelete('this color set')) return
     const removedIndex = historyIndex
     const nextHistory = removeColorSetting(history, removedIndex, DEFAULT_COLOR_ROLES)
     const nextIndex = Math.min(removedIndex, nextHistory.length - 1)
@@ -195,6 +195,7 @@ export function AdminAppearancePage() {
   }
 
   const removeBanner = (idx: number) => {
+    if (!adminConfirmDelete(`banner ${idx + 1}`)) return
     setDraft((d) => {
       const next = d.heroBanners.filter((_, i) => i !== idx)
       return { ...d, heroBanners: next.length ? next : ['/promo-hero.png'] }
