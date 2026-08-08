@@ -1,7 +1,7 @@
 import { getSupabase } from './supabaseClient'
 import { isSupabaseConfigured } from './mapSupabaseAuthError'
 
-const CACHE_KEY = 'tle_store_appearance_v1'
+const CACHE_KEY = 'tle_store_appearance_v2'
 
 export type ExclusiveOfferAppearance = {
   enabled: boolean
@@ -23,11 +23,20 @@ export type BrandColors = {
   light: string
 }
 
+/** The three colors the admin actually picks. Soft tones are derived from main. */
+export type BrandColorRoles = {
+  main: string
+  accent: string
+  dark: string
+}
+
 export type StoreAppearance = {
   /** Public image URLs, 1–4 slides. */
   heroBanners: string[]
   exclusiveOffer: ExclusiveOfferAppearance
   colors: BrandColors
+  /** Recently used / saved hexes for quick re-pick (main + accent + dark). */
+  usedColors: string[]
 }
 
 export const DEFAULT_BRAND_COLORS: BrandColors = {
@@ -38,6 +47,12 @@ export const DEFAULT_BRAND_COLORS: BrandColors = {
   cream: '#faf8f5',
   blush: '#f8edf2',
   light: '#eeb8ce',
+}
+
+export const DEFAULT_COLOR_ROLES: BrandColorRoles = {
+  main: DEFAULT_BRAND_COLORS.pink,
+  accent: DEFAULT_BRAND_COLORS.gold,
+  dark: DEFAULT_BRAND_COLORS.charcoal,
 }
 
 export const DEFAULT_STORE_APPEARANCE: StoreAppearance = {
@@ -52,7 +67,14 @@ export const DEFAULT_STORE_APPEARANCE: StoreAppearance = {
     buttonIcon: 'photo_camera',
   },
   colors: { ...DEFAULT_BRAND_COLORS },
+  usedColors: [
+    DEFAULT_BRAND_COLORS.pink,
+    DEFAULT_BRAND_COLORS.gold,
+    DEFAULT_BRAND_COLORS.charcoal,
+  ],
 }
+
+const MAX_USED_COLORS = 12
 
 function isHex(s: string): boolean {
   return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s.trim())
@@ -98,28 +120,119 @@ function normalizeOffer(raw: unknown): ExclusiveOfferAppearance {
   }
 }
 
+function clampByte(n: number): number {
+  return Math.max(0, Math.min(255, Math.round(n)))
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = normalizeHex(hex, DEFAULT_BRAND_COLORS.pink).slice(1)
+  const n = parseInt(h, 16)
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return `#${[r, g, b].map((x) => clampByte(x).toString(16).padStart(2, '0')).join('')}`
+}
+
+/** Mix color toward white (t=0 same, t=1 white). */
+function tint(hex: string, t: number): string {
+  const { r, g, b } = hexToRgb(hex)
+  return rgbToHex(r + (255 - r) * t, g + (255 - g) * t, b + (255 - b) * t)
+}
+
+/** Mix color toward black (t=0 same, t=1 black). */
+function shade(hex: string, t: number): string {
+  const { r, g, b } = hexToRgb(hex)
+  return rgbToHex(r * (1 - t), g * (1 - t), b * (1 - t))
+}
+
+/** Build full CSS brand palette from the 3 admin-facing roles. */
+export function brandColorsFromRoles(roles: BrandColorRoles): BrandColors {
+  const main = normalizeHex(roles.main, DEFAULT_COLOR_ROLES.main)
+  const accent = normalizeHex(roles.accent, DEFAULT_COLOR_ROLES.accent)
+  const dark = normalizeHex(roles.dark, DEFAULT_COLOR_ROLES.dark)
+  return {
+    pink: main,
+    deep: shade(main, 0.22),
+    light: tint(main, 0.45),
+    blush: tint(main, 0.88),
+    gold: accent,
+    charcoal: dark,
+    cream: '#faf8f5',
+  }
+}
+
+export function rolesFromBrandColors(colors: BrandColors): BrandColorRoles {
+  return {
+    main: normalizeHex(colors.pink, DEFAULT_COLOR_ROLES.main),
+    accent: normalizeHex(colors.gold, DEFAULT_COLOR_ROLES.accent),
+    dark: normalizeHex(colors.charcoal, DEFAULT_COLOR_ROLES.dark),
+  }
+}
+
+export function normalizeUsedColors(raw: unknown, seed: string[] = []): string[] {
+  const fromRaw = Array.isArray(raw)
+    ? raw.map((c) => (typeof c === 'string' ? normalizeHex(c, '') : '')).filter((c) => c.length === 7)
+    : []
+  const fromSeed = seed
+    .map((c) => normalizeHex(c, ''))
+    .filter((c) => c.length === 7)
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const c of [...fromRaw, ...fromSeed]) {
+    if (seen.has(c)) continue
+    seen.add(c)
+    out.push(c)
+    if (out.length >= MAX_USED_COLORS) break
+  }
+  return out.length ? out : [...DEFAULT_STORE_APPEARANCE.usedColors]
+}
+
+/** Put hexes at the front of used-colors (newest first), deduped. */
+export function rememberUsedColors(existing: string[], ...hexes: string[]): string[] {
+  return normalizeUsedColors([], [...hexes, ...existing])
+}
+
 function normalizeColors(raw: unknown): BrandColors {
   const d = DEFAULT_BRAND_COLORS
   if (!raw || typeof raw !== 'object') return { ...d }
   const o = raw as Record<string, unknown>
-  return {
-    pink: normalizeHex(o.pink, d.pink),
-    deep: normalizeHex(o.deep, d.deep),
-    gold: normalizeHex(o.gold, d.gold),
-    charcoal: normalizeHex(o.charcoal, d.charcoal),
-    cream: normalizeHex(o.cream, d.cream),
-    blush: normalizeHex(o.blush, d.blush),
-    light: normalizeHex(o.light, d.light),
+  // Prefer explicit roles when present (newer saves).
+  if (typeof o.main === 'string' || typeof o.accent === 'string' || typeof o.dark === 'string') {
+    return brandColorsFromRoles({
+      main: normalizeHex(o.main, d.pink),
+      accent: normalizeHex(o.accent, d.gold),
+      dark: normalizeHex(o.dark, d.charcoal),
+    })
   }
+  const pink = normalizeHex(o.pink, d.pink)
+  const gold = normalizeHex(o.gold, d.gold)
+  const charcoal = normalizeHex(o.charcoal, d.charcoal)
+  // If only legacy full palette exists, keep soft tones when present; otherwise derive.
+  if (typeof o.deep === 'string' || typeof o.blush === 'string') {
+    return {
+      pink,
+      deep: normalizeHex(o.deep, shade(pink, 0.22)),
+      gold,
+      charcoal,
+      cream: normalizeHex(o.cream, d.cream),
+      blush: normalizeHex(o.blush, tint(pink, 0.88)),
+      light: normalizeHex(o.light, tint(pink, 0.45)),
+    }
+  }
+  return brandColorsFromRoles({ main: pink, accent: gold, dark: charcoal })
 }
 
 export function normalizeStoreAppearance(raw: unknown): StoreAppearance {
   if (!raw || typeof raw !== 'object') return structuredClone(DEFAULT_STORE_APPEARANCE)
   const o = raw as Record<string, unknown>
+  const colors = normalizeColors(o.colors)
+  const roles = rolesFromBrandColors(colors)
   return {
     heroBanners: normalizeBanners(o.heroBanners),
     exclusiveOffer: normalizeOffer(o.exclusiveOffer),
-    colors: normalizeColors(o.colors),
+    colors,
+    usedColors: normalizeUsedColors(o.usedColors, [roles.main, roles.accent, roles.dark]),
   }
 }
 
@@ -215,7 +328,13 @@ export async function saveStoreAppearance(
   appearance: StoreAppearance,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) return { ok: false, message: 'Not configured.' }
-  const normalized = normalizeStoreAppearance(appearance)
+  const roles = rolesFromBrandColors(appearance.colors)
+  const withHistory = {
+    ...appearance,
+    colors: brandColorsFromRoles(roles),
+    usedColors: rememberUsedColors(appearance.usedColors, roles.main, roles.accent, roles.dark),
+  }
+  const normalized = normalizeStoreAppearance(withHistory)
   if (normalized.heroBanners.length < 1) {
     return { ok: false, message: 'Add at least one hero banner image.' }
   }
@@ -223,10 +342,21 @@ export async function saveStoreAppearance(
     return { ok: false, message: 'You can use up to 4 hero banners.' }
   }
 
+  const savedRoles = rolesFromBrandColors(normalized.colors)
   const { error } = await getSupabase()
     .from('shop_settings')
     .update({
-      appearance: normalized,
+      appearance: {
+        heroBanners: normalized.heroBanners,
+        exclusiveOffer: normalized.exclusiveOffer,
+        colors: {
+          ...normalized.colors,
+          main: savedRoles.main,
+          accent: savedRoles.accent,
+          dark: savedRoles.dark,
+        },
+        usedColors: normalized.usedColors,
+      },
       updated_at: new Date().toISOString(),
     })
     .eq('id', 'default')
