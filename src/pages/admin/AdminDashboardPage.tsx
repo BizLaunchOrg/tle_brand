@@ -16,7 +16,7 @@ import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { AdminRangeTabs, adminDeliveryPillClass } from './adminRangeTabs.tsx'
 import { fetchVisitorStatsForRange, type VisitorStats } from '../../lib/adminVisitorStats.ts'
-import { ad, adminFont, adminGreetingName } from './adminUi.ts'
+import { ad, adminFont, adminGreetingName, adminMoneyText } from './adminUi.ts'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
@@ -236,7 +236,7 @@ export function AdminDashboardPage() {
             </p>
             <span className={muted + ' text-[11px]'}>{rangeLabel}</span>
           </div>
-          <p className={ad(theme, 'mt-2 text-3xl font-bold tabular-nums tracking-tight text-stone-900', 'mt-2 text-3xl font-bold tabular-nums tracking-tight text-white')}>
+          <p className={'mt-2 text-3xl font-bold tabular-nums tracking-tight ' + adminMoneyText(theme)}>
             {formatNaira(rangeStats.revenue)}
           </p>
           <p className={muted + ' mt-1 text-[12px]'}>{rangeStats.count} orders in this period</p>
@@ -287,11 +287,11 @@ export function AdminDashboardPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className={'rounded-xl border p-3 sm:p-4 ' + ad(theme, 'border-stone-100 bg-stone-50/50', 'border-neutral-700 bg-neutral-900/40')}>
               <p className={muted + ' text-[10px] font-semibold uppercase tracking-wide'}>Total sales</p>
-              <p className={ad(theme, 'mt-1 text-lg font-bold tabular-nums text-stone-900', 'mt-1 text-lg font-bold tabular-nums text-white')}>{formatNaira(yearTotal.revenue)}</p>
+              <p className={'mt-1 text-lg font-bold tabular-nums ' + adminMoneyText(theme)}>{formatNaira(yearTotal.revenue)}</p>
             </div>
             <div className={'rounded-xl border p-3 sm:p-4 ' + ad(theme, 'border-emerald-100 bg-emerald-50/60', 'border-emerald-900/40 bg-emerald-950/20')}>
               <p className={muted + ' text-[10px] font-semibold uppercase tracking-wide'}>Total settled</p>
-              <p className={ad(theme, 'mt-1 text-lg font-bold tabular-nums text-emerald-800', 'mt-1 text-lg font-bold tabular-nums text-emerald-300')}>{formatNaira(yearSettled)}</p>
+              <p className={'mt-1 text-lg font-bold tabular-nums ' + adminMoneyText(theme)}>{formatNaira(yearSettled)}</p>
             </div>
             <div className={'rounded-xl border p-3 sm:p-4 ' + ad(theme, 'border-amber-100 bg-amber-50/60', 'border-amber-900/35 bg-amber-950/20')}>
               <p className={muted + ' text-[10px] font-semibold uppercase tracking-wide'}>Pipeline (pending)</p>
@@ -406,7 +406,7 @@ export function AdminDashboardPage() {
                         {new Date(o.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric' })}
                       </td>
                       <td className={td + ' max-w-[140px] truncate'}>{o.email}</td>
-                      <td className={td + ' text-right font-semibold tabular-nums ' + ad(theme, 'text-emerald-800', 'text-emerald-300')}>
+                      <td className={td + ' text-right font-semibold tabular-nums ' + adminMoneyText(theme)}>
                         {formatNaira(Number(o.total_ngn) || 0)}
                       </td>
                     </tr>
@@ -480,11 +480,11 @@ export function AdminDashboardPage() {
           <div className={'mt-6 grid gap-4 border-t pt-6 sm:grid-cols-2 lg:grid-cols-4 ' + ad(theme, 'border-stone-100', 'border-neutral-800')}>
             <div className="rounded-2xl border border-stone-100 bg-stone-50/60 p-4">
               <p className={muted + ' text-[11px] font-semibold uppercase tracking-wide'}>Total sales</p>
-              <p className={ad(theme, 'mt-2 text-xl font-bold tabular-nums text-stone-900', 'mt-2 text-xl font-bold tabular-nums text-white')}>{formatNaira(yearTotal.revenue)}</p>
+              <p className={'mt-2 text-xl font-bold tabular-nums ' + adminMoneyText(theme)}>{formatNaira(yearTotal.revenue)}</p>
             </div>
             <div className="rounded-2xl border border-emerald-100/80 bg-emerald-50/50 p-4">
               <p className={muted + ' text-[11px] font-semibold uppercase tracking-wide'}>Total settled</p>
-              <p className={ad(theme, 'mt-2 text-xl font-bold tabular-nums text-emerald-900', 'mt-2 text-xl font-bold tabular-nums text-emerald-300')}>{formatNaira(yearSettled)}</p>
+              <p className={'mt-2 text-xl font-bold tabular-nums ' + adminMoneyText(theme)}>{formatNaira(yearSettled)}</p>
               <p className={muted + ' mt-1 text-[11px]'}>Completed / delivered orders</p>
             </div>
             <div className="rounded-2xl border border-amber-100/80 bg-amber-50/50 p-4">
@@ -538,7 +538,7 @@ export function AdminDashboardPage() {
                         </td>
                         <td className={td + ' font-mono text-[12px]'}>{o.id.slice(0, 10)}…</td>
                         <td className={td + ' max-w-[180px] truncate'}>{o.email}</td>
-                        <td className={td + ' text-right font-semibold tabular-nums ' + ad(theme, 'text-emerald-800', 'text-emerald-300')}>
+                        <td className={td + ' text-right font-semibold tabular-nums ' + adminMoneyText(theme)}>
                           {formatNaira(Number(o.total_ngn) || 0)}
                         </td>
                         <td className={td}>
@@ -589,7 +589,7 @@ export function AdminDashboardPage() {
                         <td className={td + ' tabular-nums ' + muted}>{i + 1}</td>
                         <td className={td + ' font-medium'}>{row.state}</td>
                         <td className={td + ' text-right tabular-nums ' + muted}>{row.orders}</td>
-                        <td className={td + ' text-right font-medium tabular-nums ' + ad(theme, 'text-emerald-800', 'text-emerald-300')}>
+                        <td className={td + ' text-right font-medium tabular-nums ' + adminMoneyText(theme)}>
                           {formatNaira(row.revenue)}
                         </td>
                       </tr>

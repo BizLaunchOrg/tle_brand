@@ -8,7 +8,7 @@ import {
   type MakeupBookingRow,
 } from '../../lib/makeupBookings.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { ad, adminFont } from './adminUi.ts'
+import { ad, adminFont, adminMoneyText } from './adminUi.ts'
 
 type Tab = 'pending' | 'accepted' | 'rejected'
 
@@ -350,7 +350,7 @@ export function AdminMakeupBookingsPage() {
             <section>
               <h3 className={muted + ' mb-2 text-[10px] font-bold uppercase tracking-wide'}>Service</h3>
               <p className={ad(theme, 'font-semibold text-stone-900', 'font-semibold text-neutral-100')}>{r.service_name}</p>
-              <p className={'text-[13px] ' + ad(theme, 'text-emerald-800', 'text-emerald-300')}>{r.service_price}</p>
+              <p className={'text-[13px] ' + adminMoneyText(theme)}>{r.service_price}</p>
               <p className={muted + ' mt-1 text-[12px]'}>{sourceLabel(r.source)}</p>
             </section>
 
@@ -696,7 +696,7 @@ export function AdminMakeupBookingsPage() {
                       </td>
                       <td className={td}>
                         <p className={'font-semibold ' + ad(theme, 'text-stone-900', 'text-neutral-100')}>{r.service_name}</p>
-                        <p className={'text-[12px] ' + ad(theme, 'text-emerald-800', 'text-emerald-300')}>{r.service_price}</p>
+                        <p className={'text-[12px] ' + adminMoneyText(theme)}>{r.service_price}</p>
                       </td>
                       <td className={td}>
                         <p className={'font-medium ' + ad(theme, 'text-stone-900', 'text-neutral-100')}>{r.customer_name}</p>

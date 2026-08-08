@@ -6,6 +6,14 @@
   --admin-accent-deep-rgb: 4 120 87;
 }
 
+/* Money / funds — always green; never follow admin accent. */
+.admin-shell :where(.admin-money) {
+  color: #15803d !important; /* green-700 */
+}
+.admin-shell.admin-shell-dark :where(.admin-money) {
+  color: #4ade80 !important; /* green-400 */
+}
+
 .admin-shell :where([class~="bg-emerald-100"]) { background-color: color-mix(in srgb, var(--admin-accent) 14%, white) !important; }
 .admin-shell :where([class~="bg-emerald-50"]) { background-color: color-mix(in srgb, var(--admin-accent) 10%, white) !important; }
 .admin-shell :where([class~="bg-emerald-50/30"]) { background-color: color-mix(in srgb, var(--admin-accent) 6%, white) !important; }

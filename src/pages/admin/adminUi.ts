@@ -5,6 +5,15 @@ export function ad(theme: AdminTheme, light: string, dark: string) {
   return theme === 'dark' ? dark : light
 }
 
+/**
+ * Money / funds text — always Tailwind green (not emerald).
+ * Admin accent remaps emerald utilities; green stays naira-green no matter her accent pick.
+ * Also adds `.admin-money` so CSS can lock the color against accent overrides.
+ */
+export function adminMoneyText(theme: AdminTheme) {
+  return 'admin-money ' + ad(theme, 'text-green-700', 'text-green-400')
+}
+
 /** OS-native stack — reads like real internal tooling, not a template. */
 export function adminFont() {
   return "font-[system-ui,-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,'Helvetica_Neue',Arial,sans-serif]"

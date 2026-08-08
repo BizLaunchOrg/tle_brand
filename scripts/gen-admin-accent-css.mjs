@@ -152,6 +152,14 @@ let css = `/* Admin accent remaps emerald utilities inside .admin-shell only. Au
   --admin-accent-deep-rgb: 4 120 87;
 }
 
+/* Money / funds — always green; never follow admin accent. */
+.admin-shell :where(.admin-money) {
+  color: #15803d !important; /* green-700 */
+}
+.admin-shell.admin-shell-dark :where(.admin-money) {
+  color: #4ade80 !important; /* green-400 */
+}
+
 `
 
 for (const t of tokens) {

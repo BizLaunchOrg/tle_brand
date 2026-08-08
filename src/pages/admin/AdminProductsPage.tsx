@@ -38,7 +38,7 @@ import {
 } from '../../lib/adminCategories.ts'
 import { openProductMarginPrintReport } from '../../lib/adminMarginReport.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { ad, adminConfirmDelete, adminFont } from './adminUi.ts'
+import { ad, adminConfirmDelete, adminFont, adminMoneyText } from './adminUi.ts'
 
 type ColorDraft = {
   id: string
@@ -672,7 +672,7 @@ export function AdminProductsPage() {
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className={'rounded-2xl border p-4 ' + ad(theme, 'border-stone-200 bg-white', 'border-neutral-700 bg-neutral-900/40')}>
           <p className={label}>Total inventory value</p>
-          <p className={'mt-2 text-xl font-bold tabular-nums ' + ad(theme, 'text-stone-900', 'text-white')}>{formatNaira(stats.inv)}</p>
+          <p className={'mt-2 text-xl font-bold tabular-nums ' + adminMoneyText(theme)}>{formatNaira(stats.inv)}</p>
           <p className={muted + ' mt-1 text-[12px]'}>Price × stock (per product or per colour).</p>
         </div>
         <div className={'rounded-2xl border p-4 ' + ad(theme, 'border-stone-200 bg-white', 'border-neutral-700 bg-neutral-900/40')}>
