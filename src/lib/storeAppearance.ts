@@ -74,7 +74,8 @@ export const DEFAULT_STORE_APPEARANCE: StoreAppearance = {
   ],
 }
 
-const MAX_USED_COLORS = 12
+/** Only previously saved store brand colors — keep the list short. */
+const MAX_USED_COLORS = 9
 
 function isHex(s: string): boolean {
   return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s.trim())
@@ -170,6 +171,14 @@ export function rolesFromBrandColors(colors: BrandColors): BrandColorRoles {
   }
 }
 
+/** Round channels so near-identical picker drags collapse to one swatch. */
+function snapHex(hex: string): string {
+  const { r, g, b } = hexToRgb(hex)
+  const step = 12
+  const snap = (n: number) => Math.min(255, Math.round(n / step) * step)
+  return rgbToHex(snap(r), snap(g), snap(b))
+}
+
 export function normalizeUsedColors(raw: unknown, seed: string[] = []): string[] {
   const fromRaw = Array.isArray(raw)
     ? raw.map((c) => (typeof c === 'string' ? normalizeHex(c, '') : '')).filter((c) => c.length === 7)
@@ -180,15 +189,19 @@ export function normalizeUsedColors(raw: unknown, seed: string[] = []): string[]
   const seen = new Set<string>()
   const out: string[] = []
   for (const c of [...fromRaw, ...fromSeed]) {
-    if (seen.has(c)) continue
-    seen.add(c)
+    const key = snapHex(c)
+    if (seen.has(key)) continue
+    seen.add(key)
     out.push(c)
     if (out.length >= MAX_USED_COLORS) break
   }
   return out.length ? out : [...DEFAULT_STORE_APPEARANCE.usedColors]
 }
 
-/** Put hexes at the front of used-colors (newest first), deduped. */
+/**
+ * Record colors that were actually saved as the store's main / accent / dark.
+ * Do not call this on every color-picker drag — only on successful save.
+ */
 export function rememberUsedColors(existing: string[], ...hexes: string[]): string[] {
   return normalizeUsedColors([], [...hexes, ...existing])
 }
@@ -329,10 +342,16 @@ export async function saveStoreAppearance(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) return { ok: false, message: 'Not configured.' }
   const roles = rolesFromBrandColors(appearance.colors)
+  // History = previously saved store colors only (not live picker drags).
   const withHistory = {
     ...appearance,
     colors: brandColorsFromRoles(roles),
-    usedColors: rememberUsedColors(appearance.usedColors, roles.main, roles.accent, roles.dark),
+    usedColors: rememberUsedColors(
+      normalizeUsedColors(appearance.usedColors),
+      roles.main,
+      roles.accent,
+      roles.dark,
+    ),
   }
   const normalized = normalizeStoreAppearance(withHistory)
   if (normalized.heroBanners.length < 1) {
