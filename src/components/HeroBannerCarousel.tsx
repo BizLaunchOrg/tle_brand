@@ -6,11 +6,14 @@ type Props = {
   className?: string
 }
 
-/** Lightweight sideways hero carousel — no heavy deps; pauses when only one slide. */
+const SWIPE_MS = 3200
+
+/** Sideways hero carousel — fills the hero frame; dots sit middle-bottom. */
 export function HeroBannerCarousel({ banners, alt = 'Hero banner', className = '' }: Props) {
   const slides = banners.filter(Boolean).slice(0, 4)
   const [index, setIndex] = useState(0)
   const multi = slides.length > 1
+  const n = slides.length
 
   useEffect(() => {
     setIndex(0)
@@ -19,20 +22,23 @@ export function HeroBannerCarousel({ banners, alt = 'Hero banner', className = '
   useEffect(() => {
     if (!multi) return
     const id = window.setInterval(() => {
-      setIndex((i) => (i + 1) % slides.length)
-    }, 5200)
+      setIndex((i) => (i + 1) % n)
+    }, SWIPE_MS)
     return () => window.clearInterval(id)
-  }, [multi, slides.length])
+  }, [multi, n])
 
-  if (slides.length === 0) {
+  if (n === 0) {
     return <div className={`bg-tle-cream ${className}`} />
   }
 
   return (
-    <div className={`relative overflow-hidden ${className}`}>
+    <div className={`relative h-full w-full overflow-hidden ${className}`}>
       <div
-        className="flex h-full w-full transition-transform duration-700 ease-out will-change-transform"
-        style={{ transform: `translateX(-${index * 100}%)` }}
+        className="flex h-full transition-transform duration-500 ease-out will-change-transform"
+        style={{
+          width: `${n * 100}%`,
+          transform: `translateX(-${(index * 100) / n}%)`,
+        }}
       >
         {slides.map((src, i) => (
           <img
@@ -41,25 +47,30 @@ export function HeroBannerCarousel({ banners, alt = 'Hero banner', className = '
             alt={i === 0 ? alt : ''}
             loading={i === 0 ? 'eager' : 'lazy'}
             fetchPriority={i === 0 ? 'high' : 'auto'}
-            className="h-full w-full min-w-full shrink-0 object-cover object-[center_22%] max-lg:object-[center_15%]"
+            className="h-full shrink-0 object-cover object-center"
+            style={{ width: `${100 / n}%` }}
             draggable={false}
           />
         ))}
       </div>
+
       {multi ? (
-        <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 lg:bottom-auto lg:top-5 lg:left-5 lg:translate-x-0">
-          {slides.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              aria-label={`Show banner ${i + 1}`}
-              onClick={() => setIndex(i)}
-              className={
-                'h-1.5 rounded-full transition-all ' +
-                (i === index ? 'w-5 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/80')
-              }
-            />
-          ))}
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center max-lg:bottom-36 lg:bottom-6">
+          <div className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-black/25 px-2.5 py-1.5 backdrop-blur-[2px]">
+            {slides.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                aria-label={`Show banner ${i + 1}`}
+                aria-current={i === index}
+                onClick={() => setIndex(i)}
+                className={
+                  'h-1.5 rounded-full transition-all ' +
+                  (i === index ? 'w-5 bg-white' : 'w-1.5 bg-white/55 hover:bg-white/85')
+                }
+              />
+            ))}
+          </div>
         </div>
       ) : null}
     </div>
