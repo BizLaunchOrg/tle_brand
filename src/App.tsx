@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import { ShopProductsProvider } from './context/ShopProductsContext.tsx'
+import { StoreAppearanceProvider } from './context/StoreAppearanceContext.tsx'
 import { MainLayout } from './components/MainLayout.tsx'
 import { LandingPage } from './pages/LandingPage/LandingPage.tsx'
 import { ContactPage } from './pages/ContactPage/ContactPage.tsx'
@@ -31,45 +32,46 @@ import { AdminAppearancePage } from './pages/admin/AdminAppearancePage.tsx'
 function App() {
   return (
     <AuthProvider>
-      <ShopProductsProvider>
-      <Toaster position="top-right" reverseOrder={false} />
-      <Routes>
-        {/* Public auth callbacks — outside storefront layout */}
-        <Route path="/auth/confirm" element={<AuthConfirmPage />} />
-        <Route path="/admin/auth/confirm" element={<AuthConfirmPage />} />
+      <StoreAppearanceProvider>
+        <ShopProductsProvider>
+          <Toaster position="top-right" reverseOrder={false} />
+          <Routes>
+            <Route path="/auth/confirm" element={<AuthConfirmPage />} />
+            <Route path="/admin/auth/confirm" element={<AuthConfirmPage />} />
 
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<LandingPage />} />
-          <Route path="shop" element={<ShopPage />} />
-          <Route path="checkout" element={<CheckoutPage />} />
-          <Route path="login" element={<LoginPage />} />
-          <Route path="signup" element={<SignupPage />} />
-          <Route path="product/:slug" element={<ProductDetailPage />} />
-          <Route path="makeup" element={<MakeupPage />} />
-          <Route path="contact" element={<ContactPage />} />
-          <Route path="book" element={<NotFoundPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
+            <Route path="/" element={<MainLayout />}>
+              <Route index element={<LandingPage />} />
+              <Route path="shop" element={<ShopPage />} />
+              <Route path="checkout" element={<CheckoutPage />} />
+              <Route path="login" element={<LoginPage />} />
+              <Route path="signup" element={<SignupPage />} />
+              <Route path="product/:slug" element={<ProductDetailPage />} />
+              <Route path="makeup" element={<MakeupPage />} />
+              <Route path="contact" element={<ContactPage />} />
+              <Route path="book" element={<NotFoundPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
 
-        <Route path="/admin" element={<AdminGate />}>
-          <Route element={<AdminLayout />}>
-            <Route index element={<AdminDashboardPage />} />
-            <Route path="orders" element={<AdminOrdersPage />} />
-            <Route path="orders/record" element={<AdminRecordSalePage />} />
-            <Route path="orders/:orderId" element={<AdminOrderDetailPage />} />
-            <Route path="products" element={<AdminProductsPage />} />
-            <Route path="categories" element={<Navigate to="/admin/products" replace />} />
-            <Route path="customers" element={<AdminCustomersPage />} />
-            <Route path="makeup-bookings" element={<AdminMakeupBookingsPage />} />
-            <Route path="makeup-hours" element={<AdminMakeupHoursPage />} />
-            <Route path="transactions" element={<AdminTransactionsPage />} />
-            <Route path="appearance" element={<AdminAppearancePage />} />
-            <Route path="account" element={<AdminAccountPage />} />
-            <Route path="account/checkout" element={<AdminAccountCheckoutPage />} />
-          </Route>
-        </Route>
-      </Routes>
-      </ShopProductsProvider>
+            <Route path="/admin" element={<AdminGate />}>
+              <Route element={<AdminLayout />}>
+                <Route index element={<AdminDashboardPage />} />
+                <Route path="orders" element={<AdminOrdersPage />} />
+                <Route path="orders/record" element={<AdminRecordSalePage />} />
+                <Route path="orders/:orderId" element={<AdminOrderDetailPage />} />
+                <Route path="products" element={<AdminProductsPage />} />
+                <Route path="categories" element={<Navigate to="/admin/products" replace />} />
+                <Route path="customers" element={<AdminCustomersPage />} />
+                <Route path="makeup-bookings" element={<AdminMakeupBookingsPage />} />
+                <Route path="makeup-hours" element={<AdminMakeupHoursPage />} />
+                <Route path="transactions" element={<AdminTransactionsPage />} />
+                <Route path="appearance" element={<AdminAppearancePage />} />
+                <Route path="account" element={<AdminAccountPage />} />
+                <Route path="account/checkout" element={<AdminAccountCheckoutPage />} />
+              </Route>
+            </Route>
+          </Routes>
+        </ShopProductsProvider>
+      </StoreAppearanceProvider>
     </AuthProvider>
   )
 }

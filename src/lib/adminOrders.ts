@@ -153,36 +153,36 @@ export async function markShippingSlipPrinted(
   return { ok: true }
 }
 
-export async function insertOfflineOrder(order: Partial<AdminOrderRow>): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+/** Admin “record sale” — insert an offline / social order row. */
+export async function insertOfflineOrder(
+  order: Partial<AdminOrderRow>,
+): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) return { ok: false, message: 'Not configured.' }
-  
-  // Ensure we have a user_id for RLS "orders_insert_own" policy
-  let row = { ...order }
-  if (!row.user_id) {
-    const { data: { session } } = await getSupabase().auth.getSession()
-    if (session?.user?.id) {
-      row.user_id = session.user.id
-    }
+
+  const email = (order.email || '').trim()
+  if (!email) return { ok: false, message: 'Customer contact is required.' }
+
+  const row: Record<string, unknown> = {
+    email,
+    shipping: order.shipping && typeof order.shipping === 'object' ? order.shipping : {},
+    line_items: order.line_items ?? [],
+    subtotal_ngn: Math.max(0, Math.round(Number(order.subtotal_ngn) || 0)),
+    delivery_ngn: Math.max(0, Math.round(Number(order.delivery_ngn) || 0)),
+    processing_ngn: Math.max(0, Math.round(Number(order.processing_ngn) || 0)),
+    sales_vat_ngn: Math.max(0, Math.round(Number(order.sales_vat_ngn) || 0)),
+    processing_vat_ngn: 0,
+    total_ngn: Math.max(0, Math.round(Number(order.total_ngn) || 0)),
+    status: (order.status || 'pending').trim() || 'pending',
+    payment_status: (order.payment_status || 'unpaid').trim() || 'unpaid',
+    delivery_status: (order.delivery_status || 'pending').trim() || 'pending',
   }
 
-  const { data, error } = await getSupabase()
-    .from('orders')
-    .insert({
-      ...row,
-      created_at: new Date().toISOString(),
-      status: row.status || 'paid',
-      payment_status: row.payment_status || 'paid',
-      delivery_status: row.delivery_status || 'pending',
-    })
-    .select('id')
-    .single()
+  if (order.user_id?.trim()) row.user_id = order.user_id.trim()
+  if (order.created_at?.trim()) row.created_at = order.created_at.trim()
 
-  if (error) {
-    if (error.message.includes('row-level security')) {
-      return { ok: false, message: 'Permission denied. Make sure you are logged in as an admin.' }
-    }
-    return { ok: false, message: error.message }
+  const { data, error } = await getSupabase().from('orders').insert(row).select('id').maybeSingle()
+  if (error || !data?.id) {
+    return { ok: false, message: 'Could not save offline order.' }
   }
-  if (!data) return { ok: false, message: 'Failed to create order.' }
-  return { ok: true, id: data.id }
+  return { ok: true, id: data.id as string }
 }

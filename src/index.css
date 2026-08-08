@@ -3,6 +3,23 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --tle-pink: #c4698d;
+    --tle-deep: #a0496f;
+    --tle-light: #eeb8ce;
+    --tle-blush: #f8edf2;
+    --tle-gold: #bf8f48;
+    --tle-charcoal: #0e0e0e;
+    --tle-cream: #faf8f5;
+    --tle-pink-rgb: 196 105 141;
+    --tle-deep-rgb: 160 73 111;
+    --tle-light-rgb: 238 184 206;
+    --tle-blush-rgb: 248 237 242;
+    --tle-gold-rgb: 191 143 72;
+    --tle-charcoal-rgb: 14 14 14;
+    --tle-cream-rgb: 250 248 245;
+  }
+
   body {
     @apply m-0 min-h-svh overflow-x-hidden bg-white font-sans text-tle-ink antialiased dark:bg-zinc-950 dark:text-zinc-100;
   }
