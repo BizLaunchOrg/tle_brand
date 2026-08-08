@@ -1,7 +1,7 @@
 import { getSupabase } from './supabaseClient'
 import { isSupabaseConfigured } from './mapSupabaseAuthError'
 
-const CACHE_KEY = 'tle_store_appearance_v2'
+const CACHE_KEY = 'tle_store_appearance_v3'
 
 export type ExclusiveOfferAppearance = {
   enabled: boolean
@@ -35,8 +35,11 @@ export type StoreAppearance = {
   heroBanners: string[]
   exclusiveOffer: ExclusiveOfferAppearance
   colors: BrandColors
-  /** Recently used / saved hexes for quick re-pick (main + accent + dark). */
-  usedColors: string[]
+  /**
+   * Saved color settings (oldest → newest).
+   * Each entry is one full store look: icons/links, buttons/footer, labels.
+   */
+  colorHistory: BrandColorRoles[]
 }
 
 export const DEFAULT_BRAND_COLORS: BrandColors = {
@@ -67,15 +70,11 @@ export const DEFAULT_STORE_APPEARANCE: StoreAppearance = {
     buttonIcon: 'photo_camera',
   },
   colors: { ...DEFAULT_BRAND_COLORS },
-  usedColors: [
-    DEFAULT_BRAND_COLORS.pink,
-    DEFAULT_BRAND_COLORS.gold,
-    DEFAULT_BRAND_COLORS.charcoal,
-  ],
+  colorHistory: [{ ...DEFAULT_COLOR_ROLES }],
 }
 
-/** Only previously saved store brand colors — keep the list short. */
-const MAX_USED_COLORS = 9
+/** Max saved color settings for Previous / Next. */
+const MAX_COLOR_HISTORY = 12
 
 function isHex(s: string): boolean {
   return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s.trim())
@@ -171,39 +170,51 @@ export function rolesFromBrandColors(colors: BrandColors): BrandColorRoles {
   }
 }
 
-/** Round channels so near-identical picker drags collapse to one swatch. */
-function snapHex(hex: string): string {
-  const { r, g, b } = hexToRgb(hex)
-  const step = 12
-  const snap = (n: number) => Math.min(255, Math.round(n / step) * step)
-  return rgbToHex(snap(r), snap(g), snap(b))
+export function rolesEqual(a: BrandColorRoles, b: BrandColorRoles): boolean {
+  return a.main === b.main && a.accent === b.accent && a.dark === b.dark
 }
 
-export function normalizeUsedColors(raw: unknown, seed: string[] = []): string[] {
-  const fromRaw = Array.isArray(raw)
-    ? raw.map((c) => (typeof c === 'string' ? normalizeHex(c, '') : '')).filter((c) => c.length === 7)
-    : []
-  const fromSeed = seed
-    .map((c) => normalizeHex(c, ''))
-    .filter((c) => c.length === 7)
-  const seen = new Set<string>()
-  const out: string[] = []
-  for (const c of [...fromRaw, ...fromSeed]) {
-    const key = snapHex(c)
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(c)
-    if (out.length >= MAX_USED_COLORS) break
+export function normalizeColorRoles(
+  raw: unknown,
+  fallback: BrandColorRoles = DEFAULT_COLOR_ROLES,
+): BrandColorRoles {
+  if (!raw || typeof raw !== 'object') return { ...fallback }
+  const o = raw as Record<string, unknown>
+  return {
+    main: normalizeHex(o.main ?? o.pink, fallback.main),
+    accent: normalizeHex(o.accent ?? o.gold, fallback.accent),
+    dark: normalizeHex(o.dark ?? o.charcoal, fallback.dark),
   }
-  return out.length ? out : [...DEFAULT_STORE_APPEARANCE.usedColors]
 }
 
-/**
- * Record colors that were actually saved as the store's main / accent / dark.
- * Do not call this on every color-picker drag — only on successful save.
- */
-export function rememberUsedColors(existing: string[], ...hexes: string[]): string[] {
-  return normalizeUsedColors([], [...hexes, ...existing])
+/** Oldest → newest. Always at least the current store colors. */
+export function normalizeColorHistory(raw: unknown, current: BrandColorRoles): BrandColorRoles[] {
+  const list: BrandColorRoles[] = []
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue
+      list.push(normalizeColorRoles(item, current))
+    }
+  }
+  if (!list.length) list.push({ ...current })
+  const deduped: BrandColorRoles[] = []
+  for (const roles of list) {
+    const prev = deduped[deduped.length - 1]
+    if (prev && rolesEqual(prev, roles)) continue
+    deduped.push(roles)
+  }
+  const last = deduped[deduped.length - 1]
+  if (!last || !rolesEqual(last, current)) deduped.push({ ...current })
+  return deduped.slice(-MAX_COLOR_HISTORY)
+}
+
+/** Append a saved color setting on successful save (skip if same as newest). */
+export function rememberColorSetting(history: BrandColorRoles[], roles: BrandColorRoles): BrandColorRoles[] {
+  const normalized = normalizeColorRoles(roles)
+  const base = history.length ? [...history] : [{ ...normalized }]
+  const last = base[base.length - 1]
+  if (last && rolesEqual(last, normalized)) return base.slice(-MAX_COLOR_HISTORY)
+  return [...base, normalized].slice(-MAX_COLOR_HISTORY)
 }
 
 function normalizeColors(raw: unknown): BrandColors {
@@ -245,7 +256,7 @@ export function normalizeStoreAppearance(raw: unknown): StoreAppearance {
     heroBanners: normalizeBanners(o.heroBanners),
     exclusiveOffer: normalizeOffer(o.exclusiveOffer),
     colors,
-    usedColors: normalizeUsedColors(o.usedColors, [roles.main, roles.accent, roles.dark]),
+    colorHistory: normalizeColorHistory(o.colorHistory, roles),
   }
 }
 
@@ -342,16 +353,10 @@ export async function saveStoreAppearance(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) return { ok: false, message: 'Not configured.' }
   const roles = rolesFromBrandColors(appearance.colors)
-  // History = previously saved store colors only (not live picker drags).
   const withHistory = {
     ...appearance,
     colors: brandColorsFromRoles(roles),
-    usedColors: rememberUsedColors(
-      normalizeUsedColors(appearance.usedColors),
-      roles.main,
-      roles.accent,
-      roles.dark,
-    ),
+    colorHistory: rememberColorSetting(appearance.colorHistory ?? [], roles),
   }
   const normalized = normalizeStoreAppearance(withHistory)
   if (normalized.heroBanners.length < 1) {
@@ -374,7 +379,7 @@ export async function saveStoreAppearance(
           accent: savedRoles.accent,
           dark: savedRoles.dark,
         },
-        usedColors: normalized.usedColors,
+        colorHistory: normalized.colorHistory,
       },
       updated_at: new Date().toISOString(),
     })
