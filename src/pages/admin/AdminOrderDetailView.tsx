@@ -21,7 +21,7 @@ import { normalizeOrderLineItems, pickLineImageFromItem } from '../../lib/adminO
 import { getOrderPaymentProofSignedUrl } from '../../lib/orderPaymentProof.ts'
 import { printShippingSlip } from './shippingSlipPrint.ts'
 
-const formatNaira = (n: number) => `â‚¦${Math.round(n).toLocaleString()}`
+const formatNaira = (n: number) => `\u20A6${Math.round(n).toLocaleString()}`
 
 const DELIVERY_OPTIONS = ['pending', 'processing', 'delivered'] as const
 
@@ -116,7 +116,7 @@ function buildLineDisplaysExt(raw: unknown): LineDisplayExt[] {
     const slug = typeof o.slug === 'string' ? o.slug.trim() : ''
     const name = typeof o.name === 'string' ? o.name : slug || 'Item'
     const qty = Math.min(999, Math.max(1, Math.floor(Number(o.quantity)) || 1))
-    const priceStr = typeof o.price === 'string' ? o.price : typeof o.price === 'number' ? formatNaira(o.price) : 'â‚¦0'
+    const priceStr = typeof o.price === 'string' ? o.price : typeof o.price === 'number' ? formatNaira(o.price) : '\u20A60'
     const unit = parseProductPriceNgn(priceStr)
     const variantId = typeof o.variantId === 'string' && o.variantId.trim() ? o.variantId.trim() : undefined
     const variantLabel =
@@ -312,6 +312,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
   const border = ad(theme, 'border-stone-200', 'border-neutral-800')
   const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
   const strong = ad(theme, 'text-stone-900', 'text-neutral-50')
+  const money = ad(theme, 'text-emerald-700', 'text-emerald-300')
   const subpanel = ad(theme, 'rounded-xl border border-stone-100 bg-stone-50/80', 'rounded-xl border border-neutral-800 bg-neutral-900/60')
   const panel = ad(theme, 'bg-white', 'bg-neutral-950')
   const selectCls = ad(
@@ -339,7 +340,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
       setBanner({ type: 'ok', text: `${label} copied.` })
       window.setTimeout(() => setBanner(null), 2200)
     } catch {
-      setBanner({ type: 'err', text: 'Copy blocked â€” select and copy manually.' })
+      setBanner({ type: 'err', text: 'Copy blocked \u2014 select and copy manually.' })
     }
   }
 
@@ -393,7 +394,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
     setBanner(null)
     const ok = printShippingSlip(order)
     if (!ok) {
-      setBanner({ type: 'err', text: 'Pop-up blocked â€” allow pop-ups for this site, then try Print again.' })
+      setBanner({ type: 'err', text: 'Pop-up blocked \u2014 allow pop-ups for this site, then try Print again.' })
     }
   }
 
@@ -448,7 +449,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
           </div>
         </div>
         <p className={muted + ' text-[12px]'}>
-          {contextTitle} Â· Transaction reference <span className={'font-mono font-semibold ' + strong}>{order.id}</span>
+          {contextTitle} {'\u00b7'} Transaction reference <span className={'font-mono font-semibold ' + strong}>{order.id}</span>
         </p>
         {banner ? (
           <div
@@ -497,7 +498,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
               <div>
                 <p className={'text-[10px] font-bold uppercase tracking-wider ' + muted}>Customer</p>
                 <p className={'mt-1 text-[15px] font-bold ' + strong}>{customerDisplayName(order)}</p>
-                <p className={'mt-1 break-all text-[13px] ' + strong}>{order.email || 'â€”'}</p>
+                <p className={'mt-1 break-all text-[13px] ' + strong}>{order.email || '\u2014'}</p>
                 {formatCell(ship.phone) ? <p className={'mt-1 text-[13px] ' + strong}>{formatCell(ship.phone)}</p> : null}
               </div>
               <div>
@@ -576,10 +577,10 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
                         <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 border-t border-black/5 pt-2 sm:pt-3">
                           <p className={muted + ' text-[12px]'}>
                             Qty <span className={'font-bold tabular-nums ' + strong}>{row.quantity}</span>
-                            <span className="mx-1.5">Â·</span>
-                            Unit <span className={'font-semibold ' + strong}>{row.unitPriceLabel}</span>
+                            <span className="mx-1.5">{'\u00b7'}</span>
+                            Unit <span className={'font-semibold tabular-nums ' + money}>{row.unitPriceLabel}</span>
                           </p>
-                          <p className={'text-[15px] font-bold tabular-nums ' + ad(theme, 'text-emerald-700', 'text-emerald-300')}>{formatNaira(row.lineTotalNgn)}</p>
+                          <p className={'text-[15px] font-bold tabular-nums ' + money}>{formatNaira(row.lineTotalNgn)}</p>
                         </div>
                         {row.extras.length > 0 ? (
                           <details className="mt-2">
@@ -606,7 +607,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
 
           <section className={'rounded-2xl border p-4 sm:p-5 ' + border + ' ' + panel}>
             <h2 className={'text-[11px] font-bold uppercase tracking-[0.12em] ' + muted}>Delivery</h2>
-            <p className={muted + ' mt-1 text-[12px]'}>Pending â†’ preparing â†’ delivered to the customer.</p>
+            <p className={muted + ' mt-1 text-[12px]'}>Pending {'\u2192'} preparing {'\u2192'} delivered to the customer.</p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
               <label className="block min-w-0 flex-1">
                 <span className={'mb-1 block text-[10px] font-bold uppercase tracking-wide ' + muted}>Status</span>
@@ -677,25 +678,25 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
               </div>
               <div className="flex justify-between gap-2">
                 <dt className={muted}>Subtotal</dt>
-                <dd className={'font-semibold tabular-nums ' + strong}>{formatNaira(Number(order.subtotal_ngn) || 0)}</dd>
+                <dd className={'font-semibold tabular-nums ' + money}>{formatNaira(Number(order.subtotal_ngn) || 0)}</dd>
               </div>
               {(Number(order.sales_vat_ngn) || 0) > 0 ? (
                 <div className="flex justify-between gap-2">
                   <dt className={muted}>VAT on products</dt>
-                  <dd className={'font-semibold tabular-nums ' + strong}>{formatNaira(Number(order.sales_vat_ngn) || 0)}</dd>
+                  <dd className={'font-semibold tabular-nums ' + money}>{formatNaira(Number(order.sales_vat_ngn) || 0)}</dd>
                 </div>
               ) : null}
               <div className="flex justify-between gap-2">
                 <dt className={muted}>Delivery</dt>
-                <dd className={'font-semibold tabular-nums ' + strong}>{formatNaira(Number(order.delivery_ngn) || 0)}</dd>
+                <dd className={'font-semibold tabular-nums ' + money}>{formatNaira(Number(order.delivery_ngn) || 0)}</dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className={muted}>Processing</dt>
-                <dd className={'font-semibold tabular-nums ' + strong}>{formatNaira(Number(order.processing_ngn) || 0)}</dd>
+                <dd className={'font-semibold tabular-nums ' + money}>{formatNaira(Number(order.processing_ngn) || 0)}</dd>
               </div>
               <div className={'mt-2 flex justify-between gap-2 border-t pt-2 ' + border}>
                 <dt className={'text-[12px] font-bold ' + strong}>Total</dt>
-                <dd className={'text-lg font-bold tabular-nums ' + ad(theme, 'text-emerald-700', 'text-emerald-300')}>{formatNaira(Number(order.total_ngn) || 0)}</dd>
+                <dd className={'text-lg font-bold tabular-nums ' + money}>{formatNaira(Number(order.total_ngn) || 0)}</dd>
               </div>
             </dl>
           </div>
@@ -712,7 +713,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
             {!order.payment_proof_storage_path?.trim() ? (
               <p className={muted + ' mt-2 text-[12px]'}>No payment screenshot on this order.</p>
             ) : proofBusy ? (
-              <p className={muted + ' mt-2 text-[12px]'}>Loading imageâ€¦</p>
+              <p className={muted + ' mt-2 text-[12px]'}>Loading image{'\u2026'}</p>
             ) : !proofSignedUrl ? (
               <p className={'mt-2 text-[12px] text-rose-700'}>Could not load payment proof.</p>
             ) : (
@@ -749,7 +750,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
                 Copy
               </button>
             </div>
-            <p className={'mt-3 whitespace-pre-line break-words text-[13px] leading-relaxed ' + strong}>{deliverText || 'â€”'}</p>
+            <p className={'mt-3 whitespace-pre-line break-words text-[13px] leading-relaxed ' + strong}>{deliverText || '\u2014'}</p>
           </div>
 
           <div className={'rounded-2xl border p-4 ' + border + ' ' + panel}>
@@ -767,13 +768,13 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
                 className={quickBtn + ' justify-center py-2.5'}
               >
                 <span className="material-symbols-outlined text-[18px] font-light">check_circle</span>
-                {slipBusy ? 'Savingâ€¦' : 'Confirm slip printed'}
+                {slipBusy ? 'Saving\u2026' : 'Confirm slip printed'}
               </button>
             </div>
             <p className={'mt-3 text-[12px] leading-relaxed ' + (slipPrintedLabel ? strong : muted)}>
               {slipPrintedLabel ? (
                 <>
-                  <span className={muted + ' font-bold uppercase tracking-wide'}>Printed Â· </span>
+                  <span className={muted + ' font-bold uppercase tracking-wide'}>Printed {'\u00b7'} </span>
                   {slipPrintedLabel}
                 </>
               ) : (
