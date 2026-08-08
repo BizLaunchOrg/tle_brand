@@ -17,10 +17,30 @@ import { ad, adminFont } from './adminUi.ts'
 
 type ColorRoleKey = keyof BrandColorRoles
 
-const COLOR_ROLES: { key: ColorRoleKey; label: string; hint: string }[] = [
-  { key: 'main', label: 'Main color', hint: 'Buttons, icons, and brand accents' },
-  { key: 'accent', label: 'Accent color', hint: 'Labels and highlight text' },
-  { key: 'dark', label: 'Dark color', hint: 'Strong buttons and dark UI' },
+const COLOR_ROLES: {
+  key: ColorRoleKey
+  title: string
+  places: string[]
+  example: string
+}[] = [
+  {
+    key: 'main',
+    title: 'Icons & links',
+    places: ['Navbar', 'Icons', 'Links', 'Hovers'],
+    example: 'Active menu, heart/cart icons, pink links',
+  },
+  {
+    key: 'dark',
+    title: 'Buttons & footer',
+    places: ['Buttons', 'Footer'],
+    example: 'Shop now, checkout, and the footer bar',
+  },
+  {
+    key: 'accent',
+    title: 'Small labels',
+    places: ['Labels', 'Highlights'],
+    example: '“Exclusive offer”, receipt titles, gold tags',
+  },
 ]
 
 export function AdminAppearancePage() {
@@ -30,6 +50,7 @@ export function AdminAppearancePage() {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [activeRole, setActiveRole] = useState<ColorRoleKey>('main')
+  const [usedOpen, setUsedOpen] = useState(false)
 
   const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
   const heading = ad(theme, 'text-2xl font-bold tracking-tight text-stone-900', 'text-2xl font-bold tracking-tight text-white')
@@ -281,11 +302,11 @@ export function AdminAppearancePage() {
 
       {/* 3 — Brand colors */}
       <section className={panel}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className={sectionTitle}>3 · Brand colors</h2>
-            <p className={muted + ' mt-1 text-[13px]'}>
-              Only three picks. Soft pinks and backgrounds are created from your main color automatically.
+            <p className={muted + ' mt-1 max-w-lg text-[13px] leading-relaxed'}>
+              Pick one color for each part of the site. Soft backgrounds follow your icons & links color.
             </p>
           </div>
           <button type="button" onClick={resetColors} className={muted + ' text-[12px] font-semibold underline-offset-2 hover:underline'}>
@@ -293,124 +314,165 @@ export function AdminAppearancePage() {
           </button>
         </div>
 
-        <div className="mt-5 grid gap-4">
-          {COLOR_ROLES.map((f) => {
+        <div className="mt-5 space-y-3">
+          {COLOR_ROLES.map((f, index) => {
             const selected = activeRole === f.key
             return (
-              <button
+              <div
                 key={f.key}
-                type="button"
-                onClick={() => setActiveRole(f.key)}
                 className={[
-                  'rounded-2xl border p-4 text-left transition',
+                  'rounded-2xl border p-4 transition',
                   selected
-                    ? ad(theme, 'border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-500/20', 'border-emerald-500 bg-emerald-950/40 ring-2 ring-emerald-500/20')
-                    : ad(theme, 'border-stone-200 bg-stone-50/50 hover:border-stone-300', 'border-neutral-700 bg-neutral-950/40 hover:border-neutral-600'),
+                    ? ad(theme, 'border-emerald-500/70 bg-emerald-50/40', 'border-emerald-500/70 bg-emerald-950/30')
+                    : ad(theme, 'border-stone-200 bg-white', 'border-neutral-700 bg-neutral-950/30'),
                 ].join(' ')}
               >
-                <div className="flex flex-wrap items-start gap-4">
-                  <div className="relative shrink-0">
-                    <span
-                      className="block size-14 rounded-2xl border border-black/10 shadow-inner"
-                      style={{ background: roles[f.key] }}
-                    />
-                    <input
-                      type="color"
-                      value={roles[f.key]}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        setActiveRole(f.key)
-                        patchRole(f.key, e.target.value)
-                      }}
-                      className="absolute inset-0 cursor-pointer opacity-0"
-                      aria-label={f.label}
-                    />
-                  </div>
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <span
+                    className={ad(
+                      theme,
+                      'mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-100 text-[11px] font-bold text-stone-600',
+                      'mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-[11px] font-bold text-neutral-300',
+                    )}
+                  >
+                    {index + 1}
+                  </span>
+
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className={ad(theme, 'text-[14px] font-bold text-stone-900', 'text-[14px] font-bold text-white')}>
-                        {f.label}
-                      </span>
-                      {selected ? (
-                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
-                          Editing
+                    <h3 className={ad(theme, 'text-[15px] font-bold text-stone-900', 'text-[15px] font-bold text-white')}>
+                      {f.title}
+                    </h3>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {f.places.map((place) => (
+                        <span
+                          key={place}
+                          className={ad(
+                            theme,
+                            'rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-600',
+                            'rounded-md bg-neutral-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-300',
+                          )}
+                        >
+                          {place}
                         </span>
-                      ) : null}
+                      ))}
                     </div>
-                    <p className={muted + ' mt-0.5 text-[12px]'}>{f.hint}</p>
-                    <input
-                      className={inputCls + ' mt-2 font-mono'}
-                      value={roles[f.key]}
-                      onClick={(e) => e.stopPropagation()}
-                      onFocus={() => setActiveRole(f.key)}
-                      onChange={(e) => patchRole(f.key, e.target.value)}
-                    />
+                    <p className={muted + ' mt-2 text-[12px]'}>{f.example}</p>
+
+                    <div className="mt-3 flex items-center gap-3">
+                      <label className="relative shrink-0 cursor-pointer">
+                        <span
+                          className="block size-12 rounded-xl border border-black/10 shadow-inner"
+                          style={{ background: roles[f.key] }}
+                        />
+                        <input
+                          type="color"
+                          value={roles[f.key]}
+                          onChange={(e) => {
+                            setActiveRole(f.key)
+                            patchRole(f.key, e.target.value)
+                          }}
+                          className="absolute inset-0 cursor-pointer opacity-0"
+                          aria-label={f.title}
+                        />
+                      </label>
+                      <input
+                        className={inputCls + ' max-w-[10rem] font-mono'}
+                        value={roles[f.key]}
+                        onFocus={() => setActiveRole(f.key)}
+                        onChange={(e) => {
+                          setActiveRole(f.key)
+                          patchRole(f.key, e.target.value)
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </button>
+              </div>
             )
           })}
         </div>
 
-        <div className="mt-6">
-          <div className="flex flex-wrap items-end justify-between gap-2">
+        {/* Used colors — collapsed by default */}
+        <div
+          className={ad(
+            theme,
+            'mt-5 overflow-hidden rounded-2xl border border-stone-200',
+            'mt-5 overflow-hidden rounded-2xl border border-neutral-700',
+          )}
+        >
+          <button
+            type="button"
+            onClick={() => setUsedOpen((o) => !o)}
+            className={ad(
+              theme,
+              'flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-stone-50',
+              'flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-neutral-900/60',
+            )}
+            aria-expanded={usedOpen}
+          >
             <div>
-              <h3 className={ad(theme, 'text-[13px] font-bold text-stone-900', 'text-[13px] font-bold text-white')}>
-                Used colors
-              </h3>
+              <p className={ad(theme, 'text-[13px] font-bold text-stone-900', 'text-[13px] font-bold text-white')}>
+                Previously used colors
+              </p>
               <p className={muted + ' mt-0.5 text-[12px]'}>
-                Colors already saved for your store (main, accent, dark). Tap a swatch to apply it to{' '}
-                <span className="font-semibold">{COLOR_ROLES.find((r) => r.key === activeRole)?.label.toLowerCase()}</span>.
+                Saved store colors — tap one to reuse on “{COLOR_ROLES.find((r) => r.key === activeRole)?.title}”
               </p>
             </div>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {draft.usedColors.map((hex) => {
-              const isActive = roles[activeRole] === hex
-              return (
-                <button
-                  key={hex}
-                  type="button"
-                  title={hex}
-                  onClick={() => applyUsedColor(hex)}
-                  className={[
-                    'size-9 rounded-full border-2 transition',
-                    isActive ? 'border-emerald-600 ring-2 ring-emerald-500/30' : 'border-white shadow ring-1 ring-black/10',
-                  ].join(' ')}
-                  style={{ background: hex }}
-                />
-              )
-            })}
-          </div>
+            <span className="material-symbols-outlined shrink-0 text-[22px] text-stone-400">
+              {usedOpen ? 'expand_less' : 'expand_more'}
+            </span>
+          </button>
+
+          {usedOpen ? (
+            <div className={ad(theme, 'border-t border-stone-200 px-4 py-3', 'border-t border-neutral-700 px-4 py-3')}>
+              <div className="flex flex-wrap gap-2">
+                {draft.usedColors.map((hex) => {
+                  const isActive = roles[activeRole] === hex
+                  return (
+                    <button
+                      key={hex}
+                      type="button"
+                      title={hex}
+                      onClick={() => applyUsedColor(hex)}
+                      className={[
+                        'size-9 rounded-full border-2 transition',
+                        isActive
+                          ? 'border-emerald-600 ring-2 ring-emerald-500/30'
+                          : 'border-white shadow ring-1 ring-black/10',
+                      ].join(' ')}
+                      style={{ background: hex }}
+                    />
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-black/5 bg-black/[0.02] p-4">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-stone-500">Preview</span>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-stone-500">Looks like</span>
           <span
             className="inline-flex size-9 items-center justify-center rounded-full"
             style={{ background: draft.colors.blush, color: draft.colors.pink }}
+            title="Icon"
           >
-            <span className="material-symbols-outlined text-[20px]">diamond</span>
+            <span className="material-symbols-outlined text-[20px]">favorite</span>
           </span>
-          <button
-            type="button"
-            className="rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white"
-            style={{ background: draft.colors.pink }}
-          >
-            Main
-          </button>
           <button
             type="button"
             className="rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white"
             style={{ background: draft.colors.charcoal }}
           >
-            Dark
+            Button
           </button>
           <span
             className="rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-widest"
             style={{ borderColor: draft.colors.gold, color: draft.colors.gold }}
           >
-            Accent
+            Label
+          </span>
+          <span className="text-[12px] font-semibold underline" style={{ color: draft.colors.pink }}>
+            Link
           </span>
         </div>
       </section>
