@@ -606,6 +606,7 @@ export function AdminProductsPage() {
   }
 
   const removeColorOptionImageAt = (colorIdx: number, imageIdx: number) => {
+    if (!adminConfirmDelete('this photo')) return
     setColorDrafts((rows) =>
       rows.map((row, i) => {
         if (i !== colorIdx) return row

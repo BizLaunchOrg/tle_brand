@@ -5,7 +5,7 @@ import { fetchCatalogProducts, type CatalogProductRow } from '../../lib/adminCat
 import { insertOfflineOrder, type AdminOrderRow } from '../../lib/adminOrders'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { AdminOfflineProductForm } from './AdminOfflineProductForm.tsx'
-import { ad, adminFont } from './adminUi'
+import { ad, adminConfirmDelete, adminFont } from './adminUi'
 import { parseProductPriceNgn } from '../../data/products'
 import { useAuth } from '../../context/AuthContext'
 
@@ -114,6 +114,7 @@ export function AdminRecordSalePage() {
   }, [])
 
   const removeLine = useCallback((lineId: string) => {
+    if (!adminConfirmDelete('this sale line')) return
     setSelectedItems((prev) => prev.filter((item) => item.lineId !== lineId))
   }, [])
   const handleNewProductSaved = (row: CatalogProductRow) => {
@@ -129,6 +130,7 @@ export function AdminRecordSalePage() {
   }
 
   const removeProductLines = (catalogId: string) => {
+    if (!adminConfirmDelete('this product from the sale')) return
     setSelectedItems((prev) => prev.filter((item) => item.id !== catalogId))
   }
 

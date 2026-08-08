@@ -375,6 +375,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
   }
 
   const cancelOrder = async () => {
+    if (!window.confirm('Are you sure you want to cancel this order? This cannot be undone.')) return
     setSaving(true)
     setBanner(null)
     const res = await updateOrderStatus(order.id, 'cancelled')
