@@ -2,25 +2,26 @@ import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { uploadProductImageFile } from '../../lib/adminProductMedia.ts'
 import {
-  DEFAULT_BRAND_COLORS,
+  brandColorsFromRoles,
+  DEFAULT_COLOR_ROLES,
   DEFAULT_STORE_APPEARANCE,
   fetchStoreAppearance,
+  rememberUsedColors,
+  rolesFromBrandColors,
   saveStoreAppearance,
-  type BrandColors,
+  type BrandColorRoles,
   type ExclusiveOfferAppearance,
   type StoreAppearance,
 } from '../../lib/storeAppearance.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { ad, adminFont } from './adminUi.ts'
 
-const COLOR_FIELDS: { key: keyof BrandColors; label: string; hint: string }[] = [
-  { key: 'pink', label: 'Primary pink', hint: 'Buttons, icons, accents' },
-  { key: 'deep', label: 'Deep / hover', hint: 'Hover states' },
-  { key: 'gold', label: 'Gold', hint: 'Eyebrows & highlights' },
-  { key: 'charcoal', label: 'Charcoal', hint: 'Primary solid buttons' },
-  { key: 'cream', label: 'Cream', hint: 'Soft backgrounds' },
-  { key: 'blush', label: 'Blush', hint: 'Soft pink panels' },
-  { key: 'light', label: 'Light pink', hint: 'Soft accents' },
+type ColorRoleKey = keyof BrandColorRoles
+
+const COLOR_ROLES: { key: ColorRoleKey; label: string; hint: string }[] = [
+  { key: 'main', label: 'Main color', hint: 'Buttons, icons, and brand accents' },
+  { key: 'accent', label: 'Accent color', hint: 'Labels and highlight text' },
+  { key: 'dark', label: 'Dark color', hint: 'Strong buttons and dark UI' },
 ]
 
 export function AdminAppearancePage() {
@@ -29,6 +30,7 @@ export function AdminAppearancePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [activeRole, setActiveRole] = useState<ColorRoleKey>('main')
 
   const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
   const heading = ad(theme, 'text-2xl font-bold tracking-tight text-stone-900', 'text-2xl font-bold tracking-tight text-white')
@@ -43,6 +45,7 @@ export function AdminAppearancePage() {
     'w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-[13px] text-stone-900 outline-none focus:ring-2 focus:ring-emerald-500/25',
     'w-full rounded-xl border border-neutral-600 bg-neutral-950 px-3 py-2.5 text-[13px] text-neutral-100 outline-none focus:ring-2 focus:ring-emerald-500/25',
   )
+  const sectionTitle = ad(theme, 'text-base font-bold text-stone-900', 'text-base font-bold text-white')
 
   useEffect(() => {
     let on = true
@@ -57,13 +60,26 @@ export function AdminAppearancePage() {
     }
   }, [])
 
+  const roles = rolesFromBrandColors(draft.colors)
+
   const patchOffer = useCallback((patch: Partial<ExclusiveOfferAppearance>) => {
     setDraft((d) => ({ ...d, exclusiveOffer: { ...d.exclusiveOffer, ...patch } }))
   }, [])
 
-  const patchColor = useCallback((key: keyof BrandColors, value: string) => {
-    setDraft((d) => ({ ...d, colors: { ...d.colors, [key]: value } }))
+  const patchRole = useCallback((key: ColorRoleKey, value: string) => {
+    setDraft((d) => {
+      const next = { ...rolesFromBrandColors(d.colors), [key]: value }
+      return {
+        ...d,
+        colors: brandColorsFromRoles(next),
+        usedColors: rememberUsedColors(d.usedColors, value),
+      }
+    })
   }, [])
+
+  const applyUsedColor = (hex: string) => {
+    patchRole(activeRole, hex)
+  }
 
   const onUploadBanner = async (file: File | null) => {
     if (!file) return
@@ -107,11 +123,17 @@ export function AdminAppearancePage() {
       toast.error(res.message)
       return
     }
+    const refreshed = await fetchStoreAppearance()
+    setDraft(refreshed)
     toast.success('Appearance saved — storefront updates instantly')
   }
 
   const resetColors = () => {
-    setDraft((d) => ({ ...d, colors: { ...DEFAULT_BRAND_COLORS } }))
+    setDraft((d) => ({
+      ...d,
+      colors: brandColorsFromRoles(DEFAULT_COLOR_ROLES),
+      usedColors: rememberUsedColors(d.usedColors, DEFAULT_COLOR_ROLES.main, DEFAULT_COLOR_ROLES.accent, DEFAULT_COLOR_ROLES.dark),
+    }))
   }
 
   if (loading) {
@@ -130,7 +152,7 @@ export function AdminAppearancePage() {
         <div>
           <h1 className={heading}>Appearance</h1>
           <p className={muted + ' mt-2 max-w-xl text-[14px] leading-relaxed'}>
-            Hero banners, exclusive offer card, and website colors. Changes apply to the customer site after you save.
+            Three controls: hero banners, exclusive offer, and brand colors.
           </p>
         </div>
         <button
@@ -143,13 +165,11 @@ export function AdminAppearancePage() {
         </button>
       </div>
 
-      {/* Hero banners */}
+      {/* 1 — Hero banners */}
       <section className={panel}>
-        <h2 className={ad(theme, 'text-base font-bold text-stone-900', 'text-base font-bold text-white')}>
-          Hero banners
-        </h2>
+        <h2 className={sectionTitle}>1 · Hero banners</h2>
         <p className={muted + ' mt-1 text-[13px]'}>
-          Add 1–4 images. One image stays still; two or more scroll sideways automatically on the home page.
+          Add 1–4 images. One stays still; two or more scroll on the home page.
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -201,14 +221,12 @@ export function AdminAppearancePage() {
         )}
       </section>
 
-      {/* Exclusive offer */}
+      {/* 2 — Exclusive offer */}
       <section className={panel}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className={ad(theme, 'text-base font-bold text-stone-900', 'text-base font-bold text-white')}>
-              Exclusive offer card
-            </h2>
-            <p className={muted + ' mt-1 text-[13px]'}>Overlay on the home hero. Turn off to hide it completely.</p>
+            <h2 className={sectionTitle}>2 · Exclusive offer</h2>
+            <p className={muted + ' mt-1 text-[13px]'}>Overlay on the home hero. Turn off to hide it.</p>
           </div>
           <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] font-semibold">
             <input
@@ -264,47 +282,117 @@ export function AdminAppearancePage() {
         </div>
       </section>
 
-      {/* Colors */}
+      {/* 3 — Brand colors */}
       <section className={panel}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className={ad(theme, 'text-base font-bold text-stone-900', 'text-base font-bold text-white')}>
-              Website colors
-            </h2>
+            <h2 className={sectionTitle}>3 · Brand colors</h2>
             <p className={muted + ' mt-1 text-[13px]'}>
-              Updates icons, buttons, and accents on the customer site via CSS variables (no lag).
+              Only three picks. Soft pinks and backgrounds are created from your main color automatically.
             </p>
           </div>
           <button type="button" onClick={resetColors} className={muted + ' text-[12px] font-semibold underline-offset-2 hover:underline'}>
-            Reset to defaults
+            Reset defaults
           </button>
         </div>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          {COLOR_FIELDS.map((f) => (
-            <label key={f.key} className="block">
-              <span className={labelCls}>{f.label}</span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={draft.colors[f.key]}
-                  onChange={(e) => patchColor(f.key, e.target.value)}
-                  className="h-10 w-12 cursor-pointer rounded-lg border border-stone-200 bg-transparent p-0.5"
+        <div className="mt-5 grid gap-4">
+          {COLOR_ROLES.map((f) => {
+            const selected = activeRole === f.key
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setActiveRole(f.key)}
+                className={[
+                  'rounded-2xl border p-4 text-left transition',
+                  selected
+                    ? ad(theme, 'border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-500/20', 'border-emerald-500 bg-emerald-950/40 ring-2 ring-emerald-500/20')
+                    : ad(theme, 'border-stone-200 bg-stone-50/50 hover:border-stone-300', 'border-neutral-700 bg-neutral-950/40 hover:border-neutral-600'),
+                ].join(' ')}
+              >
+                <div className="flex flex-wrap items-start gap-4">
+                  <div className="relative shrink-0">
+                    <span
+                      className="block size-14 rounded-2xl border border-black/10 shadow-inner"
+                      style={{ background: roles[f.key] }}
+                    />
+                    <input
+                      type="color"
+                      value={roles[f.key]}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        setActiveRole(f.key)
+                        patchRole(f.key, e.target.value)
+                      }}
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                      aria-label={f.label}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={ad(theme, 'text-[14px] font-bold text-stone-900', 'text-[14px] font-bold text-white')}>
+                        {f.label}
+                      </span>
+                      {selected ? (
+                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                          Editing
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className={muted + ' mt-0.5 text-[12px]'}>{f.hint}</p>
+                    <input
+                      className={inputCls + ' mt-2 font-mono'}
+                      value={roles[f.key]}
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={() => setActiveRole(f.key)}
+                      onChange={(e) => patchRole(f.key, e.target.value)}
+                    />
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="mt-6">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h3 className={ad(theme, 'text-[13px] font-bold text-stone-900', 'text-[13px] font-bold text-white')}>
+                Used colors
+              </h3>
+              <p className={muted + ' mt-0.5 text-[12px]'}>
+                Main, accent, and dark colors you pick are saved here. Tap a swatch to apply it to{' '}
+                <span className="font-semibold">{COLOR_ROLES.find((r) => r.key === activeRole)?.label.toLowerCase()}</span>.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {draft.usedColors.map((hex) => {
+              const isActive = roles[activeRole] === hex
+              return (
+                <button
+                  key={hex}
+                  type="button"
+                  title={hex}
+                  onClick={() => applyUsedColor(hex)}
+                  className={[
+                    'size-9 rounded-full border-2 transition',
+                    isActive ? 'border-emerald-600 ring-2 ring-emerald-500/30' : 'border-white shadow ring-1 ring-black/10',
+                  ].join(' ')}
+                  style={{ background: hex }}
                 />
-                <input
-                  className={inputCls + ' font-mono'}
-                  value={draft.colors[f.key]}
-                  onChange={(e) => patchColor(f.key, e.target.value)}
-                />
-              </div>
-              <span className={muted + ' mt-1 block text-[11px]'}>{f.hint}</span>
-            </label>
-          ))}
+              )
+            })}
+          </div>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-black/5 bg-black/[0.02] p-4">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-stone-500">Live preview</span>
-          <span className="inline-flex size-9 items-center justify-center rounded-full" style={{ background: draft.colors.blush, color: draft.colors.pink }}>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-stone-500">Preview</span>
+          <span
+            className="inline-flex size-9 items-center justify-center rounded-full"
+            style={{ background: draft.colors.blush, color: draft.colors.pink }}
+          >
             <span className="material-symbols-outlined text-[20px]">diamond</span>
           </span>
           <button
@@ -312,17 +400,20 @@ export function AdminAppearancePage() {
             className="rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white"
             style={{ background: draft.colors.pink }}
           >
-            Accent
+            Main
           </button>
           <button
             type="button"
             className="rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white"
             style={{ background: draft.colors.charcoal }}
           >
-            Charcoal
+            Dark
           </button>
-          <span className="rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-widest" style={{ borderColor: draft.colors.gold, color: draft.colors.gold }}>
-            Gold label
+          <span
+            className="rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-widest"
+            style={{ borderColor: draft.colors.gold, color: draft.colors.gold }}
+          >
+            Accent
           </span>
         </div>
       </section>
