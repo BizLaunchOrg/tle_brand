@@ -6,7 +6,6 @@ import {
   DEFAULT_COLOR_ROLES,
   DEFAULT_STORE_APPEARANCE,
   fetchStoreAppearance,
-  rememberUsedColors,
   rolesFromBrandColors,
   saveStoreAppearance,
   type BrandColorRoles,
@@ -72,7 +71,6 @@ export function AdminAppearancePage() {
       return {
         ...d,
         colors: brandColorsFromRoles(next),
-        usedColors: rememberUsedColors(d.usedColors, value),
       }
     })
   }, [])
@@ -132,7 +130,6 @@ export function AdminAppearancePage() {
     setDraft((d) => ({
       ...d,
       colors: brandColorsFromRoles(DEFAULT_COLOR_ROLES),
-      usedColors: rememberUsedColors(d.usedColors, DEFAULT_COLOR_ROLES.main, DEFAULT_COLOR_ROLES.accent, DEFAULT_COLOR_ROLES.dark),
     }))
   }
 
@@ -362,7 +359,7 @@ export function AdminAppearancePage() {
                 Used colors
               </h3>
               <p className={muted + ' mt-0.5 text-[12px]'}>
-                Main, accent, and dark colors you pick are saved here. Tap a swatch to apply it to{' '}
+                Colors already saved for your store (main, accent, dark). Tap a swatch to apply it to{' '}
                 <span className="font-semibold">{COLOR_ROLES.find((r) => r.key === activeRole)?.label.toLowerCase()}</span>.
               </p>
             </div>
