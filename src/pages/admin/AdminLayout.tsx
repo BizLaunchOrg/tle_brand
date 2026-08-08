@@ -163,6 +163,7 @@ function AdminLayoutInner() {
   const storeHost = getPublicStorefrontUrl().replace(/^https?:\/\//, '')
 
   const shell = [
+    'admin-shell',
     adminFont(),
     ad(
       theme,

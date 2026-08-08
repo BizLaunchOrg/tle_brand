@@ -1,0 +1,97 @@
+/* Admin accent remaps emerald utilities inside .admin-shell only. Auto-generated — run: node scripts/gen-admin-accent-css.mjs */
+:root {
+  --admin-accent: #059669;
+  --admin-accent-deep: #047857;
+  --admin-accent-rgb: 5 150 105;
+  --admin-accent-deep-rgb: 4 120 87;
+}
+
+.admin-shell :where([class~="bg-emerald-100"]) { background-color: color-mix(in srgb, var(--admin-accent) 14%, white) !important; }
+.admin-shell :where([class~="bg-emerald-50"]) { background-color: color-mix(in srgb, var(--admin-accent) 10%, white) !important; }
+.admin-shell :where([class~="bg-emerald-50/30"]) { background-color: color-mix(in srgb, var(--admin-accent) 6%, white) !important; }
+.admin-shell :where([class~="bg-emerald-50/50"]) { background-color: color-mix(in srgb, var(--admin-accent) 6%, white) !important; }
+.admin-shell :where([class~="bg-emerald-50/60"]) { background-color: color-mix(in srgb, var(--admin-accent) 6%, white) !important; }
+.admin-shell :where([class~="bg-emerald-50/80"]) { background-color: color-mix(in srgb, var(--admin-accent) 8%, white) !important; }
+.admin-shell :where([class~="bg-emerald-50/90"]) { background-color: color-mix(in srgb, var(--admin-accent) 9%, white) !important; }
+.admin-shell :where([class~="bg-emerald-500"]) { background-color: var(--admin-accent) !important; }
+.admin-shell :where([class~="bg-emerald-600"]) { background-color: var(--admin-accent) !important; }
+.admin-shell :where([class~="bg-emerald-700"]) { background-color: var(--admin-accent-deep) !important; }
+.admin-shell :where([class~="bg-emerald-900/50"]) { background-color: color-mix(in srgb, var(--admin-accent-deep) 36%, black) !important; }
+.admin-shell :where([class~="bg-emerald-950/20"]) { background-color: color-mix(in srgb, var(--admin-accent-deep) 25%, black) !important; }
+.admin-shell :where([class~="bg-emerald-950/25"]) { background-color: color-mix(in srgb, var(--admin-accent-deep) 27%, black) !important; }
+.admin-shell :where([class~="bg-emerald-950/30"]) { background-color: color-mix(in srgb, var(--admin-accent-deep) 29%, black) !important; }
+.admin-shell :where([class~="bg-emerald-950/35"]) { background-color: color-mix(in srgb, var(--admin-accent-deep) 30%, black) !important; }
+.admin-shell :where([class~="bg-emerald-950/40"]) { background-color: color-mix(in srgb, var(--admin-accent-deep) 32%, black) !important; }
+.admin-shell :where([class~="bg-emerald-950/45"]) { background-color: color-mix(in srgb, var(--admin-accent-deep) 34%, black) !important; }
+.admin-shell :where([class~="bg-emerald-950/50"]) { background-color: color-mix(in srgb, var(--admin-accent-deep) 36%, black) !important; }
+.admin-shell :where([class~="border-emerald-100"]) { border-color: color-mix(in srgb, var(--admin-accent) 14%, white) !important; }
+.admin-shell :where([class~="border-emerald-100/80"]) { border-color: color-mix(in srgb, var(--admin-accent) 11%, white) !important; }
+.admin-shell :where([class~="border-emerald-200"]) { border-color: color-mix(in srgb, var(--admin-accent) 20%, white) !important; }
+.admin-shell :where([class~="border-emerald-300"]) { border-color: var(--admin-accent) !important; }
+.admin-shell :where([class~="border-emerald-400"]) { border-color: var(--admin-accent) !important; }
+.admin-shell :where([class~="border-emerald-400/60"]) { border-color: color-mix(in srgb, var(--admin-accent) 60%, transparent) !important; }
+.admin-shell :where([class~="border-emerald-500"]) { border-color: var(--admin-accent) !important; }
+.admin-shell :where([class~="border-emerald-600"]) { border-color: var(--admin-accent) !important; }
+.admin-shell :where([class~="border-emerald-700"]) { border-color: var(--admin-accent-deep) !important; }
+.admin-shell :where([class~="border-emerald-800"]) { border-color: var(--admin-accent-deep) !important; }
+.admin-shell :where([class~="border-emerald-800/40"]) { border-color: color-mix(in srgb, var(--admin-accent-deep) 40%, transparent) !important; }
+.admin-shell :where([class~="border-emerald-800/50"]) { border-color: color-mix(in srgb, var(--admin-accent-deep) 50%, transparent) !important; }
+.admin-shell :where([class~="border-emerald-800/60"]) { border-color: color-mix(in srgb, var(--admin-accent-deep) 60%, transparent) !important; }
+.admin-shell :where([class~="border-emerald-900/30"]) { border-color: color-mix(in srgb, var(--admin-accent-deep) 29%, black) !important; }
+.admin-shell :where([class~="border-emerald-900/40"]) { border-color: color-mix(in srgb, var(--admin-accent-deep) 32%, black) !important; }
+.admin-shell :where([class~="decoration-emerald-200"]) { text-decoration-color: color-mix(in srgb, var(--admin-accent) 20%, white) !important; }
+.admin-shell :where([class~="decoration-emerald-800"]) { text-decoration-color: var(--admin-accent-deep) !important; }
+.admin-shell :where([class~="focus:border-emerald-500"]):focus { border-color: var(--admin-accent) !important; }
+.admin-shell :where([class~="focus:ring-emerald-500"]):focus { --tw-ring-color: var(--admin-accent); }
+.admin-shell :where([class~="focus:ring-emerald-500/20"]):focus { --tw-ring-color: color-mix(in srgb, var(--admin-accent) 20%, transparent); }
+.admin-shell :where([class~="focus:ring-emerald-500/25"]):focus { --tw-ring-color: color-mix(in srgb, var(--admin-accent) 25%, transparent); }
+.admin-shell :where([class~="focus:ring-emerald-500/30"]):focus { --tw-ring-color: color-mix(in srgb, var(--admin-accent) 30%, transparent); }
+.admin-shell :where([class~="hover:bg-emerald-100"]):hover { background-color: color-mix(in srgb, var(--admin-accent) 14%, white) !important; }
+.admin-shell :where([class~="hover:bg-emerald-50/40"]):hover { background-color: color-mix(in srgb, var(--admin-accent) 6%, white) !important; }
+.admin-shell :where([class~="hover:bg-emerald-50/50"]):hover { background-color: color-mix(in srgb, var(--admin-accent) 6%, white) !important; }
+.admin-shell :where([class~="hover:bg-emerald-500"]):hover { background-color: var(--admin-accent) !important; }
+.admin-shell :where([class~="hover:bg-emerald-700"]):hover { background-color: var(--admin-accent-deep) !important; }
+.admin-shell :where([class~="hover:bg-emerald-900/50"]):hover { background-color: color-mix(in srgb, var(--admin-accent-deep) 36%, black) !important; }
+.admin-shell :where([class~="hover:bg-emerald-950/15"]):hover { background-color: color-mix(in srgb, var(--admin-accent-deep) 23%, black) !important; }
+.admin-shell :where([class~="hover:bg-emerald-950/20"]):hover { background-color: color-mix(in srgb, var(--admin-accent-deep) 25%, black) !important; }
+.admin-shell :where([class~="hover:bg-emerald-950/50"]):hover { background-color: color-mix(in srgb, var(--admin-accent-deep) 36%, black) !important; }
+.admin-shell :where([class~="hover:bg-emerald-950/55"]):hover { background-color: color-mix(in srgb, var(--admin-accent-deep) 37%, black) !important; }
+.admin-shell :where([class~="hover:bg-emerald-950/70"]):hover { background-color: color-mix(in srgb, var(--admin-accent-deep) 43%, black) !important; }
+.admin-shell :where([class~="hover:border-emerald-300"]):hover { border-color: var(--admin-accent) !important; }
+.admin-shell :where([class~="hover:border-emerald-400"]):hover { border-color: var(--admin-accent) !important; }
+.admin-shell :where([class~="hover:border-emerald-500"]):hover { border-color: var(--admin-accent) !important; }
+.admin-shell :where([class~="hover:border-emerald-700"]):hover { border-color: var(--admin-accent-deep) !important; }
+.admin-shell :where([class~="hover:text-emerald-200"]):hover { color: color-mix(in srgb, var(--admin-accent) 20%, white) !important; }
+.admin-shell :where([class~="hover:text-emerald-300"]):hover { color: var(--admin-accent) !important; }
+.admin-shell :where([class~="hover:text-emerald-800"]):hover { color: var(--admin-accent-deep) !important; }
+.admin-shell :where([class~="hover:text-emerald-900"]):hover { color: var(--admin-accent-deep) !important; }
+.admin-shell :where([class~="ring-emerald-200/80"]) { --tw-ring-color: color-mix(in srgb, var(--admin-accent) 16%, white); }
+.admin-shell :where([class~="ring-emerald-400"]) { --tw-ring-color: var(--admin-accent); }
+.admin-shell :where([class~="ring-emerald-500"]) { --tw-ring-color: var(--admin-accent); }
+.admin-shell :where([class~="ring-emerald-500/80"]) { --tw-ring-color: color-mix(in srgb, var(--admin-accent) 80%, transparent); }
+.admin-shell :where([class~="ring-emerald-600"]) { --tw-ring-color: var(--admin-accent); }
+.admin-shell :where([class~="ring-emerald-800/50"]) { --tw-ring-color: color-mix(in srgb, var(--admin-accent-deep) 50%, transparent); }
+.admin-shell :where([class~="shadow-emerald-600/20"]) { --tw-shadow-color: color-mix(in srgb, var(--admin-accent) 20%, transparent); }
+.admin-shell :where([class~="shadow-emerald-600/25"]) { --tw-shadow-color: color-mix(in srgb, var(--admin-accent) 25%, transparent); }
+.admin-shell :where([class~="shadow-emerald-900/20"]) { --tw-shadow-color: color-mix(in srgb, var(--admin-accent-deep) 25%, black); }
+.admin-shell :where([class~="shadow-emerald-900/25"]) { --tw-shadow-color: color-mix(in srgb, var(--admin-accent-deep) 27%, black); }
+.admin-shell :where([class~="shadow-emerald-900/40"]) { --tw-shadow-color: color-mix(in srgb, var(--admin-accent-deep) 32%, black); }
+.admin-shell :where([class~="shadow-emerald-900/5"]) { --tw-shadow-color: color-mix(in srgb, var(--admin-accent-deep) 20%, black); }
+.admin-shell :where([class~="text-emerald-100"]) { color: color-mix(in srgb, var(--admin-accent) 14%, white) !important; }
+.admin-shell :where([class~="text-emerald-200"]) { color: color-mix(in srgb, var(--admin-accent) 20%, white) !important; }
+.admin-shell :where([class~="text-emerald-300"]) { color: var(--admin-accent) !important; }
+.admin-shell :where([class~="text-emerald-300/90"]) { color: color-mix(in srgb, var(--admin-accent) 90%, transparent) !important; }
+.admin-shell :where([class~="text-emerald-400"]) { color: var(--admin-accent) !important; }
+.admin-shell :where([class~="text-emerald-400/90"]) { color: color-mix(in srgb, var(--admin-accent) 90%, transparent) !important; }
+.admin-shell :where([class~="text-emerald-50"]) { color: color-mix(in srgb, var(--admin-accent) 10%, white) !important; }
+.admin-shell :where([class~="text-emerald-600"]) { color: var(--admin-accent) !important; }
+.admin-shell :where([class~="text-emerald-600/70"]) { color: color-mix(in srgb, var(--admin-accent) 70%, transparent) !important; }
+.admin-shell :where([class~="text-emerald-700"]) { color: var(--admin-accent-deep) !important; }
+.admin-shell :where([class~="text-emerald-700/90"]) { color: color-mix(in srgb, var(--admin-accent-deep) 90%, transparent) !important; }
+.admin-shell :where([class~="text-emerald-800"]) { color: var(--admin-accent-deep) !important; }
+.admin-shell :where([class~="text-emerald-800/80"]) { color: color-mix(in srgb, var(--admin-accent-deep) 80%, transparent) !important; }
+.admin-shell :where([class~="text-emerald-900"]) { color: var(--admin-accent-deep) !important; }
+.admin-shell :where([class~="text-emerald-900/80"]) { color: color-mix(in srgb, var(--admin-accent-deep) 46%, black) !important; }
+@media (prefers-color-scheme: dark) { .admin-shell :where([class~="dark:bg-emerald-950/35"]) { background-color: color-mix(in srgb, var(--admin-accent-deep) 30%, black) !important; } }
+@media (prefers-color-scheme: dark) { .admin-shell :where([class~="dark:text-emerald-100"]) { color: color-mix(in srgb, var(--admin-accent) 14%, white) !important; } }
+@media (prefers-color-scheme: dark) { .admin-shell :where([class~="dark:text-emerald-400"]) { color: var(--admin-accent) !important; } }

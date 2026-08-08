@@ -1,7 +1,7 @@
 import { getSupabase } from './supabaseClient'
 import { isSupabaseConfigured } from './mapSupabaseAuthError'
 
-const CACHE_KEY = 'tle_store_appearance_v3'
+const CACHE_KEY = 'tle_store_appearance_v4'
 
 export type ExclusiveOfferAppearance = {
   enabled: boolean
@@ -40,6 +40,8 @@ export type StoreAppearance = {
    * Each entry is one full store look: icons/links, buttons/footer, labels.
    */
   colorHistory: BrandColorRoles[]
+  /** Admin panel accent (buttons, nav active, links). Storefront ignores this. */
+  adminAccent: string
 }
 
 export const DEFAULT_BRAND_COLORS: BrandColors = {
@@ -71,6 +73,8 @@ export const DEFAULT_STORE_APPEARANCE: StoreAppearance = {
   },
   colors: { ...DEFAULT_BRAND_COLORS },
   colorHistory: [{ ...DEFAULT_COLOR_ROLES }],
+  /** Default matches previous admin emerald-600. */
+  adminAccent: '#059669',
 }
 
 /** Max saved color settings for Previous / Next. */
@@ -276,6 +280,7 @@ export function normalizeStoreAppearance(raw: unknown): StoreAppearance {
     exclusiveOffer: normalizeOffer(o.exclusiveOffer),
     colors,
     colorHistory: normalizeColorHistory(o.colorHistory, roles),
+    adminAccent: normalizeHex(o.adminAccent, DEFAULT_STORE_APPEARANCE.adminAccent),
   }
 }
 
@@ -317,6 +322,18 @@ export function applyBrandColors(colors: BrandColors): void {
   root.style.setProperty('--tle-light-rgb', hexToRgbTriplet(colors.light))
 }
 
+/** Admin panel accent only — remapped inside `.admin-shell` (see adminAccent.css). */
+export function applyAdminAccent(hex: string): void {
+  if (typeof document === 'undefined') return
+  const accent = normalizeHex(hex, DEFAULT_STORE_APPEARANCE.adminAccent)
+  const deep = shade(accent, 0.18)
+  const root = document.documentElement
+  root.style.setProperty('--admin-accent', accent)
+  root.style.setProperty('--admin-accent-deep', deep)
+  root.style.setProperty('--admin-accent-rgb', hexToRgbTriplet(accent))
+  root.style.setProperty('--admin-accent-deep-rgb', hexToRgbTriplet(deep))
+}
+
 function hexToRgbTriplet(hex: string): string {
   const h = normalizeHex(hex, DEFAULT_BRAND_COLORS.pink).slice(1)
   const n = parseInt(h, 16)
@@ -330,6 +347,7 @@ function hexToRgbTriplet(hex: string): string {
 export function bootstrapAppearanceFromCache(): StoreAppearance {
   const cached = readAppearanceCache()
   applyBrandColors(cached.colors)
+  applyAdminAccent(cached.adminAccent)
   return cached
 }
 
@@ -343,6 +361,7 @@ export function setMemoryAppearance(appearance: StoreAppearance): void {
   memoryCache = appearance
   writeAppearanceCache(appearance)
   applyBrandColors(appearance.colors)
+  applyAdminAccent(appearance.adminAccent)
 }
 
 export async function fetchStoreAppearance(): Promise<StoreAppearance> {
@@ -399,6 +418,7 @@ export async function saveStoreAppearance(
           dark: savedRoles.dark,
         },
         colorHistory: normalized.colorHistory,
+        adminAccent: normalized.adminAccent,
       },
       updated_at: new Date().toISOString(),
     })

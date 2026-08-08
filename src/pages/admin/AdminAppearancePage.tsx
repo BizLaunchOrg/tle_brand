@@ -224,7 +224,7 @@ export function AdminAppearancePage() {
     setDraft(refreshed)
     setIsNewDraft(false)
     setHistoryIndex(Math.max(0, refreshed.colorHistory.length - 1))
-    toast.success('Appearance saved — storefront updates instantly')
+    toast.success('Appearance saved — store and admin colors updated')
   }
 
   if (loading) {
@@ -236,14 +236,19 @@ export function AdminAppearancePage() {
   }
 
   const offer = draft.exclusiveOffer
+  const categoryLabel = ad(
+    theme,
+    'text-[11px] font-bold uppercase tracking-[0.18em] text-stone-400',
+    'text-[11px] font-bold uppercase tracking-[0.18em] text-neutral-500',
+  )
 
   return (
-    <div className={['mx-auto max-w-3xl space-y-6', adminFont()].join(' ')}>
+    <div className={['mx-auto max-w-3xl space-y-8', adminFont()].join(' ')}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className={heading}>Appearance</h1>
           <p className={muted + ' mt-2 max-w-xl text-[14px] leading-relaxed'}>
-            Home banners, offer card, and the three store colors.
+            Storefront look for customers, and one accent color for the admin panel.
           </p>
         </div>
         <button
@@ -254,6 +259,12 @@ export function AdminAppearancePage() {
         >
           {saving ? 'Saving…' : 'Save appearance'}
         </button>
+      </div>
+
+      {/* ——— Storefront ——— */}
+      <div className="space-y-2">
+        <p className={categoryLabel}>Storefront</p>
+        <p className={muted + ' text-[13px]'}>What shoppers see on the website. Does not change the admin panel.</p>
       </div>
 
       {/* Hero */}
@@ -373,13 +384,13 @@ export function AdminAppearancePage() {
         </div>
       </section>
 
-      {/* Colors */}
+      {/* Store colors */}
       <section className={panel}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className={sectionTitle}>Brand colors</h2>
+            <h2 className={sectionTitle}>Store colors</h2>
             <p className={muted + ' mt-1 max-w-lg text-[13px] leading-relaxed'}>
-              Three colors only — one for each part of the store below.
+              Three colors for the customer site — icons, buttons/footer, and labels.
             </p>
           </div>
           <button type="button" onClick={formNewColors} className={linkBtn}>
@@ -502,6 +513,67 @@ export function AdminAppearancePage() {
           {!isNewDraft && history[historyIndex] && !rolesEqual(roles, history[historyIndex]!) ? (
             <span className={muted + ' ml-auto text-[11px]'}>Edited — save to keep</span>
           ) : null}
+        </div>
+      </section>
+
+      {/* ——— Admin ——— */}
+      <div className="space-y-2 pt-2">
+        <p className={categoryLabel}>Admin panel</p>
+        <p className={muted + ' text-[13px]'}>Only for you in admin. Shoppers never see this color.</p>
+      </div>
+
+      <section className={panel}>
+        <h2 className={sectionTitle}>Admin color</h2>
+        <p className={muted + ' mt-1 max-w-lg text-[13px] leading-relaxed'}>
+          One accent for admin buttons, active menu items, and links. Applies after you save.
+        </p>
+
+        <div className="mt-5 flex flex-wrap items-center gap-4">
+          <label className="relative shrink-0 cursor-pointer">
+            <span
+              className="block size-14 rounded-2xl border border-black/10 shadow-inner"
+              style={{ background: draft.adminAccent }}
+            />
+            <input
+              type="color"
+              value={draft.adminAccent}
+              onChange={(e) => setDraft((d) => ({ ...d, adminAccent: e.target.value }))}
+              className="absolute inset-0 cursor-pointer opacity-0"
+              aria-label="Admin accent color"
+            />
+          </label>
+          <div className="min-w-0 flex-1">
+            <span className={labelCls}>Accent</span>
+            <input
+              className={inputCls + ' max-w-[10rem] font-mono'}
+              value={draft.adminAccent}
+              onChange={(e) => setDraft((d) => ({ ...d, adminAccent: e.target.value }))}
+            />
+            <p className={muted + ' mt-2 text-[12px]'}>Sidebar highlights, Save buttons, and focus rings.</p>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-black/5 bg-black/[0.02] p-4">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-stone-500">Preview</span>
+          <button
+            type="button"
+            className="rounded-xl px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white"
+            style={{ background: draft.adminAccent }}
+          >
+            Save
+          </button>
+          <span className="text-[13px] font-semibold" style={{ color: draft.adminAccent }}>
+            Active menu
+          </span>
+          <span
+            className="rounded-lg px-2.5 py-1 text-[11px] font-semibold"
+            style={{
+              background: `${draft.adminAccent}22`,
+              color: draft.adminAccent,
+            }}
+          >
+            Badge
+          </span>
         </div>
       </section>
 
