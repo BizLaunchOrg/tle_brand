@@ -4,7 +4,7 @@ import type { AdminOrderRow } from '../../lib/adminOrders.ts'
 import { buyerRollupFromOrders, uniqueBuyerCount } from '../../lib/adminOrderAnalytics.ts'
 import { OrderRelativeTime } from './OrderRelativeTime.tsx'
 import { useAdminTheme } from './AdminThemeContext.tsx'
-import { ad, adminFont } from './adminUi.ts'
+import { ad, adminFont, adminMoneyText } from './adminUi.ts'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
 
@@ -125,7 +125,7 @@ export function AdminCustomersPage() {
                     <td className={td + ' max-w-[140px]'}>
                       <OrderRelativeTime iso={r.lastOrderAt} theme={theme} />
                     </td>
-                    <td className={td + ' text-right font-semibold tabular-nums ' + ad(theme, 'text-emerald-800', 'text-emerald-300')}>
+                    <td className={td + ' text-right font-semibold tabular-nums ' + adminMoneyText(theme)}>
                       {formatNaira(r.lifetimeSpendNgn)}
                     </td>
                   </tr>

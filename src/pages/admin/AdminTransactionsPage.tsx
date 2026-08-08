@@ -14,7 +14,7 @@ import { firstLineItemDisplayableImage } from '../../lib/adminOrderLineSnapshots
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { AdminRangeTabs, AdminStatusBucketTabs, adminPaymentPillClass, type AdminOrderBucket } from './adminRangeTabs.tsx'
 import { OrderRelativeTime } from './OrderRelativeTime.tsx'
-import { ad, adminFont } from './adminUi.ts'
+import { ad, adminFont, adminMoneyText } from './adminUi.ts'
 import { printOrdersStatement } from './statementPrint.ts'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
@@ -216,14 +216,14 @@ export function AdminTransactionsPage() {
           <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-[0.12em] text-sky-900/75', 'text-[10px] font-bold uppercase tracking-[0.12em] text-sky-200/90')}>
             Gross total
           </p>
-          <p className={ad(theme, 'mt-2 text-xl font-bold tabular-nums text-stone-900 sm:text-2xl', 'mt-2 text-xl font-bold tabular-nums text-white sm:text-2xl')}>{formatNaira(stats.revenue)}</p>
+          <p className={'mt-2 text-xl font-bold tabular-nums sm:text-2xl ' + adminMoneyText(theme)}>{formatNaira(stats.revenue)}</p>
           <p className={muted + ' mt-1 text-[11px]'}>All amounts in view</p>
         </div>
         <div className={'rounded-2xl border p-4 shadow-sm ' + overviewShell('emerald', theme)}>
           <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-900/80', 'text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-300/90')}>
             Settled
           </p>
-          <p className={ad(theme, 'mt-2 text-xl font-bold tabular-nums text-emerald-800 sm:text-2xl', 'mt-2 text-xl font-bold tabular-nums text-emerald-300 sm:text-2xl')}>{formatNaira(settled)}</p>
+          <p className={'mt-2 text-xl font-bold tabular-nums sm:text-2xl ' + adminMoneyText(theme)}>{formatNaira(settled)}</p>
           <p className={muted + ' mt-1 text-[11px]'}>Completed / delivered</p>
         </div>
       </div>
@@ -265,7 +265,7 @@ export function AdminTransactionsPage() {
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className={ad(theme, 'text-lg font-bold tabular-nums text-emerald-700', 'text-lg font-bold tabular-nums text-emerald-300')}>{formatNaira(Number(o.total_ngn) || 0)}</p>
+                  <p className={'text-lg font-bold tabular-nums ' + adminMoneyText(theme)}>{formatNaira(Number(o.total_ngn) || 0)}</p>
                   <span className={'mt-1 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ' + adminPaymentPillClass(orderIsPaymentPaid(o), theme)}>
                     {orderIsPaymentPaid(o) ? 'paid' : 'unpaid'}
                   </span>
@@ -316,7 +316,7 @@ export function AdminTransactionsPage() {
                     </td>
                     <td className={td + ' font-mono text-[12px] ' + ad(theme, 'text-stone-700', 'text-neutral-300')}>{o.id.slice(0, 14)}…</td>
                     <td className={td + ' max-w-[200px] truncate font-medium ' + ad(theme, 'text-stone-900', 'text-neutral-100')}>{o.email}</td>
-                    <td className={td + ' text-right text-[14px] font-bold tabular-nums ' + ad(theme, 'text-emerald-700', 'text-emerald-300')}>
+                    <td className={td + ' text-right text-[14px] font-bold tabular-nums ' + adminMoneyText(theme)}>
                       {formatNaira(Number(o.total_ngn) || 0)}
                     </td>
                     <td className={td}>

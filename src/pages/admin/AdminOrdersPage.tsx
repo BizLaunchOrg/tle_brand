@@ -15,7 +15,7 @@ import {
 import { normalizeOrderLineItems } from '../../lib/adminOrderLineSnapshots.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { adminDeliveryPillClass, adminPaymentPillClass } from './adminRangeTabs.tsx'
-import { ad, adminFont } from './adminUi.ts'
+import { ad, adminFont, adminMoneyText } from './adminUi.ts'
 import { OrderRelativeTime } from './OrderRelativeTime.tsx'
 
 const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString()}`
@@ -273,7 +273,7 @@ export function AdminOrdersPage() {
             <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-wider text-stone-500', 'text-[10px] font-bold uppercase tracking-wider text-neutral-500')}>Completed</p>
             <span className="material-symbols-outlined text-[22px] font-light text-sky-600">receipt_long</span>
           </div>
-          <p className={'mt-2 text-lg font-bold tabular-nums sm:text-xl ' + ad(theme, 'text-stone-900', 'text-white')}>{formatNaira(stats.completedNgn)}</p>
+          <p className={'mt-2 text-lg font-bold tabular-nums sm:text-xl ' + adminMoneyText(theme)}>{formatNaira(stats.completedNgn)}</p>
           <p className={muted + ' mt-1 text-[11px]'}>Paid and delivered</p>
         </div>
         <div className={'rounded-2xl border p-4 ' + cardWrap}>
@@ -281,7 +281,7 @@ export function AdminOrdersPage() {
             <p className={ad(theme, 'text-[10px] font-bold uppercase tracking-wider text-stone-500', 'text-[10px] font-bold uppercase tracking-wider text-neutral-500')}>Awaiting delivery</p>
             <span className="material-symbols-outlined text-[22px] font-light text-amber-600">local_shipping</span>
           </div>
-          <p className={'mt-2 text-lg font-bold tabular-nums sm:text-xl ' + ad(theme, 'text-stone-900', 'text-white')}>{formatNaira(stats.awaitingDeliveryNgn)}</p>
+          <p className={'mt-2 text-lg font-bold tabular-nums sm:text-xl ' + adminMoneyText(theme)}>{formatNaira(stats.awaitingDeliveryNgn)}</p>
           <p className={muted + ' mt-1 text-[11px]'}>
             {stats.awaitingDeliveryCount} paid, not yet delivered
           </p>
@@ -529,7 +529,7 @@ export function AdminOrdersPage() {
                           })()}
                         </div>
                       </td>
-                      <td className={td + ' text-right text-[12px] font-bold tabular-nums sm:text-[13px] ' + ad(theme, 'text-emerald-700', 'text-emerald-300')}>
+                      <td className={td + ' text-right text-[12px] font-bold tabular-nums sm:text-[13px] ' + adminMoneyText(theme)}>
                         {formatNaira(Number(o.total_ngn) || 0)}
                       </td>
                       <td className={td + ' min-w-0'}>
@@ -611,7 +611,7 @@ export function AdminOrdersPage() {
                       })()}
                     </div>
                     <p className={'mt-0.5 line-clamp-2 text-[12px] ' + muted}>{orderLineSummary(o.line_items)}</p>
-                    <p className={'mt-2 text-lg font-bold tabular-nums ' + ad(theme, 'text-emerald-700', 'text-emerald-300')}>{formatNaira(Number(o.total_ngn) || 0)}</p>
+                    <p className={'mt-2 text-lg font-bold tabular-nums ' + adminMoneyText(theme)}>{formatNaira(Number(o.total_ngn) || 0)}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <span className={'rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ' + adminDeliveryPillClass(d, theme)}>{cancelled ? 'Cancelled' : d}</span>
                       <span className={'rounded-full px-2 py-0.5 text-[10px] font-bold ' + adminPaymentPillClass(pPaid, theme)}>{cancelled ? '—' : pPaid ? 'Paid' : 'Unpaid'}</span>

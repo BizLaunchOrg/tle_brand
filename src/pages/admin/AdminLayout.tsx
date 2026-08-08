@@ -164,13 +164,16 @@ function AdminLayoutInner() {
 
   const shell = [
     'admin-shell',
+    theme === 'dark' ? 'admin-shell-dark' : '',
     adminFont(),
     ad(
       theme,
       'min-h-svh bg-[#f0f3f1] text-stone-900 antialiased [font-feature-settings:normal]',
       'min-h-svh bg-[#0c0f0d] text-neutral-200 antialiased [font-feature-settings:normal]',
     ),
-  ].join(' ')
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   const sidebar = ad(theme, 'border-stone-200/90 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)]', 'border-neutral-800 bg-[#101412]')
 

@@ -15,7 +15,7 @@ import {
 import { OrderRelativeTime } from './OrderRelativeTime.tsx'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { adminDeliveryPillClass, adminPaymentPillClass } from './adminRangeTabs.tsx'
-import { ad, adminFont } from './adminUi.ts'
+import { ad, adminFont, adminMoneyText } from './adminUi.ts'
 import { effectiveDeliveryStatus, orderIsPaymentPaid } from '../../lib/adminOrderAnalytics.ts'
 import { normalizeOrderLineItems, pickLineImageFromItem } from '../../lib/adminOrderLineSnapshots.ts'
 import { getOrderPaymentProofSignedUrl } from '../../lib/orderPaymentProof.ts'
@@ -312,7 +312,7 @@ export function AdminOrderDetailView({ order, backHref, backLabel, contextTitle,
   const border = ad(theme, 'border-stone-200', 'border-neutral-800')
   const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
   const strong = ad(theme, 'text-stone-900', 'text-neutral-50')
-  const money = ad(theme, 'text-emerald-700', 'text-emerald-300')
+  const money = adminMoneyText(theme)
   const subpanel = ad(theme, 'rounded-xl border border-stone-100 bg-stone-50/80', 'rounded-xl border border-neutral-800 bg-neutral-900/60')
   const panel = ad(theme, 'bg-white', 'bg-neutral-950')
   const selectCls = ad(
