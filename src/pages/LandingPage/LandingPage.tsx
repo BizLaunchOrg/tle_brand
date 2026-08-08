@@ -7,6 +7,7 @@ import {
   type CSSProperties,
 } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { HeroBannerCarousel } from "../../components/HeroBannerCarousel.tsx";
 import { MakeupBookingDateTimePick } from "../../components/MakeupBookingDateTimePick.tsx";
 import { BookingPaymentProofFields } from "../../components/BookingPaymentProofFields.tsx";
 import { BookingTransferDetailsCard } from "../../components/BookingTransferDetailsCard.tsx";
@@ -20,7 +21,6 @@ import {
   MAKEUP_HIGHLIGHT_TAGS,
   PHOTOSHOOT_PACKAGES,
   bookableServiceFromPhotoshootLine,
-  isLocationRequiredForService,
 } from "../../data/bookingServices.ts";
 import { BOOKING_TRANSFER_DEMO } from "../../data/bookingTransferDetails.ts";
 import { validateLandingBookingDetails } from "../../lib/bookingFormValidation.ts";
@@ -32,7 +32,11 @@ import {
   type MakeupAvailabilityRuleRow,
   type MakeupCalendarDay,
 } from "../../lib/makeupAvailability.ts";
-import { useShopProducts } from "../../context/ShopProductsContext.tsx";
+import {
+  useShopCatalogLoading,
+  useShopProducts,
+} from "../../context/ShopProductsContext.tsx";
+import { useStoreAppearance } from "../../context/StoreAppearanceContext.tsx";
 import { useCartDrawer } from "../../context/CartDrawerContext.tsx";
 
 const MARQUEE_ITEMS = [
@@ -45,118 +49,96 @@ const MARQUEE_ITEMS = [
   "Makeup Studio",
 ] as const;
 
-/** High-heel silhouette (Material Symbols has no reliable heels glyph). */
-function HeroHeelIcon({ size = 54 }: { size?: number }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      width={size}
-      height={size}
-      fill="currentColor"
-      className="block"
-      aria-hidden
-    >
-      <path d="M2 20.5h20v1H2v-1zm3.2-.5h8.8l2.4-8.6c.35-1.2 1.4-2 2.6-2h1.4c1.35 0 2.45 1.05 2.65 2.4l1.7 8.2h-1.6l-1.55-7.6c-.15-.55-.6-.9-1.15-.9h-1.4c-.55 0-1 .35-1.15.9l-2.35 7.6H5.2zm7.4-10.6c0-.7.55-1.25 1.25-1.25h.9c.7 0 1.25.55 1.25 1.25v.55h-3.4v-.55zM16.75 20l1.1-8.2.75-1.05.45 9.25h-2.3z" />
-    </svg>
-  );
-}
-
-type HeroFloatItem = {
-  id: string;
-  style: CSSProperties;
-  size?: number;
-} & ({ kind: "heel" } | { kind?: "symbol"; icon: string });
-
-/** Decorative hero icons — each `id` must be unique (no repeated glyphs). */
-const HERO_FLOAT: HeroFloatItem[] = [
+const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   {
-    id: "diamond",
     style: {
-      left: "12%",
-      top: "16%",
+      left: "8%",
+      top: "18%",
       animationDuration: "8s",
       animationDelay: "0s",
     },
     icon: "diamond",
-    size: 56,
   },
   {
-    id: "cart",
     style: {
-      left: "82%",
-      top: "68%",
+      left: "84%",
+      top: "66%",
       animationDuration: "10s",
       animationDelay: "1.8s",
     },
-    icon: "shopping_cart",
-    size: 52,
+    icon: "shopping_bag",
   },
   {
-    id: "heels",
-    kind: "heel",
     style: {
-      left: "72%",
-      top: "10%",
-      animationDuration: "9s",
-      animationDelay: "3.4s",
-    },
-    size: 54,
-  },
-  {
-    id: "makeup",
-    style: {
-      left: "48%",
-      top: "34%",
+      left: "52%",
+      top: "32%",
       animationDuration: "7s",
-      animationDelay: "2.2s",
+      animationDelay: "3.2s",
     },
     icon: "face_retouching_natural",
-    size: 50,
   },
   {
-    id: "fashion",
     style: {
       left: "6%",
-      top: "72%",
+      top: "78%",
       animationDuration: "12s",
       animationDelay: "0.6s",
     },
-    icon: "checkroom",
-    size: 52,
+    icon: "styler",
   },
   {
-    id: "brush",
     style: {
-      left: "88%",
-      top: "38%",
-      animationDuration: "11s",
-      animationDelay: "4.1s",
+      left: "72%",
+      top: "12%",
+      animationDuration: "6s",
+      animationDelay: "2.4s",
     },
-    icon: "brush",
-    size: 48,
+    icon: "checkroom",
   },
   {
-    id: "camera",
     style: {
-      left: "28%",
+      left: "86%",
+      top: "82%",
+      animationDuration: "14s",
+      animationDelay: "4.5s",
+    },
+    icon: "auto_awesome",
+  },
+  {
+    style: {
+      left: "42%",
+      top: "43%",
+      animationDuration: "11s",
+      animationDelay: "1s",
+    },
+    icon: "workspace_premium",
+  },
+  {
+    style: {
+      left: "24%",
       top: "8%",
       animationDuration: "9s",
       animationDelay: "5s",
     },
-    icon: "photo_camera",
-    size: 50,
+    icon: "local_mall",
   },
   {
-    id: "spa",
     style: {
-      left: "58%",
-      top: "52%",
-      animationDuration: "13s",
-      animationDelay: "1.2s",
+      left: "62%",
+      top: "56%",
+      animationDuration: "9s",
+      animationDelay: "2.2s",
     },
-    icon: "spa",
-    size: 50,
+    icon: "diamond",
+  },
+  {
+    style: {
+      left: "34%",
+      top: "30%",
+      animationDuration: "8.6s",
+      animationDelay: "4.1s",
+    },
+    icon: "diamond",
   },
 ];
 
@@ -165,6 +147,10 @@ const revealCls =
 
 export function LandingPage() {
   const products = useShopProducts();
+  const catalogLoading = useShopCatalogLoading();
+  const appearance = useStoreAppearance();
+  const offer = appearance.exclusiveOffer;
+  const heroBanners = appearance.heroBanners;
   const wrapRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -192,7 +178,10 @@ export function LandingPage() {
   });
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [customerLocation, setCustomerLocation] = useState("");
+  const [skinType, setSkinType] = useState("");
+  const [allergies, setAllergies] = useState("");
   const [bookingNotes, setBookingNotes] = useState("");
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
@@ -337,13 +326,14 @@ export function LandingPage() {
     }
     const name = customerName.trim();
     const phone = customerPhone.trim();
-    const isLocationRequired = isLocationRequiredForService(selectedService.name);
-
+    const email = customerEmail.trim();
     const detailErr = validateLandingBookingDetails({
       name: customerName,
       phone: customerPhone,
+      email: customerEmail,
       location: customerLocation,
-      isLocationRequired,
+      skinType,
+      allergies,
     });
     if (detailErr) {
       setBookingError(detailErr);
@@ -376,10 +366,10 @@ export function LandingPage() {
       preferred_time: selectedTime,
       customer_name: name,
       customer_phone: phone,
-      customer_email: "",
-      location_venue: isLocationRequired ? customerLocation.trim() : "",
-      skin_type: "",
-      allergies: "",
+      customer_email: email,
+      location_venue: customerLocation.trim(),
+      skin_type: skinType.trim(),
+      allergies: allergies.trim(),
       notes: bookingNotes.trim(),
       payment_proof_storage_path: up.path,
     });
@@ -441,28 +431,13 @@ export function LandingPage() {
           id="home"
         >
           <div className="pointer-events-none absolute inset-y-0 right-[45%] left-0 z-[1] overflow-hidden max-lg:right-0 max-lg:bottom-[45%] max-lg:top-0">
-            {HERO_FLOAT.map((hi) => (
+            {HERO_FLOAT.map((hi, idx) => (
               <span
-                key={hi.id}
-                className="animate-tle-float absolute text-tle-pink/35 sm:text-tle-pink/30"
-                style={hi.style}
-                aria-hidden
+                key={idx}
+                className="material-symbols-outlined animate-tle-float absolute text-tle-pink/[0.2]"
+                style={{ ...hi.style, fontSize: 40, lineHeight: 1 }}
               >
-                {hi.kind === "heel" ? (
-                  <HeroHeelIcon size={hi.size ?? 54} />
-                ) : (
-                  <span
-                    className="material-symbols-outlined block"
-                    style={{
-                      fontSize: hi.size ?? 52,
-                      lineHeight: 1,
-                      fontVariationSettings:
-                        "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 48",
-                    }}
-                  >
-                    {hi.icon}
-                  </span>
-                )}
+                {hi.icon}
               </span>
             ))}
           </div>
@@ -485,7 +460,7 @@ export function LandingPage() {
             </h1>
 
             <p className="mb-11 max-w-[min(100%,42rem)] text-[13px] font-normal leading-[1.65] text-black sm:text-[15px] sm:leading-[1.7] lg:text-[17px] lg:leading-[1.72] max-lg:mx-auto max-lg:text-center lg:mx-0 lg:text-left dark:text-black">
-              From curated fashion pieces to flawless glam, TOBILICIOUS BY LADY EMMA is designed for
+              From curated fashion pieces to flawless glam, TLE is designed for
               people who love beauty, confidence, and intentional style.
             </p>
 
@@ -505,7 +480,7 @@ export function LandingPage() {
               >
                 Book a Makeup Session
                 <span className="material-symbols-outlined text-lg leading-none">
-                  face_retouching_natural
+                  calendar_month
                 </span>
               </Link>
             </div>
@@ -559,10 +534,10 @@ export function LandingPage() {
             className="relative min-h-[55vh] overflow-hidden bg-tle-cream lg:min-h-0"
             id="photoshoot-promo"
           >
-            <img
-              src="/promo-hero.png"
-              alt="TOBILICIOUS BY LADY EMMA studio portrait"
-              className="absolute inset-0 size-full object-cover object-[center_22%] max-lg:object-[center_15%]"
+            <HeroBannerCarousel
+              banners={heroBanners}
+              alt="Studio portrait"
+              className="absolute inset-0 size-full"
             />
             <div className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-t from-black/55 via-black/15 to-transparent lg:bg-gradient-to-r lg:from-white/[0.12] lg:via-transparent lg:to-transparent" />
             <div
@@ -570,31 +545,31 @@ export function LandingPage() {
               aria-hidden
             />
 
-            <div className="absolute inset-x-4 bottom-5 z-20 max-w-md pointer-events-none sm:inset-x-auto sm:right-6 sm:bottom-8 sm:max-w-sm lg:right-10 lg:bottom-12 lg:max-w-[24rem]">
-              <div className="pointer-events-auto rounded-[26px] border border-white/55 bg-white/[0.97] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] backdrop-blur-md sm:p-6">
-                <p className="inline-flex rounded-full border border-tle-gold/35 bg-tle-gold/10 px-3 py-1 font-sans text-[9px] font-bold tracking-[0.2em] text-tle-gold uppercase">
-                  Exclusive offer
-                </p>
-                <h3 className="mt-3 font-sans text-[clamp(1.05rem,3.8vw,1.35rem)] font-semibold leading-snug text-tle-ink">
-                  Book a makeup session and enjoy an exclusive studio photoshoot
-                  experience.
-                </h3>
-                <p className="mt-2 text-[12.5px] leading-relaxed text-tle-muted">
-                  Tap below to choose your photoshoot bundle (outfits &amp;
-                  edited pictures), then pick your date and time.
-                </p>
-                <button
-                  type="button"
-                  onClick={openHeroPhotoshootBooking}
-                  className="mt-4 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full border-0 bg-tle-charcoal px-5 py-3.5 font-sans text-[11px] font-bold tracking-[0.14em] text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-pink hover:shadow-[0_12px_28px_rgba(196,105,141,0.35)] sm:w-auto sm:px-7"
-                >
-                  Book makeup + photoshoot
-                  <span className="material-symbols-outlined text-[18px] leading-none">
-                    photo_camera
-                  </span>
-                </button>
+            {offer.enabled ? (
+              <div className="absolute inset-x-4 bottom-5 z-20 max-w-md pointer-events-none sm:inset-x-auto sm:right-6 sm:bottom-8 sm:max-w-sm lg:right-10 lg:bottom-12 lg:max-w-[24rem]">
+                <div className="pointer-events-auto rounded-[26px] border border-white/55 bg-white/[0.97] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] backdrop-blur-md sm:p-6">
+                  <p className="inline-flex rounded-full border border-tle-gold/35 bg-tle-gold/10 px-3 py-1 font-sans text-[9px] font-bold tracking-[0.2em] text-tle-gold uppercase">
+                    {offer.badge}
+                  </p>
+                  <h3 className="mt-3 font-sans text-[clamp(1.05rem,3.8vw,1.35rem)] font-semibold leading-snug text-tle-ink">
+                    {offer.headline}
+                  </h3>
+                  <p className="mt-2 text-[12.5px] leading-relaxed text-tle-muted">
+                    {offer.subtext}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openHeroPhotoshootBooking}
+                    className="mt-4 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full border-0 bg-tle-charcoal px-5 py-3.5 font-sans text-[11px] font-bold tracking-[0.14em] text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-pink hover:shadow-[0_12px_28px_rgba(196,105,141,0.35)] sm:w-auto sm:px-7"
+                  >
+                    {offer.buttonText}
+                    <span className="material-symbols-outlined text-[18px] leading-none">
+                      {offer.buttonIcon || "photo_camera"}
+                    </span>
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : null}
           </div>
         </section>
 
@@ -686,7 +661,16 @@ export function LandingPage() {
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-4 md:gap-5">
             {visibleProducts.length === 0 ? (
               <div className="col-span-full rounded-[20px] border border-black/8 bg-tle-cream/80 px-6 py-14 text-center">
-                {products.length === 0 ? (
+                {catalogLoading ? (
+                  <>
+                    <p className="font-sans text-lg font-medium text-tle-ink">
+                      Loading products…
+                    </p>
+                    <p className="mt-2 text-sm text-tle-muted">
+                      Pulling the latest arrivals for you.
+                    </p>
+                  </>
+                ) : products.length === 0 ? (
                   <>
                     <p className="font-sans text-lg font-medium text-tle-ink">
                       New arrivals are on the way.
@@ -1252,20 +1236,63 @@ export function LandingPage() {
                       autoComplete="tel"
                     />
                   </div>
-                  {isLocationRequiredForService(selectedService.name) ? (
-                      <div className="flex flex-col gap-2 md:col-span-2">
-                        <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
-                          Location / Venue
-                        </label>
-                        <input
-                          type="text"
-                          value={customerLocation}
-                          onChange={(e) => setCustomerLocation(e.target.value)}
-                          className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
-                          placeholder="Your address or venue name"
-                        />
-                      </div>
-                  ) : null}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
+                      placeholder="hello@example.com"
+                      autoComplete="email"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
+                      Location / Venue
+                    </label>
+                    <input
+                      type="text"
+                      value={customerLocation}
+                      onChange={(e) => setCustomerLocation(e.target.value)}
+                      className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
+                      placeholder="Your address or venue name"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
+                      Skin Type
+                    </label>
+                    <select
+                      value={skinType}
+                      onChange={(e) => setSkinType(e.target.value)}
+                      className="w-full cursor-pointer appearance-none rounded-xl border-[1.5px] border-black/10 bg-white bg-[length:12px] bg-[right_16px_center] bg-no-repeat px-[18px] py-3.5 pr-11 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A7E78' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+                      }}
+                    >
+                      <option value="">Select skin type</option>
+                      <option value="Oily">Oily</option>
+                      <option value="Dry">Dry</option>
+                      <option value="Combination">Combination</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Sensitive">Sensitive</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
+                      Any Allergies or Skin Concerns?
+                    </label>
+                    <input
+                      type="text"
+                      value={allergies}
+                      onChange={(e) => setAllergies(e.target.value)}
+                      className="w-full rounded-xl border-[1.5px] border-black/10 px-[18px] py-3.5 font-sans text-sm text-tle-ink outline-none transition-colors focus:border-tle-pink"
+                      placeholder="e.g. fragrance-free, no latex"
+                    />
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-col gap-2">
                   <label className="text-[11px] font-semibold tracking-wide text-tle-muted uppercase">
@@ -1290,14 +1317,13 @@ export function LandingPage() {
                     type="button"
                     className="inline-flex items-center gap-2.5 rounded-full bg-tle-charcoal px-11 py-4 font-sans text-xs font-bold tracking-wide text-white uppercase transition-all hover:-translate-y-0.5 hover:bg-tle-pink"
                     onClick={() => {
-                      const isLocationRequired = isLocationRequiredForService(
-                        selectedService.name,
-                      );
                       const err = validateLandingBookingDetails({
                         name: customerName,
                         phone: customerPhone,
+                        email: customerEmail,
                         location: customerLocation,
-                        isLocationRequired,
+                        skinType,
+                        allergies,
                       });
                       if (err) {
                         setBookingError(err);
@@ -1411,8 +1437,8 @@ export function LandingPage() {
             You&apos;re All Booked! 🎉
           </h2>
           <p className="mb-10 max-w-[440px] text-center text-[15px] leading-relaxed text-tle-muted">
-            Your session is confirmed. We&apos;ll reach out on the phone number you
-            provided. We can&apos;t wait to see you!
+            Your session is confirmed. Check your email for a full summary and
+            reminder. We can&apos;t wait to see you!
           </p>
           <div className="mb-9 w-full max-w-[480px] rounded-[20px] border border-tle-gold/20 bg-white px-8 py-8">
             {[

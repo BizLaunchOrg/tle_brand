@@ -63,6 +63,7 @@ export function MakeupPage() {
   const [preferredDateIso, setPreferredDateIso] = useState('')
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [customerEmail, setCustomerEmail] = useState('')
   const [bookingNotes, setBookingNotes] = useState('')
   const [bookingError, setBookingError] = useState<string | null>(null)
   const [bookingSubmitting, setBookingSubmitting] = useState(false)
@@ -110,9 +111,11 @@ export function MakeupPage() {
     }
     const name = customerName.trim()
     const phone = customerPhone.trim()
+    const email = customerEmail.trim()
     const detailErr = validateMakeupBookingDetails({
       name: customerName,
       phone: customerPhone,
+      email: customerEmail,
     })
     if (detailErr) {
       setBookingError(detailErr)
@@ -143,7 +146,7 @@ export function MakeupPage() {
       preferred_time: selectedTime,
       customer_name: name,
       customer_phone: phone,
-      customer_email: '',
+      customer_email: email,
       location_venue: '',
       skin_type: '',
       allergies: '',
@@ -165,6 +168,7 @@ export function MakeupPage() {
     setPreferredDateIso('')
     setCustomerName('')
     setCustomerPhone('')
+    setCustomerEmail('')
     setBookingNotes('')
   }
 
@@ -482,6 +486,13 @@ export function MakeupPage() {
                 placeholder="Phone number"
                 className="w-full rounded-xl border-[1.5px] border-black/10 px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink"
               />
+              <input
+                type="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                placeholder="Email address"
+                className="w-full rounded-xl border-[1.5px] border-black/10 px-4 py-3 text-sm outline-none transition-colors focus:border-tle-pink sm:col-span-2"
+              />
               <textarea
                 value={bookingNotes}
                 onChange={(e) => setBookingNotes(e.target.value)}
@@ -504,6 +515,7 @@ export function MakeupPage() {
                   const err = validateMakeupBookingDetails({
                     name: customerName,
                     phone: customerPhone,
+                    email: customerEmail,
                   })
                   if (err) {
                     setBookingError(err)

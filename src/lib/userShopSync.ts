@@ -154,8 +154,8 @@ export async function createOrder(params: {
     delivery_ngn: params.deliveryNgn,
     processing_ngn: params.processingNgn,
     total_ngn: params.totalNgn,
-    status: 'paid' as const,
-    payment_status: 'paid' as const,
+    status: 'awaiting_payment' as const,
+    payment_status: 'unpaid' as const,
     delivery_status: 'pending' as const,
     payment_proof_storage_path: proofPath,
   }

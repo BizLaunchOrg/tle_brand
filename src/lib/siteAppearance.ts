@@ -1,7 +1,57 @@
-const STORAGE_KEY = 'tle_site_color'
+/**
+ * @deprecated Prefer storeAppearance.ts for storefront theming.
+ * Kept so older admin color picks don't crash; maps emerald palette → brand pink CSS vars.
+ */
+import {
+  applyBrandColors,
+  DEFAULT_BRAND_COLORS,
+  type BrandColors,
+} from './storeAppearance'
 
 export const AVAILABLE_COLORS = ['emerald', 'sky', 'amber', 'rose', 'violet'] as const
 export type SiteColor = (typeof AVAILABLE_COLORS)[number]
+
+const PRESETS: Record<SiteColor, BrandColors> = {
+  emerald: {
+    ...DEFAULT_BRAND_COLORS,
+    pink: '#059669',
+    deep: '#047857',
+    light: '#6ee7b7',
+    blush: '#ecfdf5',
+    gold: '#bf8f48',
+  },
+  sky: {
+    ...DEFAULT_BRAND_COLORS,
+    pink: '#0284c7',
+    deep: '#0369a1',
+    light: '#7dd3fc',
+    blush: '#f0f9ff',
+  },
+  amber: {
+    ...DEFAULT_BRAND_COLORS,
+    pink: '#d97706',
+    deep: '#b45309',
+    light: '#fcd34d',
+    blush: '#fffbeb',
+    gold: '#f59e0b',
+  },
+  rose: {
+    ...DEFAULT_BRAND_COLORS,
+    pink: '#e11d48',
+    deep: '#be123c',
+    light: '#fda4af',
+    blush: '#fff1f2',
+  },
+  violet: {
+    ...DEFAULT_BRAND_COLORS,
+    pink: '#7c3aed',
+    deep: '#6d28d9',
+    light: '#c4b5fd',
+    blush: '#f5f3ff',
+  },
+}
+
+const STORAGE_KEY = 'tle_site_color'
 
 export function getSiteColor(): SiteColor {
   try {
@@ -10,7 +60,7 @@ export function getSiteColor(): SiteColor {
   } catch {
     /* ignore */
   }
-  return 'emerald'
+  return 'rose'
 }
 
 export function setSiteColor(c: SiteColor) {
@@ -19,66 +69,12 @@ export function setSiteColor(c: SiteColor) {
   } catch {
     /* ignore */
   }
-  applySiteColor()
+  applyBrandColors(PRESETS[c])
 }
 
-// Replace color tokens in DOM class names. This is a pragmatic runtime approach since
-// many components use Tailwind color classnames (e.g. `bg-emerald-600`). We replace
-// the color token substring (e.g. `emerald`) with the selected color.
+/** Fast CSS-variable apply — no MutationObserver. */
 export function applySiteColor(): void {
-  if (typeof document === 'undefined') return
-  const to = getSiteColor()
-  const tokens = AVAILABLE_COLORS
-  // Apply to existing nodes
-  const walk = (el: Element) => {
-    const cls = (el.getAttribute('class') || '').trim()
-    if (!cls) return
-    const parts = cls.split(/\s+/)
-    let changed = false
-    for (let i = 0; i < parts.length; i++) {
-      const p = parts[i]
-      for (const t of tokens) {
-        if (p.includes(t) && t !== to) {
-          parts[i] = p.replace(new RegExp(t, 'g'), to)
-          changed = true
-          break
-        }
-      }
-    }
-    if (changed) el.setAttribute('class', parts.join(' '))
-  }
-
-  const all = Array.from(document.querySelectorAll('[class]'))
-  for (const el of all) walk(el)
-
-  // Ensure future DOM additions get the same treatment (SPA navigation / react mounts)
-  ;(applySiteColor as any)._observer ??= new MutationObserver((mutations) => {
-    for (const m of mutations) {
-      if (m.type === 'attributes' && m.target instanceof Element && m.attributeName === 'class') {
-        walk(m.target as Element)
-      }
-      if (m.addedNodes && m.addedNodes.length) {
-        m.addedNodes.forEach((n) => {
-          if (n instanceof Element) {
-            walk(n)
-            // also walk descendants
-            n.querySelectorAll('[class]').forEach((el) => walk(el))
-          }
-        })
-      }
-    }
-  })
-
-  ;(applySiteColor as any)._observer.disconnect()
-  ;(applySiteColor as any)._observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
-
-  // Mark document element with current color (useful for CSS fallbacks)
-  try {
-    document.documentElement.setAttribute('data-tle-color', to)
-  } catch {
-    /* ignore */
-  }
+  applyBrandColors(PRESETS[getSiteColor()])
 }
 
-// Also run once on import as a no-op guard (will be invoked explicitly in main.tsx)
 export default null

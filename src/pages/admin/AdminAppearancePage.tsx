@@ -1,90 +1,341 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { useAdminTheme } from './AdminThemeContext'
-import { ad } from './adminUi'
-import { AVAILABLE_COLORS, getSiteColor, setSiteColor, applySiteColor } from '../../lib/siteAppearance'
-import type { SiteColor } from '../../lib/siteAppearance'
+import { uploadProductImageFile } from '../../lib/adminProductMedia.ts'
+import {
+  DEFAULT_BRAND_COLORS,
+  DEFAULT_STORE_APPEARANCE,
+  fetchStoreAppearance,
+  saveStoreAppearance,
+  type BrandColors,
+  type ExclusiveOfferAppearance,
+  type StoreAppearance,
+} from '../../lib/storeAppearance.ts'
+import { useAdminTheme } from './AdminThemeContext.tsx'
+import { ad, adminFont } from './adminUi.ts'
+
+const COLOR_FIELDS: { key: keyof BrandColors; label: string; hint: string }[] = [
+  { key: 'pink', label: 'Primary pink', hint: 'Buttons, icons, accents' },
+  { key: 'deep', label: 'Deep / hover', hint: 'Hover states' },
+  { key: 'gold', label: 'Gold', hint: 'Eyebrows & highlights' },
+  { key: 'charcoal', label: 'Charcoal', hint: 'Primary solid buttons' },
+  { key: 'cream', label: 'Cream', hint: 'Soft backgrounds' },
+  { key: 'blush', label: 'Blush', hint: 'Soft pink panels' },
+  { key: 'light', label: 'Light pink', hint: 'Soft accents' },
+]
 
 export function AdminAppearancePage() {
   const { theme } = useAdminTheme()
-  const [color, setColor] = useState<SiteColor>(getSiteColor)
-  const current = getSiteColor()
+  const [draft, setDraft] = useState<StoreAppearance>(() => structuredClone(DEFAULT_STORE_APPEARANCE))
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+
+  const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
+  const heading = ad(theme, 'text-2xl font-bold tracking-tight text-stone-900', 'text-2xl font-bold tracking-tight text-white')
+  const panel = ad(
+    theme,
+    'rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6',
+    'rounded-2xl border border-neutral-700 bg-neutral-900/50 p-5 shadow-sm sm:p-6',
+  )
+  const labelCls = muted + ' mb-1.5 block text-[10px] font-bold uppercase tracking-wide'
+  const inputCls = ad(
+    theme,
+    'w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-[13px] text-stone-900 outline-none focus:ring-2 focus:ring-emerald-500/25',
+    'w-full rounded-xl border border-neutral-600 bg-neutral-950 px-3 py-2.5 text-[13px] text-neutral-100 outline-none focus:ring-2 focus:ring-emerald-500/25',
+  )
 
   useEffect(() => {
-    setColor(getSiteColor())
+    let on = true
+    void (async () => {
+      const data = await fetchStoreAppearance()
+      if (!on) return
+      setDraft(data)
+      setLoading(false)
+    })()
+    return () => {
+      on = false
+    }
   }, [])
 
-  const save = () => {
-    setSiteColor(color)
-    applySiteColor()
-    toast.success('Site color updated')
+  const patchOffer = useCallback((patch: Partial<ExclusiveOfferAppearance>) => {
+    setDraft((d) => ({ ...d, exclusiveOffer: { ...d.exclusiveOffer, ...patch } }))
+  }, [])
+
+  const patchColor = useCallback((key: keyof BrandColors, value: string) => {
+    setDraft((d) => ({ ...d, colors: { ...d.colors, [key]: value } }))
+  }, [])
+
+  const onUploadBanner = async (file: File | null) => {
+    if (!file) return
+    if (draft.heroBanners.length >= 4) {
+      toast.error('Maximum 4 hero banners')
+      return
+    }
+    setUploading(true)
+    const res = await uploadProductImageFile(file)
+    setUploading(false)
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    setDraft((d) => ({ ...d, heroBanners: [...d.heroBanners, res.publicUrl].slice(0, 4) }))
+    toast.success('Banner uploaded')
   }
 
-  const swatchCls: Record<SiteColor, string> = {
-    emerald: 'bg-emerald-600',
-    sky: 'bg-sky-600',
-    amber: 'bg-amber-500',
-    rose: 'bg-rose-500',
-    violet: 'bg-violet-600',
+  const removeBanner = (idx: number) => {
+    setDraft((d) => {
+      const next = d.heroBanners.filter((_, i) => i !== idx)
+      return { ...d, heroBanners: next.length ? next : ['/promo-hero.png'] }
+    })
   }
+
+  const moveBanner = (idx: number, dir: -1 | 1) => {
+    setDraft((d) => {
+      const next = [...d.heroBanners]
+      const j = idx + dir
+      if (j < 0 || j >= next.length) return d
+      ;[next[idx], next[j]] = [next[j], next[idx]]
+      return { ...d, heroBanners: next }
+    })
+  }
+
+  const onSave = async () => {
+    setSaving(true)
+    const res = await saveStoreAppearance(draft)
+    setSaving(false)
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    toast.success('Appearance saved — storefront updates instantly')
+  }
+
+  const resetColors = () => {
+    setDraft((d) => ({ ...d, colors: { ...DEFAULT_BRAND_COLORS } }))
+  }
+
+  if (loading) {
+    return (
+      <div className={adminFont()}>
+        <p className={muted}>Loading appearance…</p>
+      </div>
+    )
+  }
+
+  const offer = draft.exclusiveOffer
 
   return (
-    <div>
-      <h1 className={ad(theme, 'text-2xl font-bold text-stone-900', 'text-2xl font-bold text-neutral-100')}>Appearance</h1>
-      <p className={ad(theme, 'mt-2 text-sm text-stone-600', 'mt-2 text-sm text-neutral-400')}>Customize website main color for the storefront.</p>
+    <div className={['mx-auto max-w-3xl space-y-6', adminFont()].join(' ')}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className={heading}>Appearance</h1>
+          <p className={muted + ' mt-2 max-w-xl text-[14px] leading-relaxed'}>
+            Hero banners, exclusive offer card, and website colors. Changes apply to the customer site after you save.
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void onSave()}
+          className="shrink-0 rounded-xl bg-emerald-600 px-5 py-2.5 text-[12px] font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-60"
+        >
+          {saving ? 'Saving…' : 'Save appearance'}
+        </button>
+      </div>
 
-      <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-start">
-        <div className="flex-1">
-          <p className={ad(theme, 'text-sm font-semibold text-stone-700', 'text-sm font-semibold text-neutral-200')}>Current site color</p>
-          <div className="mt-2 flex items-center gap-3">
-            <span className={`inline-block h-8 w-20 rounded-md ${swatchCls[current]}`} />
-            <span className={ad(theme, 'text-sm text-stone-700', 'text-sm text-neutral-200')}>{current}</span>
-          </div>
+      {/* Hero banners */}
+      <section className={panel}>
+        <h2 className={ad(theme, 'text-base font-bold text-stone-900', 'text-base font-bold text-white')}>
+          Hero banners
+        </h2>
+        <p className={muted + ' mt-1 text-[13px]'}>
+          Add 1–4 images. One image stays still; two or more scroll sideways automatically on the home page.
+        </p>
 
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
-            {AVAILABLE_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                className={
-                  'flex cursor-pointer flex-col items-center gap-2 rounded-xl p-3 text-center transition ' +
-                  (color === c ? 'ring-2 ring-offset-2 ring-emerald-400' : 'hover:brightness-95')
-                }
-              >
-                <span className={`block h-10 w-24 rounded-lg ${swatchCls[c]}`} aria-hidden />
-                <span className={ad(theme, 'text-sm text-stone-700', 'text-sm text-neutral-200')}>{c}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-6 flex items-center gap-3">
-            <button onClick={save} className={ad(theme, 'rounded-xl bg-emerald-600 px-4 py-2 text-white', 'rounded-xl bg-emerald-600 px-4 py-2 text-white')}>
-              Apply
-            </button>
-            <button
-              onClick={() => {
-                setColor(getSiteColor())
-                toast('Reverted')
-              }}
-              className={ad(theme, 'rounded-xl border border-stone-200 px-4 py-2', 'rounded-xl border border-neutral-700 px-4 py-2')}
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {draft.heroBanners.map((url, i) => (
+            <div
+              key={`${url}-${i}`}
+              className={ad(theme, 'overflow-hidden rounded-xl border border-stone-200', 'overflow-hidden rounded-xl border border-neutral-700')}
             >
-              Cancel
-            </button>
-          </div>
+              <img src={url} alt="" className="aspect-[4/3] w-full object-cover" />
+              <div className="flex flex-wrap items-center gap-2 p-2">
+                <span className={muted + ' text-[11px] font-semibold'}>#{i + 1}</span>
+                <button type="button" className="text-[11px] font-semibold text-emerald-700" onClick={() => moveBanner(i, -1)} disabled={i === 0}>
+                  Left
+                </button>
+                <button
+                  type="button"
+                  className="text-[11px] font-semibold text-emerald-700"
+                  onClick={() => moveBanner(i, 1)}
+                  disabled={i === draft.heroBanners.length - 1}
+                >
+                  Right
+                </button>
+                <button type="button" className="ml-auto text-[11px] font-semibold text-rose-600" onClick={() => removeBanner(i)}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="w-full sm:w-64">
-          <p className={ad(theme, 'text-sm font-semibold text-stone-700', 'text-sm font-semibold text-neutral-200')}>Preview</p>
-          <div className={ad(theme, 'mt-3 rounded-lg border border-stone-100 p-3', 'mt-3 rounded-lg border border-neutral-800 p-3')}>
-            <div className={`mb-3 h-8 rounded-md ${swatchCls[color]}`} />
-            <div className="flex items-center gap-2">
-              <span className={`inline-block h-8 w-8 rounded-md ${swatchCls[color]}`} />
-              <button className={`rounded-md px-3 py-1 text-white ${swatchCls[color]}`}>Primary</button>
-            </div>
-            <p className={ad(theme, 'mt-3 text-sm text-stone-600', 'mt-3 text-sm text-neutral-400')}>Sidebar / buttons will use the selected color after applying.</p>
+        {draft.heroBanners.length < 4 ? (
+          <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-emerald-400/60 bg-emerald-50/50 px-4 py-3 text-[12px] font-bold uppercase tracking-wide text-emerald-800">
+            <span className="material-symbols-outlined text-[18px]">add_photo_alternate</span>
+            {uploading ? 'Uploading…' : 'Add banner image'}
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              disabled={uploading}
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null
+                e.target.value = ''
+                void onUploadBanner(f)
+              }}
+            />
+          </label>
+        ) : (
+          <p className={muted + ' mt-3 text-[12px]'}>Maximum of 4 banners reached.</p>
+        )}
+      </section>
+
+      {/* Exclusive offer */}
+      <section className={panel}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className={ad(theme, 'text-base font-bold text-stone-900', 'text-base font-bold text-white')}>
+              Exclusive offer card
+            </h2>
+            <p className={muted + ' mt-1 text-[13px]'}>Overlay on the home hero. Turn off to hide it completely.</p>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] font-semibold">
+            <input
+              type="checkbox"
+              checked={offer.enabled}
+              onChange={(e) => patchOffer({ enabled: e.target.checked })}
+              className="size-4 rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+            />
+            Show on home
+          </label>
+        </div>
+
+        <div className={'mt-5 grid gap-4 ' + (offer.enabled ? '' : 'pointer-events-none opacity-45')}>
+          <label>
+            <span className={labelCls}>Badge</span>
+            <input className={inputCls} value={offer.badge} onChange={(e) => patchOffer({ badge: e.target.value })} />
+          </label>
+          <label>
+            <span className={labelCls}>Headline</span>
+            <textarea
+              className={inputCls + ' min-h-[72px] resize-y'}
+              value={offer.headline}
+              onChange={(e) => patchOffer({ headline: e.target.value })}
+            />
+          </label>
+          <label>
+            <span className={labelCls}>Subtext</span>
+            <textarea
+              className={inputCls + ' min-h-[72px] resize-y'}
+              value={offer.subtext}
+              onChange={(e) => patchOffer({ subtext: e.target.value })}
+            />
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label>
+              <span className={labelCls}>Button text</span>
+              <input className={inputCls} value={offer.buttonText} onChange={(e) => patchOffer({ buttonText: e.target.value })} />
+            </label>
+            <label>
+              <span className={labelCls}>Button icon (Material Symbol)</span>
+              <input
+                className={inputCls}
+                value={offer.buttonIcon}
+                onChange={(e) => patchOffer({ buttonIcon: e.target.value })}
+                placeholder="photo_camera"
+              />
+              <span className={muted + ' mt-1 flex items-center gap-1 text-[11px]'}>
+                Preview:
+                <span className="material-symbols-outlined text-[18px] text-emerald-700">{offer.buttonIcon || 'photo_camera'}</span>
+              </span>
+            </label>
           </div>
         </div>
+      </section>
+
+      {/* Colors */}
+      <section className={panel}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className={ad(theme, 'text-base font-bold text-stone-900', 'text-base font-bold text-white')}>
+              Website colors
+            </h2>
+            <p className={muted + ' mt-1 text-[13px]'}>
+              Updates icons, buttons, and accents on the customer site via CSS variables (no lag).
+            </p>
+          </div>
+          <button type="button" onClick={resetColors} className={muted + ' text-[12px] font-semibold underline-offset-2 hover:underline'}>
+            Reset to defaults
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          {COLOR_FIELDS.map((f) => (
+            <label key={f.key} className="block">
+              <span className={labelCls}>{f.label}</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={draft.colors[f.key]}
+                  onChange={(e) => patchColor(f.key, e.target.value)}
+                  className="h-10 w-12 cursor-pointer rounded-lg border border-stone-200 bg-transparent p-0.5"
+                />
+                <input
+                  className={inputCls + ' font-mono'}
+                  value={draft.colors[f.key]}
+                  onChange={(e) => patchColor(f.key, e.target.value)}
+                />
+              </div>
+              <span className={muted + ' mt-1 block text-[11px]'}>{f.hint}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-black/5 bg-black/[0.02] p-4">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-stone-500">Live preview</span>
+          <span className="inline-flex size-9 items-center justify-center rounded-full" style={{ background: draft.colors.blush, color: draft.colors.pink }}>
+            <span className="material-symbols-outlined text-[20px]">diamond</span>
+          </span>
+          <button
+            type="button"
+            className="rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white"
+            style={{ background: draft.colors.pink }}
+          >
+            Accent
+          </button>
+          <button
+            type="button"
+            className="rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white"
+            style={{ background: draft.colors.charcoal }}
+          >
+            Charcoal
+          </button>
+          <span className="rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-widest" style={{ borderColor: draft.colors.gold, color: draft.colors.gold }}>
+            Gold label
+          </span>
+        </div>
+      </section>
+
+      <div className="flex justify-end pb-8">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void onSave()}
+          className="rounded-xl bg-emerald-600 px-6 py-3 text-[12px] font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-60"
+        >
+          {saving ? 'Saving…' : 'Save appearance'}
+        </button>
       </div>
     </div>
   )

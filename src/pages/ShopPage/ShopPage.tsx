@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { ProductCard } from '../../components/ProductCard.tsx'
 import { useCartDrawer } from '../../context/CartDrawerContext.tsx'
 import { defaultVariantSelection, productMatchesGender, type ProductGender } from '../../data/products.ts'
-import { useShopProducts } from '../../context/ShopProductsContext.tsx'
+import { useShopCatalogLoading, useShopProducts } from '../../context/ShopProductsContext.tsx'
 
 type TypeFilter = 'all' | ProductGender
 
@@ -19,6 +19,7 @@ const SHOP_PAGE_SIZE = 12
 
 export function ShopPage() {
   const products = useShopProducts()
+  const catalogLoading = useShopCatalogLoading()
   const [searchParams, setSearchParams] = useSearchParams()
   const { addToCart, toggleFavorite, isFavorite, hasProductInCart } = useCartDrawer()
 
@@ -148,15 +149,29 @@ export function ShopPage() {
 
         {visibleProducts.length === 0 ? (
           <div className="rounded-[20px] border border-black/8 bg-white px-6 py-14 text-center">
-            <p className="font-sans text-lg font-medium text-tle-ink">No products match your filters.</p>
-            {typeFilter === 'unisex' ? (
-              <p className="mt-2 text-sm text-tle-muted">
-                Nothing is listed under Unisex yet. You can still browse{' '}
-                <strong className="font-semibold text-tle-ink">For Her</strong>,{' '}
-                <strong className="font-semibold text-tle-ink">For Him</strong>, or all products together.
-              </p>
+            {catalogLoading ? (
+              <>
+                <p className="font-sans text-lg font-medium text-tle-ink">Loading products…</p>
+                <p className="mt-2 text-sm text-tle-muted">Pulling the latest arrivals for you.</p>
+              </>
+            ) : products.length === 0 ? (
+              <>
+                <p className="font-sans text-lg font-medium text-tle-ink">New arrivals are on the way.</p>
+                <p className="mt-2 text-sm text-tle-muted">Check back soon — products appear here as soon as they go live.</p>
+              </>
             ) : (
-              <p className="mt-2 text-sm text-tle-muted">Try another type/category or clear search.</p>
+              <>
+                <p className="font-sans text-lg font-medium text-tle-ink">No products match your filters.</p>
+                {typeFilter === 'unisex' ? (
+                  <p className="mt-2 text-sm text-tle-muted">
+                    Nothing is listed under Unisex yet. You can still browse{' '}
+                    <strong className="font-semibold text-tle-ink">For Her</strong>,{' '}
+                    <strong className="font-semibold text-tle-ink">For Him</strong>, or all products together.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm text-tle-muted">Try another type/category or clear search.</p>
+                )}
+              </>
             )}
           </div>
         ) : (
