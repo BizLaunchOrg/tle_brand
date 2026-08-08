@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { uploadProductImageFile } from '../../lib/adminProductMedia.ts'
 import {
@@ -6,6 +6,7 @@ import {
   DEFAULT_COLOR_ROLES,
   DEFAULT_STORE_APPEARANCE,
   fetchStoreAppearance,
+  rolesEqual,
   rolesFromBrandColors,
   saveStoreAppearance,
   type BrandColorRoles,
@@ -17,29 +18,29 @@ import { ad, adminFont } from './adminUi.ts'
 
 type ColorRoleKey = keyof BrandColorRoles
 
-const COLOR_ROLES: {
+const COLOR_SECTIONS: {
   key: ColorRoleKey
   title: string
   places: string[]
-  example: string
+  help: string
 }[] = [
   {
     key: 'main',
     title: 'Icons & links',
-    places: ['Navbar', 'Icons', 'Links', 'Hovers'],
-    example: 'Active menu, heart/cart icons, pink links',
+    places: ['Navbar', 'Icons', 'Links'],
+    help: 'Menu highlights, hearts, cart badges, and link color.',
   },
   {
     key: 'dark',
     title: 'Buttons & footer',
     places: ['Buttons', 'Footer'],
-    example: 'Shop now, checkout, and the footer bar',
+    help: 'Shop now, checkout buttons, and the footer background.',
   },
   {
     key: 'accent',
     title: 'Small labels',
-    places: ['Labels', 'Highlights'],
-    example: '“Exclusive offer”, receipt titles, gold tags',
+    places: ['Labels'],
+    help: '“Exclusive offer” and other small gold-style tags.',
   },
 ]
 
@@ -49,8 +50,9 @@ export function AdminAppearancePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [activeRole, setActiveRole] = useState<ColorRoleKey>('main')
-  const [usedOpen, setUsedOpen] = useState(false)
+  /** Index into colorHistory (oldest → newest). */
+  const [historyIndex, setHistoryIndex] = useState(0)
+  const [isNewDraft, setIsNewDraft] = useState(false)
 
   const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
   const heading = ad(theme, 'text-2xl font-bold tracking-tight text-stone-900', 'text-2xl font-bold tracking-tight text-white')
@@ -66,6 +68,8 @@ export function AdminAppearancePage() {
     'w-full rounded-xl border border-neutral-600 bg-neutral-950 px-3 py-2.5 text-[13px] text-neutral-100 outline-none focus:ring-2 focus:ring-emerald-500/25',
   )
   const sectionTitle = ad(theme, 'text-base font-bold text-stone-900', 'text-base font-bold text-white')
+  const linkBtn =
+    'inline-flex items-center gap-1 text-[13px] font-semibold text-emerald-700 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-stone-400 disabled:no-underline dark:text-emerald-400 dark:disabled:text-neutral-500'
 
   useEffect(() => {
     let on = true
@@ -73,6 +77,8 @@ export function AdminAppearancePage() {
       const data = await fetchStoreAppearance()
       if (!on) return
       setDraft(data)
+      setHistoryIndex(Math.max(0, data.colorHistory.length - 1))
+      setIsNewDraft(false)
       setLoading(false)
     })()
     return () => {
@@ -81,6 +87,22 @@ export function AdminAppearancePage() {
   }, [])
 
   const roles = rolesFromBrandColors(draft.colors)
+  const history = draft.colorHistory
+  const historyLen = history.length
+  const canGoPrevious = isNewDraft ? historyLen > 0 : historyIndex > 0
+  /** Disabled on the newest saved setting (and while drafting new colors). */
+  const canGoNext = !isNewDraft && historyIndex < historyLen - 1
+
+  const historyLabel = useMemo(() => {
+    if (isNewDraft) return 'New colors (not saved yet)'
+    if (historyLen <= 1) return 'Current store colors'
+    if (historyIndex === historyLen - 1) return `Current · ${historyIndex + 1} of ${historyLen}`
+    return `Saved setting · ${historyIndex + 1} of ${historyLen}`
+  }, [historyIndex, historyLen, isNewDraft])
+
+  const applyRoles = useCallback((next: BrandColorRoles) => {
+    setDraft((d) => ({ ...d, colors: brandColorsFromRoles(next) }))
+  }, [])
 
   const patchOffer = useCallback((patch: Partial<ExclusiveOfferAppearance>) => {
     setDraft((d) => ({ ...d, exclusiveOffer: { ...d.exclusiveOffer, ...patch } }))
@@ -89,15 +111,40 @@ export function AdminAppearancePage() {
   const patchRole = useCallback((key: ColorRoleKey, value: string) => {
     setDraft((d) => {
       const next = { ...rolesFromBrandColors(d.colors), [key]: value }
-      return {
-        ...d,
-        colors: brandColorsFromRoles(next),
-      }
+      return { ...d, colors: brandColorsFromRoles(next) }
     })
   }, [])
 
-  const applyUsedColor = (hex: string) => {
-    patchRole(activeRole, hex)
+  const goPrevious = () => {
+    if (!canGoPrevious) return
+    if (isNewDraft) {
+      const last = history[historyLen - 1]
+      if (!last) return
+      setIsNewDraft(false)
+      setHistoryIndex(historyLen - 1)
+      applyRoles(last)
+      return
+    }
+    const nextIndex = historyIndex - 1
+    const setting = history[nextIndex]
+    if (!setting) return
+    setHistoryIndex(nextIndex)
+    applyRoles(setting)
+  }
+
+  const goNext = () => {
+    if (!canGoNext) return
+    const nextIndex = historyIndex + 1
+    const setting = history[nextIndex]
+    if (!setting) return
+    setHistoryIndex(nextIndex)
+    applyRoles(setting)
+  }
+
+  const formNewColors = () => {
+    setIsNewDraft(true)
+    applyRoles({ ...DEFAULT_COLOR_ROLES })
+    toast.success('New color set — change the three colors below, then save')
   }
 
   const onUploadBanner = async (file: File | null) => {
@@ -144,14 +191,9 @@ export function AdminAppearancePage() {
     }
     const refreshed = await fetchStoreAppearance()
     setDraft(refreshed)
+    setIsNewDraft(false)
+    setHistoryIndex(Math.max(0, refreshed.colorHistory.length - 1))
     toast.success('Appearance saved — storefront updates instantly')
-  }
-
-  const resetColors = () => {
-    setDraft((d) => ({
-      ...d,
-      colors: brandColorsFromRoles(DEFAULT_COLOR_ROLES),
-    }))
   }
 
   if (loading) {
@@ -170,7 +212,7 @@ export function AdminAppearancePage() {
         <div>
           <h1 className={heading}>Appearance</h1>
           <p className={muted + ' mt-2 max-w-xl text-[14px] leading-relaxed'}>
-            Three controls: hero banners, exclusive offer, and brand colors.
+            Home banners, offer card, and the three store colors.
           </p>
         </div>
         <button
@@ -183,11 +225,11 @@ export function AdminAppearancePage() {
         </button>
       </div>
 
-      {/* 1 — Hero banners */}
+      {/* Hero */}
       <section className={panel}>
-        <h2 className={sectionTitle}>1 · Hero banners</h2>
+        <h2 className={sectionTitle}>Hero banners</h2>
         <p className={muted + ' mt-1 text-[13px]'}>
-          Add 1–4 images. One stays still; two or more scroll on the home page.
+          Photos on the home page. Add 1–4. Two or more scroll automatically.
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -198,13 +240,13 @@ export function AdminAppearancePage() {
             >
               <img src={url} alt="" className="aspect-[4/3] w-full object-cover" />
               <div className="flex flex-wrap items-center gap-2 p-2">
-                <span className={muted + ' text-[11px] font-semibold'}>#{i + 1}</span>
-                <button type="button" className="text-[11px] font-semibold text-emerald-700" onClick={() => moveBanner(i, -1)} disabled={i === 0}>
+                <span className={muted + ' text-[11px] font-semibold'}>Banner {i + 1}</span>
+                <button type="button" className="text-[11px] font-semibold text-emerald-700 disabled:opacity-40" onClick={() => moveBanner(i, -1)} disabled={i === 0}>
                   Left
                 </button>
                 <button
                   type="button"
-                  className="text-[11px] font-semibold text-emerald-700"
+                  className="text-[11px] font-semibold text-emerald-700 disabled:opacity-40"
                   onClick={() => moveBanner(i, 1)}
                   disabled={i === draft.heroBanners.length - 1}
                 >
@@ -235,16 +277,16 @@ export function AdminAppearancePage() {
             />
           </label>
         ) : (
-          <p className={muted + ' mt-3 text-[12px]'}>Maximum of 4 banners reached.</p>
+          <p className={muted + ' mt-3 text-[12px]'}>Maximum of 4 banners.</p>
         )}
       </section>
 
-      {/* 2 — Exclusive offer */}
+      {/* Offer */}
       <section className={panel}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className={sectionTitle}>2 · Exclusive offer</h2>
-            <p className={muted + ' mt-1 text-[13px]'}>Overlay on the home hero. Turn off to hide it.</p>
+            <h2 className={sectionTitle}>Exclusive offer</h2>
+            <p className={muted + ' mt-1 text-[13px]'}>Card on the home hero. Turn off to hide it.</p>
           </div>
           <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] font-semibold">
             <input
@@ -284,7 +326,7 @@ export function AdminAppearancePage() {
               <input className={inputCls} value={offer.buttonText} onChange={(e) => patchOffer({ buttonText: e.target.value })} />
             </label>
             <label>
-              <span className={labelCls}>Button icon (Material Symbol)</span>
+              <span className={labelCls}>Button icon</span>
               <input
                 className={inputCls}
                 value={offer.buttonIcon}
@@ -300,161 +342,98 @@ export function AdminAppearancePage() {
         </div>
       </section>
 
-      {/* 3 — Brand colors */}
+      {/* Colors */}
       <section className={panel}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className={sectionTitle}>3 · Brand colors</h2>
+            <h2 className={sectionTitle}>Brand colors</h2>
             <p className={muted + ' mt-1 max-w-lg text-[13px] leading-relaxed'}>
-              Pick one color for each part of the site. Soft backgrounds follow your icons & links color.
+              Three colors only — one for each part of the store below.
             </p>
           </div>
-          <button type="button" onClick={resetColors} className={muted + ' text-[12px] font-semibold underline-offset-2 hover:underline'}>
-            Reset defaults
+          <button type="button" onClick={formNewColors} className={linkBtn}>
+            Form new colors
+          </button>
+        </div>
+
+        {/* History navigator */}
+        <div
+          className={ad(
+            theme,
+            'mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-3',
+            'mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-700 bg-neutral-950/50 px-4 py-3',
+          )}
+        >
+          <button type="button" className={linkBtn} onClick={goPrevious} disabled={!canGoPrevious}>
+            <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+            Previous
+          </button>
+          <div className="min-w-0 text-center">
+            <p className={ad(theme, 'text-[13px] font-bold text-stone-900', 'text-[13px] font-bold text-white')}>
+              {historyLabel}
+            </p>
+            <div className="mt-1.5 flex justify-center gap-1.5">
+              <span className="size-4 rounded-full border border-black/10" style={{ background: roles.main }} title="Icons & links" />
+              <span className="size-4 rounded-full border border-black/10" style={{ background: roles.dark }} title="Buttons & footer" />
+              <span className="size-4 rounded-full border border-black/10" style={{ background: roles.accent }} title="Labels" />
+            </div>
+          </div>
+          <button type="button" className={linkBtn} onClick={goNext} disabled={!canGoNext}>
+            Next
+            <span className="material-symbols-outlined text-[18px]">chevron_right</span>
           </button>
         </div>
 
         <div className="mt-5 space-y-3">
-          {COLOR_ROLES.map((f, index) => {
-            const selected = activeRole === f.key
-            return (
-              <div
-                key={f.key}
-                className={[
-                  'rounded-2xl border p-4 transition',
-                  selected
-                    ? ad(theme, 'border-emerald-500/70 bg-emerald-50/40', 'border-emerald-500/70 bg-emerald-950/30')
-                    : ad(theme, 'border-stone-200 bg-white', 'border-neutral-700 bg-neutral-950/30'),
-                ].join(' ')}
-              >
-                <div className="flex items-start gap-3 sm:gap-4">
+          {COLOR_SECTIONS.map((f) => (
+            <div
+              key={f.key}
+              className={ad(theme, 'rounded-2xl border border-stone-200 p-4', 'rounded-2xl border border-neutral-700 p-4')}
+            >
+              <h3 className={ad(theme, 'text-[15px] font-bold text-stone-900', 'text-[15px] font-bold text-white')}>
+                {f.title}
+              </h3>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {f.places.map((place) => (
                   <span
+                    key={place}
                     className={ad(
                       theme,
-                      'mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-100 text-[11px] font-bold text-stone-600',
-                      'mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-[11px] font-bold text-neutral-300',
+                      'rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-600',
+                      'rounded-md bg-neutral-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-300',
                     )}
                   >
-                    {index + 1}
+                    {place}
                   </span>
-
-                  <div className="min-w-0 flex-1">
-                    <h3 className={ad(theme, 'text-[15px] font-bold text-stone-900', 'text-[15px] font-bold text-white')}>
-                      {f.title}
-                    </h3>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {f.places.map((place) => (
-                        <span
-                          key={place}
-                          className={ad(
-                            theme,
-                            'rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-600',
-                            'rounded-md bg-neutral-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-300',
-                          )}
-                        >
-                          {place}
-                        </span>
-                      ))}
-                    </div>
-                    <p className={muted + ' mt-2 text-[12px]'}>{f.example}</p>
-
-                    <div className="mt-3 flex items-center gap-3">
-                      <label className="relative shrink-0 cursor-pointer">
-                        <span
-                          className="block size-12 rounded-xl border border-black/10 shadow-inner"
-                          style={{ background: roles[f.key] }}
-                        />
-                        <input
-                          type="color"
-                          value={roles[f.key]}
-                          onChange={(e) => {
-                            setActiveRole(f.key)
-                            patchRole(f.key, e.target.value)
-                          }}
-                          className="absolute inset-0 cursor-pointer opacity-0"
-                          aria-label={f.title}
-                        />
-                      </label>
-                      <input
-                        className={inputCls + ' max-w-[10rem] font-mono'}
-                        value={roles[f.key]}
-                        onFocus={() => setActiveRole(f.key)}
-                        onChange={(e) => {
-                          setActiveRole(f.key)
-                          patchRole(f.key, e.target.value)
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
-            )
-          })}
-        </div>
-
-        {/* Used colors — collapsed by default */}
-        <div
-          className={ad(
-            theme,
-            'mt-5 overflow-hidden rounded-2xl border border-stone-200',
-            'mt-5 overflow-hidden rounded-2xl border border-neutral-700',
-          )}
-        >
-          <button
-            type="button"
-            onClick={() => setUsedOpen((o) => !o)}
-            className={ad(
-              theme,
-              'flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-stone-50',
-              'flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-neutral-900/60',
-            )}
-            aria-expanded={usedOpen}
-          >
-            <div>
-              <p className={ad(theme, 'text-[13px] font-bold text-stone-900', 'text-[13px] font-bold text-white')}>
-                Previously used colors
-              </p>
-              <p className={muted + ' mt-0.5 text-[12px]'}>
-                Saved store colors — tap one to reuse on “{COLOR_ROLES.find((r) => r.key === activeRole)?.title}”
-              </p>
-            </div>
-            <span className="material-symbols-outlined shrink-0 text-[22px] text-stone-400">
-              {usedOpen ? 'expand_less' : 'expand_more'}
-            </span>
-          </button>
-
-          {usedOpen ? (
-            <div className={ad(theme, 'border-t border-stone-200 px-4 py-3', 'border-t border-neutral-700 px-4 py-3')}>
-              <div className="flex flex-wrap gap-2">
-                {draft.usedColors.map((hex) => {
-                  const isActive = roles[activeRole] === hex
-                  return (
-                    <button
-                      key={hex}
-                      type="button"
-                      title={hex}
-                      onClick={() => applyUsedColor(hex)}
-                      className={[
-                        'size-9 rounded-full border-2 transition',
-                        isActive
-                          ? 'border-emerald-600 ring-2 ring-emerald-500/30'
-                          : 'border-white shadow ring-1 ring-black/10',
-                      ].join(' ')}
-                      style={{ background: hex }}
-                    />
-                  )
-                })}
+              <p className={muted + ' mt-2 text-[12px]'}>{f.help}</p>
+              <div className="mt-3 flex items-center gap-3">
+                <label className="relative shrink-0 cursor-pointer">
+                  <span className="block size-12 rounded-xl border border-black/10 shadow-inner" style={{ background: roles[f.key] }} />
+                  <input
+                    type="color"
+                    value={roles[f.key]}
+                    onChange={(e) => patchRole(f.key, e.target.value)}
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                    aria-label={f.title}
+                  />
+                </label>
+                <input
+                  className={inputCls + ' max-w-[10rem] font-mono'}
+                  value={roles[f.key]}
+                  onChange={(e) => patchRole(f.key, e.target.value)}
+                />
               </div>
             </div>
-          ) : null}
+          ))}
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-black/5 bg-black/[0.02] p-4">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-stone-500">Looks like</span>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-stone-500">Preview</span>
           <span
             className="inline-flex size-9 items-center justify-center rounded-full"
             style={{ background: draft.colors.blush, color: draft.colors.pink }}
-            title="Icon"
           >
             <span className="material-symbols-outlined text-[20px]">favorite</span>
           </span>
@@ -474,6 +453,9 @@ export function AdminAppearancePage() {
           <span className="text-[12px] font-semibold underline" style={{ color: draft.colors.pink }}>
             Link
           </span>
+          {!isNewDraft && history[historyIndex] && !rolesEqual(roles, history[historyIndex]!) ? (
+            <span className={muted + ' ml-auto text-[11px]'}>Edited — save to keep</span>
+          ) : null}
         </div>
       </section>
 
