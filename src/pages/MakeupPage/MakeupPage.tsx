@@ -4,12 +4,11 @@ import { MakeupBookingDateTimePick } from '../../components/MakeupBookingDateTim
 import { BookingPaymentProofFields } from '../../components/BookingPaymentProofFields.tsx'
 import { BookingTransferDetailsCard } from '../../components/BookingTransferDetailsCard.tsx'
 import {
-  BOOKABLE_SERVICES,
-  PHOTOSHOOT_PACKAGES,
   bookableServiceFromPhotoshootLine,
   isPhotoshootService,
 } from '../../data/bookingServices.ts'
 import type { BookableServiceItem } from '../../data/bookingServices.ts'
+import { useMakeupMenu } from '../../context/MakeupMenuContext.tsx'
 import { validateMakeupBookingDetails } from '../../lib/bookingFormValidation.ts'
 import { formatBookingDateLabel } from '../../lib/makeupBookingDates.ts'
 import { insertMakeupBooking } from '../../lib/makeupBookings.ts'
@@ -57,6 +56,7 @@ const REVIEW_IMAGES = [
 ] as const
 
 export function MakeupPage() {
+  const { services, photoshootPackages, makeupItems, items } = useMakeupMenu()
   const [formStep, setFormStep] = useState(1)
   const [selectedService, setSelectedService] = useState<BookableServiceItem | null>(null)
   const [selectedTime, setSelectedTime] = useState('')
@@ -89,7 +89,7 @@ export function MakeupPage() {
   }
 
   const pickPhotoshootPackage = (line: string) => {
-    const s = bookableServiceFromPhotoshootLine(line)
+    const s = bookableServiceFromPhotoshootLine(line, services)
     if (!s) return
     setBookingSuccessRef(null)
     setSelectedService(s)
@@ -193,10 +193,14 @@ export function MakeupPage() {
               Your Signature <em className="font-sans font-medium italic text-tle-pink">Glow-Up</em>
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-tle-muted sm:text-[15px]">
-              Studio session at <span className="font-medium text-tle-ink">₦35,000</span>. Home service from{' '}
-              <span className="font-medium text-tle-ink">₦50,000</span> and bridal from{' '}
-              <span className="font-medium text-tle-ink">₦100,000</span> (home and bridal depend on location). Photoshoot
-              bundles with edited pictures are listed below — book any option on this page or from the home booking form.
+              {makeupItems.length
+                ? makeupItems
+                    .slice(0, 3)
+                    .map((s) => `${s.name} at ${s.price}`)
+                    .join('. ') + '.'
+                : 'Book a makeup session by appointment.'}{' '}
+              Photoshoot bundles with edited pictures are listed below — book any option on this page or from the home
+              booking form.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
@@ -263,7 +267,7 @@ export function MakeupPage() {
         </div>
 
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {BOOKABLE_SERVICES.map((s) => (
+          {services.map((s) => (
             <article
               key={s.name}
               role="button"
@@ -323,7 +327,7 @@ export function MakeupPage() {
               <button
                 type="button"
                 onClick={() => {
-                  if (selectedService && isPhotoshootService(selectedService.name)) goToStep(2)
+                  if (selectedService && isPhotoshootService(selectedService.name, items)) goToStep(2)
                   else goToStep(1)
                 }}
                 className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-tle-gold px-7 py-3.5 font-sans text-[11px] font-bold tracking-[0.14em] text-tle-charcoal uppercase shadow-lg shadow-black/15 transition-all hover:-translate-y-0.5 hover:bg-white"
@@ -333,8 +337,8 @@ export function MakeupPage() {
               </button>
             </div>
             <div className="relative z-[1] mt-6 grid gap-3 sm:grid-cols-3">
-              {PHOTOSHOOT_PACKAGES.map((p) => {
-                const sel = selectedService?.name === bookableServiceFromPhotoshootLine(p.line)?.name
+              {photoshootPackages.map((p) => {
+                const sel = selectedService?.name === bookableServiceFromPhotoshootLine(p.line, services)?.name
                 return (
                   <div
                     key={p.line}

@@ -28,11 +28,14 @@ import { AdminCustomersPage } from './pages/admin/AdminCustomersPage.tsx'
 import { AdminMakeupBookingsPage } from './pages/admin/AdminMakeupBookingsPage.tsx'
 import { AdminMakeupHoursPage } from './pages/admin/AdminMakeupHoursPage.tsx'
 import { AdminAppearancePage } from './pages/admin/AdminAppearancePage.tsx'
+import { AdminMakeupMenuPage } from './pages/admin/AdminMakeupMenuPage.tsx'
+import { MakeupMenuProvider } from './context/MakeupMenuContext.tsx'
 
 function App() {
   return (
     <AuthProvider>
       <StoreAppearanceProvider>
+        <MakeupMenuProvider>
         <ShopProductsProvider>
           <Toaster position="top-right" reverseOrder={false} />
           <Routes>
@@ -62,6 +65,7 @@ function App() {
                 <Route path="categories" element={<Navigate to="/admin/products" replace />} />
                 <Route path="customers" element={<AdminCustomersPage />} />
                 <Route path="makeup-bookings" element={<AdminMakeupBookingsPage />} />
+                <Route path="makeup-menu" element={<AdminMakeupMenuPage />} />
                 <Route path="makeup-hours" element={<AdminMakeupHoursPage />} />
                 <Route path="transactions" element={<AdminTransactionsPage />} />
                 <Route path="appearance" element={<AdminAppearancePage />} />
@@ -71,6 +75,7 @@ function App() {
             </Route>
           </Routes>
         </ShopProductsProvider>
+        </MakeupMenuProvider>
       </StoreAppearanceProvider>
     </AuthProvider>
   )
