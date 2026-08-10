@@ -60,8 +60,14 @@ const PRODUCT_UI_SECTIONS: {
   {
     key: 'cardBg',
     title: 'Card background',
-    places: ['Product cards', 'Add to cart'],
-    help: 'Black area behind product photos and the add-to-cart button.',
+    places: ['Product photos'],
+    help: 'Dark area behind product photos on cards and product pages.',
+  },
+  {
+    key: 'addToCart',
+    title: 'Add to cart button',
+    places: ['Product cards', 'Product page'],
+    help: 'Color of the Add to cart button (separate from the photo background).',
   },
   {
     key: 'price',
@@ -74,6 +80,12 @@ const PRODUCT_UI_SECTIONS: {
     title: 'Favorites & accents',
     places: ['Wishlist', 'Sale tags', 'Thumbnails'],
     help: 'Heart icon, sale badges, and photo thumbnail highlights.',
+  },
+  {
+    key: 'whatsapp',
+    title: 'WhatsApp',
+    places: ['Floating button', 'Contact page'],
+    help: 'Color of the WhatsApp chat button customers see on the site.',
   },
 ]
 
@@ -396,7 +408,7 @@ export function AdminAppearancePage() {
       <section className={panel}>
         <h2 className={sectionTitle}>Hero banners</h2>
         <p className={muted + ' mt-1 text-[13px]'}>
-          Photos on the home page. Add 1–4. Two or more scroll automatically.
+          Photos on the home page. Add 1–4. They auto-advance slowly — shoppers can also swipe or tap the dots.
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -446,6 +458,94 @@ export function AdminAppearancePage() {
         ) : (
           <p className={muted + ' mt-3 text-[12px]'}>Maximum of 4 banners.</p>
         )}
+      </section>
+
+      {/* Hero marquee / trending strip */}
+      <section className={panel}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className={sectionTitle}>Trending marquee</h2>
+            <p className={muted + ' mt-1 max-w-lg text-[13px] leading-relaxed'}>
+              Scrolling phrases under the hero (what&apos;s trending). Edit the list — they loop on the home page.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={linkBtn}
+            onClick={() =>
+              setDraft((d) => ({
+                ...d,
+                heroMarquee: [...d.heroMarquee, 'New phrase'].slice(0, 16),
+              }))
+            }
+            disabled={draft.heroMarquee.length >= 16}
+          >
+            Add phrase
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-2">
+          {draft.heroMarquee.map((text, i) => (
+            <div key={`mq-${i}`} className="flex flex-wrap items-center gap-2">
+              <input
+                className={inputCls + ' min-w-0 flex-1'}
+                value={text}
+                onChange={(e) =>
+                  setDraft((d) => {
+                    const next = [...d.heroMarquee]
+                    next[i] = e.target.value
+                    return { ...d, heroMarquee: next }
+                  })
+                }
+                placeholder="e.g. Soft Glam"
+                aria-label={`Marquee phrase ${i + 1}`}
+              />
+              <button
+                type="button"
+                className="text-[11px] font-semibold text-emerald-700 disabled:opacity-40"
+                disabled={i === 0}
+                onClick={() =>
+                  setDraft((d) => {
+                    const next = [...d.heroMarquee]
+                    ;[next[i - 1], next[i]] = [next[i]!, next[i - 1]!]
+                    return { ...d, heroMarquee: next }
+                  })
+                }
+              >
+                Up
+              </button>
+              <button
+                type="button"
+                className="text-[11px] font-semibold text-emerald-700 disabled:opacity-40"
+                disabled={i >= draft.heroMarquee.length - 1}
+                onClick={() =>
+                  setDraft((d) => {
+                    const next = [...d.heroMarquee]
+                    ;[next[i], next[i + 1]] = [next[i + 1]!, next[i]!]
+                    return { ...d, heroMarquee: next }
+                  })
+                }
+              >
+                Down
+              </button>
+              <button
+                type="button"
+                className="text-[11px] font-semibold text-rose-600 disabled:opacity-40"
+                disabled={draft.heroMarquee.length <= 1}
+                onClick={() => {
+                  if (!adminConfirmDelete(`phrase “${text || i + 1}”`)) return
+                  setDraft((d) => ({
+                    ...d,
+                    heroMarquee: d.heroMarquee.filter((_, j) => j !== i),
+                  }))
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+        <p className={muted + ' mt-3 text-[12px]'}>Up to 16 phrases. Empty lines are removed when you save.</p>
       </section>
 
       {/* Offer */}
@@ -645,9 +745,9 @@ export function AdminAppearancePage() {
       <section className={panel}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className={sectionTitle}>Product card colors</h2>
+            <h2 className={sectionTitle}>Product & contact colors</h2>
             <p className={muted + ' mt-1 max-w-lg text-[13px] leading-relaxed'}>
-              Three colors for product cards — photo background, price, and wishlist accents.
+              Card photo, Add to cart, price, wishlist, and the WhatsApp button — each can be its own color.
             </p>
           </div>
           <button type="button" onClick={formNewProductUiColors} className={linkBtn}>
@@ -670,10 +770,12 @@ export function AdminAppearancePage() {
             <p className={ad(theme, 'text-[13px] font-bold text-stone-900', 'text-[13px] font-bold text-white')}>
               {productHistoryLabel}
             </p>
-            <div className="mt-1.5 flex justify-center gap-1.5">
+            <div className="mt-1.5 flex flex-wrap justify-center gap-1.5">
               <span className="size-4 rounded-full border border-black/10" style={{ background: productUi.cardBg }} title="Card background" />
+              <span className="size-4 rounded-full border border-black/10" style={{ background: productUi.addToCart }} title="Add to cart" />
               <span className="size-4 rounded-full border border-black/10" style={{ background: productUi.price }} title="Price" />
               <span className="size-4 rounded-full border border-black/10" style={{ background: productUi.favorite }} title="Favorites" />
+              <span className="size-4 rounded-full border border-black/10" style={{ background: productUi.whatsapp }} title="WhatsApp" />
             </div>
           </div>
           <button type="button" className={linkBtn} onClick={productGoNext} disabled={!productCanGoNext}>
@@ -683,7 +785,7 @@ export function AdminAppearancePage() {
         </div>
 
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-0.5">
-          <p className={muted + ' text-[11px]'}>Same three colors are never saved twice.</p>
+          <p className={muted + ' text-[11px]'}>Same color set is never saved twice.</p>
           <button
             type="button"
             onClick={deleteCurrentProductUiSet}
@@ -748,11 +850,25 @@ export function AdminAppearancePage() {
           >
             <span className="material-symbols-outlined text-[24px] text-white/80">image</span>
           </div>
+          <button
+            type="button"
+            className="rounded-[10px] px-3 py-2 text-[10px] font-bold tracking-wide text-white uppercase"
+            style={{ background: productUi.addToCart }}
+          >
+            Add to cart
+          </button>
           <span className="font-bold tabular-nums" style={{ color: productUi.price }}>
             ₦12,500
           </span>
           <span className="material-symbols-outlined text-[28px]" style={{ color: productUi.favorite }}>
             favorite
+          </span>
+          <span
+            className="inline-flex size-10 items-center justify-center rounded-full text-white"
+            style={{ background: productUi.whatsapp }}
+            title="WhatsApp"
+          >
+            <span className="material-symbols-outlined text-[22px]">chat</span>
           </span>
           {!productIsNewDraft && productHistory[productHistoryIndex] && !productUiRolesEqual(productUi, productHistory[productHistoryIndex]!) ? (
             <span className={muted + ' ml-auto text-[11px]'}>Edited — save to keep</span>

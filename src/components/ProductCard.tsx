@@ -132,7 +132,7 @@ export function ProductCard({
             className={`flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-[10px] px-2 text-[9px] font-bold tracking-[0.1em] text-white uppercase transition-colors sm:min-h-[48px] sm:gap-2 sm:px-3 sm:text-[11px] ${
               inCart ? 'bg-emerald-600 hover:bg-emerald-700' : 'hover:opacity-95'
             }`}
-            style={inCart ? undefined : { backgroundColor: 'var(--tle-product-card-bg, #000000)' }}
+            style={inCart ? undefined : { backgroundColor: 'var(--tle-product-add-to-cart, #000000)' }}
             onClick={(e) => {
               e.preventDefault()
               onAddToCart?.()

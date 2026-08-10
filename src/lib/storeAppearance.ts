@@ -1,7 +1,7 @@
 import { getSupabase } from './supabaseClient'
 import { isSupabaseConfigured } from './mapSupabaseAuthError'
 
-const CACHE_KEY = 'tle_store_appearance_v5'
+const CACHE_KEY = 'tle_store_appearance_v7'
 
 export type ExclusiveOfferAppearance = {
   enabled: boolean
@@ -30,16 +30,22 @@ export type BrandColorRoles = {
   dark: string
 }
 
-/** Product card colors on the storefront (card well, price, wishlist accents). */
+/** Product card + contact accent colors on the storefront. */
 export type ProductUiColorRoles = {
   cardBg: string
   price: string
   favorite: string
+  /** Add to cart button (separate from photo well). */
+  addToCart: string
+  /** Floating WhatsApp button / contact WhatsApp icon. */
+  whatsapp: string
 }
 
 export type StoreAppearance = {
   /** Public image URLs, 1–4 slides. */
   heroBanners: string[]
+  /** Scrolling “trending” strip under the hero. */
+  heroMarquee: string[]
   exclusiveOffer: ExclusiveOfferAppearance
   colors: BrandColors
   /**
@@ -47,9 +53,9 @@ export type StoreAppearance = {
    * Each entry is one full store look: icons/links, buttons/footer, labels.
    */
   colorHistory: BrandColorRoles[]
-  /** Current product card colors (card background, price, favorites). */
+  /** Current product card + WhatsApp colors. */
   productUiColors: ProductUiColorRoles
-  /** Saved product card color sets (oldest → newest). */
+  /** Saved product UI color sets (oldest → newest). */
   productUiColorHistory: ProductUiColorRoles[]
   /** Admin panel accent (buttons, nav active, links). Storefront ignores this. */
   adminAccent: string
@@ -75,10 +81,21 @@ export const DEFAULT_PRODUCT_UI_ROLES: ProductUiColorRoles = {
   cardBg: '#000000',
   price: '#047857',
   favorite: '#ff7a20',
+  addToCart: '#000000',
+  whatsapp: '#25d366',
 }
 
 export const DEFAULT_STORE_APPEARANCE: StoreAppearance = {
   heroBanners: ['/promo-hero.png'],
+  heroMarquee: [
+    'Soft Glam',
+    'Bridal Beauty',
+    'Statement Jewelry',
+    'Fashion Pieces',
+    'Luxury Accessories',
+    'Elevated Style',
+    'Makeup Studio',
+  ],
   exclusiveOffer: {
     enabled: true,
     badge: 'Exclusive offer',
@@ -123,6 +140,16 @@ function normalizeBanners(raw: unknown): string[] {
     .filter(Boolean)
     .slice(0, 4)
   return urls.length ? urls : [...DEFAULT_STORE_APPEARANCE.heroBanners]
+}
+
+function normalizeMarquee(raw: unknown): string[] {
+  const fallback = [...DEFAULT_STORE_APPEARANCE.heroMarquee]
+  if (!Array.isArray(raw)) return fallback
+  const items = raw
+    .map((u) => (typeof u === 'string' ? u.trim() : ''))
+    .filter(Boolean)
+    .slice(0, 16)
+  return items.length ? items : fallback
 }
 
 function normalizeOffer(raw: unknown): ExclusiveOfferAppearance {
@@ -260,7 +287,13 @@ export function removeColorSetting(
 }
 
 export function productUiRolesEqual(a: ProductUiColorRoles, b: ProductUiColorRoles): boolean {
-  return a.cardBg === b.cardBg && a.price === b.price && a.favorite === b.favorite
+  return (
+    a.cardBg === b.cardBg &&
+    a.price === b.price &&
+    a.favorite === b.favorite &&
+    a.addToCart === b.addToCart &&
+    a.whatsapp === b.whatsapp
+  )
 }
 
 export function normalizeProductUiRoles(
@@ -269,10 +302,14 @@ export function normalizeProductUiRoles(
 ): ProductUiColorRoles {
   if (!raw || typeof raw !== 'object') return { ...fallback }
   const o = raw as Record<string, unknown>
+  const cardBg = normalizeHex(o.cardBg ?? o.card, fallback.cardBg)
   return {
-    cardBg: normalizeHex(o.cardBg ?? o.card, fallback.cardBg),
+    cardBg,
     price: normalizeHex(o.price, fallback.price),
     favorite: normalizeHex(o.favorite ?? o.gold, fallback.favorite),
+    // Older saves used cardBg for the cart button — keep that look until she picks a new one.
+    addToCart: normalizeHex(o.addToCart ?? o.cart ?? o.cardBg ?? o.card, cardBg),
+    whatsapp: normalizeHex(o.whatsapp, fallback.whatsapp),
   }
 }
 
@@ -363,6 +400,7 @@ export function normalizeStoreAppearance(raw: unknown): StoreAppearance {
   const productUiColors = normalizeProductUiRoles(o.productUiColors ?? o.productUi)
   return {
     heroBanners: normalizeBanners(o.heroBanners),
+    heroMarquee: normalizeMarquee(o.heroMarquee ?? o.marquee),
     exclusiveOffer: normalizeOffer(o.exclusiveOffer),
     colors,
     colorHistory: normalizeColorHistory(o.colorHistory, roles),
@@ -418,9 +456,13 @@ export function applyProductUiColors(roles: ProductUiColorRoles): void {
   root.style.setProperty('--tle-product-card-bg', normalized.cardBg)
   root.style.setProperty('--tle-product-price', normalized.price)
   root.style.setProperty('--tle-product-favorite', normalized.favorite)
+  root.style.setProperty('--tle-product-add-to-cart', normalized.addToCart)
+  root.style.setProperty('--tle-product-whatsapp', normalized.whatsapp)
   root.style.setProperty('--tle-product-card-bg-rgb', hexToRgbTriplet(normalized.cardBg))
   root.style.setProperty('--tle-product-price-rgb', hexToRgbTriplet(normalized.price))
   root.style.setProperty('--tle-product-favorite-rgb', hexToRgbTriplet(normalized.favorite))
+  root.style.setProperty('--tle-product-add-to-cart-rgb', hexToRgbTriplet(normalized.addToCart))
+  root.style.setProperty('--tle-product-whatsapp-rgb', hexToRgbTriplet(normalized.whatsapp))
 }
 
 /** Admin panel accent only — remapped inside `.admin-shell` (see adminAccent.css). */
@@ -509,6 +551,9 @@ export async function saveStoreAppearance(
   if (normalized.heroBanners.length > 4) {
     return { ok: false, message: 'You can use up to 4 hero banners.' }
   }
+  if (normalized.heroMarquee.length < 1) {
+    return { ok: false, message: 'Add at least one trending marquee phrase.' }
+  }
 
   const savedRoles = rolesFromBrandColors(normalized.colors)
   const { error } = await getSupabase()
@@ -516,6 +561,7 @@ export async function saveStoreAppearance(
     .update({
       appearance: {
         heroBanners: normalized.heroBanners,
+        heroMarquee: normalized.heroMarquee,
         exclusiveOffer: normalized.exclusiveOffer,
         colors: {
           ...normalized.colors,

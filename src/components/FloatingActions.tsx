@@ -35,7 +35,8 @@ export function FloatingActions() {
         href={WHATSAPP_HREF}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex size-12 items-center justify-center rounded-full bg-[#25D366] text-white shadow-[0_10px_24px_rgba(0,0,0,0.26)] transition-transform hover:scale-[1.04] hover:bg-[#1fb85a]"
+        className="flex size-12 items-center justify-center rounded-full text-white shadow-[0_10px_24px_rgba(0,0,0,0.26)] transition-transform hover:scale-[1.04] hover:brightness-95"
+        style={{ backgroundColor: 'var(--tle-product-whatsapp, #25d366)' }}
         aria-label="Chat on WhatsApp"
       >
         <WhatsAppIcon className="size-7" />
