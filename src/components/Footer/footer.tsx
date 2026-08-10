@@ -57,9 +57,33 @@ export function Footer() {
               decoding="async"
             />
           </Link>
-          <p className="max-w-[240px] text-[13px] leading-relaxed text-white/[0.38]">
+          <p className="max-w-[280px] text-[13px] leading-relaxed text-white/[0.38]">
             Intentional fashion, beauty, and glam experiences for him and her 🤍
           </p>
+          <a
+            href="https://www.instagram.com/tlebeautybrand/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/[0.08] py-2.5 pr-5 pl-2.5 no-underline transition-all hover:border-tle-pink hover:bg-tle-pink/15"
+            aria-label="Follow TOBILICIOUS on Instagram @tlebeautybrand"
+          >
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white">
+              <img
+                src="/instagram.svg"
+                alt=""
+                className="size-5"
+                width={20}
+                height={20}
+                decoding="async"
+              />
+            </span>
+            <span className="min-w-0 text-left">
+              <span className="block text-[10px] font-bold tracking-[0.16em] text-white/55 uppercase">
+                Follow us
+              </span>
+              <span className="mt-0.5 block text-[13px] font-semibold text-white">@tlebeautybrand</span>
+            </span>
+          </a>
         </div>
         <div>
           <div className="mb-5 text-[10px] font-bold tracking-[0.25em] text-white uppercase">Services</div>
@@ -97,24 +121,6 @@ export function Footer() {
         <span className="text-xs text-white/25">
           © {new Date().getFullYear()} TOBILICIOUS BY LADY EMMA. All rights reserved.
         </span>
-        <div>
-          <a
-            href="https://www.instagram.com/tlebeautybrand/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex size-[38px] items-center justify-center rounded-full border border-white/10 bg-white/[0.04] no-underline transition-all hover:border-tle-pink hover:bg-tle-pink/10"
-            aria-label="Instagram @tlebeautybrand"
-          >
-            <img
-              src="/instagram.svg"
-              alt=""
-              className="size-5"
-              width={20}
-              height={20}
-              decoding="async"
-            />
-          </a>
-        </div>
       </div>
     </footer>
   )
