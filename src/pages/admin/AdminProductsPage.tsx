@@ -1047,10 +1047,10 @@ export function AdminProductsPage() {
             </div>
 
             <div className="hidden w-full overflow-x-auto md:block">
-              <table className="w-full max-w-full table-fixed border-collapse text-left text-[12px] sm:text-[13px]">
+              <table className="w-full min-w-[920px] table-fixed border-collapse text-left text-[12px] sm:text-[13px]">
                 <thead>
                   <tr className={tableHead}>
-                    <th className="w-9 px-1 py-2.5 sm:w-10 sm:px-2 sm:py-3">
+                    <th className="w-10 px-2 py-3">
                       <input
                         type="checkbox"
                         className="rounded border-stone-300"
@@ -1059,16 +1059,16 @@ export function AdminProductsPage() {
                         aria-label="Select all visible"
                       />
                     </th>
-                    <th className="w-[52px] px-1 py-2.5 sm:w-14 sm:px-2 sm:py-3">Image</th>
-                    <th className="w-[28%] min-w-0 px-1 py-2.5 sm:px-2 sm:py-3">Product</th>
-                    <th className="w-[13%] min-w-0 px-1 py-2.5 sm:px-2 sm:py-3">Category</th>
-                    <th className="hidden w-12 px-1 py-2.5 text-center sm:table-cell sm:px-2 sm:py-3">Who for</th>
-                    <th className="w-11 px-1 py-2.5 text-center sm:w-14 sm:px-2 sm:py-3">Stock</th>
-                    <th className="hidden w-[72px] px-1 py-2.5 lg:table-cell lg:px-2 lg:py-3">CP</th>
-                    <th className="min-w-0 px-1 py-2.5 sm:px-2 sm:py-3">SP</th>
-                    <th className="hidden w-[92px] px-1 py-2.5 lg:table-cell lg:px-2 lg:py-3">Status</th>
-                    <th className="hidden w-[88px] px-1 py-2.5 text-center sm:table-cell sm:px-2 sm:py-3">Shelf</th>
-                    <th className="w-[76px] px-1 py-2.5 text-right sm:w-24 sm:px-2 sm:py-3">Actions</th>
+                    <th className="w-14 px-2 py-3">Image</th>
+                    <th className="w-[22%] min-w-0 px-2 py-3">Product</th>
+                    <th className="w-[12%] min-w-0 px-2 py-3">Category</th>
+                    <th className="hidden w-16 px-2 py-3 text-center sm:table-cell">Who for</th>
+                    <th className="w-[14%] min-w-0 px-2 py-3">Stock</th>
+                    <th className="hidden w-[72px] px-2 py-3 lg:table-cell">CP</th>
+                    <th className="w-[88px] px-2 py-3">SP</th>
+                    <th className="hidden w-[92px] px-2 py-3 lg:table-cell">Status</th>
+                    <th className="w-[108px] px-2 py-3 text-center">Shelf</th>
+                    <th className="w-[88px] px-2 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1087,33 +1087,42 @@ export function AdminProductsPage() {
                       const pub = isPublishedPayload(p)
                       const genderLabel = p.gender === 'unisex' ? 'unisex' : p.gender
                       const cpCell = p.cp?.trim() ? p.cp.trim() : '—'
+                      const shelfBtn =
+                        'inline-flex size-8 shrink-0 items-center justify-center rounded-lg border ' +
+                        ad(
+                          theme,
+                          'border-stone-200 text-stone-700 hover:bg-stone-100 disabled:opacity-40',
+                          'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40',
+                        )
                       return (
                         <tr key={row.id} className={ad(theme, 'hover:bg-stone-50/80', 'hover:bg-neutral-800/40')}>
-                          <td className={'px-1 py-2 align-middle sm:px-2 ' + tableCell}>
+                          <td className={'px-2 py-2.5 align-middle ' + tableCell}>
                             <input type="checkbox" className="rounded border-stone-300" checked={selected.has(row.id)} onChange={() => toggleSelect(row.id)} />
                           </td>
-                          <td className={'px-1 py-2 align-middle sm:px-2 ' + tableCell}>
+                          <td className={'px-2 py-2.5 align-middle ' + tableCell}>
                             <TableThumb url={thumb} theme={theme} />
                           </td>
-                          <td className={'min-w-0 max-w-0 px-1 py-2 align-middle sm:px-2 ' + tableCell}>
+                          <td className={'min-w-0 max-w-0 overflow-hidden px-2 py-2.5 align-middle ' + tableCell}>
                             <p className={'truncate font-semibold ' + ad(theme, 'text-stone-900', 'text-white')}>{p.name || row.slug}</p>
                             <p className={'truncate font-mono text-[10px] sm:text-[11px] ' + muted}>{row.slug}</p>
                           </td>
-                          <td className={'min-w-0 max-w-0 truncate px-1 py-2 align-middle sm:px-2 ' + tableCell}>{p.cat || '—'}</td>
-                          <td className={'hidden px-1 py-2 text-center align-middle text-[11px] capitalize sm:table-cell sm:px-2 ' + tableCell}>{genderLabel}</td>
+                          <td className={'min-w-0 max-w-0 truncate overflow-hidden px-2 py-2.5 align-middle ' + tableCell}>{p.cat || '—'}</td>
+                          <td className={'hidden px-2 py-2.5 text-center align-middle text-[11px] capitalize sm:table-cell ' + tableCell}>{genderLabel}</td>
                           <td
                             className={
-                              'px-1 py-2 text-center align-middle tabular-nums sm:px-2 ' + tableCell + ' ' + stockCls
+                              'min-w-0 max-w-0 overflow-hidden px-2 py-2.5 align-middle tabular-nums ' + tableCell + ' ' + stockCls
                             }
                             title={p.stockUnlimited === true ? 'Unlimited' : stockLabel}
                           >
-                            {p.stockUnlimited === true ? '∞' : stockLabel}
+                            <span className="line-clamp-2 break-words">
+                              {p.stockUnlimited === true ? '∞' : stockLabel}
+                            </span>
                           </td>
-                          <td className={'hidden min-w-0 max-w-[5.5rem] truncate px-1 py-2 align-middle font-mono text-[11px] tabular-nums lg:table-cell lg:max-w-[7rem] lg:px-2 ' + tableCell}>
+                          <td className={'hidden truncate overflow-hidden px-2 py-2.5 align-middle font-mono text-[11px] tabular-nums lg:table-cell ' + tableCell}>
                             {cpCell}
                           </td>
-                          <td className={'min-w-0 truncate px-1 py-2 align-middle font-semibold tabular-nums sm:px-2 ' + tableCell}>{p.price || '—'}</td>
-                          <td className={'hidden px-1 py-2 align-middle lg:table-cell lg:px-2 ' + tableCell}>
+                          <td className={'truncate overflow-hidden px-2 py-2.5 align-middle font-semibold tabular-nums ' + tableCell}>{p.price || '—'}</td>
+                          <td className={'hidden px-2 py-2.5 align-middle lg:table-cell ' + tableCell}>
                             <span
                               className={
                                 'inline-flex max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-bold ' +
@@ -1125,56 +1134,45 @@ export function AdminProductsPage() {
                               {pub ? 'Published' : 'Draft'}
                             </span>
                           </td>
-                          <td className={'hidden px-1 py-2 text-center align-middle sm:table-cell sm:px-2 ' + tableCell}>
-                            <div className="inline-flex flex-col gap-0.5">
+                          <td className={'px-2 py-2.5 text-center align-middle ' + tableCell}>
+                            <div className="inline-flex items-center justify-center gap-0.5">
                               <button
                                 type="button"
                                 disabled={shelfPosition(row.id) <= 0}
                                 onClick={() => moveShelf(row, 'top')}
-                                className={
-                                  'inline-flex size-7 items-center justify-center rounded-md border ' +
-                                  ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-100 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
-                                }
+                                className={shelfBtn}
                                 aria-label="Move to top of shop"
                                 title="Top"
                               >
                                 <span className="material-symbols-outlined text-[16px] font-light">vertical_align_top</span>
                               </button>
-                              <div className="flex justify-center gap-0.5">
-                                <button
-                                  type="button"
-                                  disabled={shelfPosition(row.id) <= 0}
-                                  onClick={() => moveShelf(row, 'up')}
-                                  className={
-                                    'inline-flex size-7 items-center justify-center rounded-md border ' +
-                                    ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-100 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
-                                  }
-                                  aria-label="Move up"
-                                  title="Up"
-                                >
-                                  <span className="material-symbols-outlined text-[16px] font-light">arrow_upward</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={shelfPosition(row.id) < 0 || shelfPosition(row.id) >= rows.length - 1}
-                                  onClick={() => moveShelf(row, 'down')}
-                                  className={
-                                    'inline-flex size-7 items-center justify-center rounded-md border ' +
-                                    ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-100 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
-                                  }
-                                  aria-label="Move down"
-                                  title="Down"
-                                >
-                                  <span className="material-symbols-outlined text-[16px] font-light">arrow_downward</span>
-                                </button>
-                              </div>
+                              <button
+                                type="button"
+                                disabled={shelfPosition(row.id) <= 0}
+                                onClick={() => moveShelf(row, 'up')}
+                                className={shelfBtn}
+                                aria-label="Move up"
+                                title="Up"
+                              >
+                                <span className="material-symbols-outlined text-[16px] font-light">arrow_upward</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={shelfPosition(row.id) < 0 || shelfPosition(row.id) >= rows.length - 1}
+                                onClick={() => moveShelf(row, 'down')}
+                                className={shelfBtn}
+                                aria-label="Move down"
+                                title="Down"
+                              >
+                                <span className="material-symbols-outlined text-[16px] font-light">arrow_downward</span>
+                              </button>
                             </div>
                           </td>
-                          <td className={'px-1 py-2 text-right align-middle sm:px-2 ' + tableCell}>
+                          <td className={'whitespace-nowrap px-2 py-2.5 text-right align-middle ' + tableCell}>
                             <button
                               type="button"
                               onClick={() => openEdit(row)}
-                              className={'mr-0.5 inline-flex size-8 items-center justify-center rounded-lg border sm:mr-1 sm:size-9 ' + ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-100', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800')}
+                              className={'mr-0.5 inline-flex size-8 items-center justify-center rounded-lg border sm:size-9 ' + ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-100', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800')}
                               aria-label="Edit"
                             >
                               <span className="material-symbols-outlined text-[18px] font-light">edit</span>
