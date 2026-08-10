@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import type { MakeupMenuCategory, MakeupMenuItem } from '../../data/bookingServices.ts'
@@ -34,6 +34,7 @@ export function AdminMakeupMenuPage() {
   const [tab, setTab] = useState<MakeupMenuCategory>('makeup')
   const [editing, setEditing] = useState<MakeupMenuItem | null>(null)
   const [isNew, setIsNew] = useState(false)
+  const editorRef = useRef<HTMLElement | null>(null)
 
   const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
   const heading = ad(theme, 'text-2xl font-bold tracking-tight text-stone-900', 'text-2xl font-bold tracking-tight text-white')
@@ -72,20 +73,32 @@ export function AdminMakeupMenuPage() {
     return tab === 'makeup' ? makeupServices(menu) : photoshootServices(menu)
   }, [menu, tab])
 
+  const scrollEditorIntoView = () => {
+    requestAnimationFrame(() => {
+      editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
   const openNew = () => {
     setIsNew(true)
     setEditing(emptyMakeupMenuItem(tab))
+    scrollEditorIntoView()
   }
 
   const openEdit = (item: MakeupMenuItem) => {
     setIsNew(false)
     setEditing({ ...item })
+    scrollEditorIntoView()
   }
 
   const closeEditor = () => {
     setEditing(null)
     setIsNew(false)
   }
+
+  useEffect(() => {
+    if (editing) scrollEditorIntoView()
+  }, [editing?.id, isNew])
 
   const patchEdit = useCallback((patch: Partial<MakeupMenuItem>) => {
     setEditing((prev) => (prev ? { ...prev, ...patch } : prev))
@@ -220,113 +233,17 @@ export function AdminMakeupMenuPage() {
         </button>
       </div>
 
-      <section className={panel}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className={ad(theme, 'text-base font-bold text-stone-900', 'text-base font-bold text-white')}>
-              {tab === 'makeup' ? 'Makeup services' : 'Photoshoot packages'}
-            </h2>
-            <p className={muted + ' mt-1 text-[13px]'}>
-              {tab === 'makeup'
-                ? 'Studio, home, bridal, and any other appointment services.'
-                : 'Featured outfit + edited pictures packages.'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={openNew}
-            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-[12px] font-bold uppercase tracking-wide text-white hover:bg-emerald-700"
-          >
-            Add new
-          </button>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          {list.length === 0 ? (
-            <p className={muted + ' py-8 text-center text-[14px]'}>No items in this category yet.</p>
-          ) : (
-            list.map((item, idx) => (
-              <div
-                key={item.id}
-                className={ad(
-                  theme,
-                  'flex flex-col gap-3 rounded-2xl border border-stone-200 p-4 sm:flex-row sm:items-center',
-                  'flex flex-col gap-3 rounded-2xl border border-neutral-700 p-4 sm:flex-row sm:items-center',
-                )}
-              >
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                  <span className="material-symbols-outlined text-[22px]">{item.icon || 'spa'}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className={ad(theme, 'font-semibold text-stone-900', 'font-semibold text-white')}>{item.name}</p>
-                  <p className={muted + ' mt-0.5 text-[12px]'}>{item.duration}</p>
-                  <p className={muted + ' mt-1 line-clamp-2 text-[13px]'}>{item.desc || '—'}</p>
-                  <p className={'mt-2 font-bold tabular-nums ' + ad(theme, 'text-stone-900', 'text-white')}>{item.price}</p>
-                </div>
-                <div className="flex flex-wrap gap-1.5 sm:flex-col">
-                  <button
-                    type="button"
-                    disabled={saving || idx === 0}
-                    onClick={() => void moveItem(item, -1)}
-                    className={
-                      'inline-flex size-9 items-center justify-center rounded-lg border disabled:opacity-40 ' +
-                      ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-50', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800')
-                    }
-                    aria-label="Move up"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">arrow_upward</span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={saving || idx >= list.length - 1}
-                    onClick={() => void moveItem(item, 1)}
-                    className={
-                      'inline-flex size-9 items-center justify-center rounded-lg border disabled:opacity-40 ' +
-                      ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-50', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800')
-                    }
-                    aria-label="Move down"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">arrow_downward</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openEdit(item)}
-                    className={
-                      'inline-flex size-9 items-center justify-center rounded-lg border ' +
-                      ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-50', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800')
-                    }
-                    aria-label="Edit"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">edit</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void onDelete(item)}
-                    className={
-                      'inline-flex size-9 items-center justify-center rounded-lg border text-rose-700 ' +
-                      ad(theme, 'border-rose-200 hover:bg-rose-50', 'border-rose-900/40 text-rose-300 hover:bg-rose-950/30')
-                    }
-                    aria-label="Delete"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </section>
-
       {editing ? (
-        <section className={panel}>
+        <section ref={editorRef} className={panel + ' ring-2 ring-emerald-500/30'}>
           <div className="flex items-center justify-between gap-3">
             <h2 className={ad(theme, 'text-base font-bold text-stone-900', 'text-base font-bold text-white')}>
-              {isNew ? 'New item' : 'Edit item'}
+              {isNew ? 'New item' : `Editing: ${editing.name || 'item'}`}
             </h2>
             <button type="button" onClick={closeEditor} className={link}>
               Cancel
             </button>
           </div>
+          <p className={muted + ' mt-1 text-[13px]'}>Change the fields below, then tap Save changes.</p>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -411,6 +328,110 @@ export function AdminMakeupMenuPage() {
           </div>
         </section>
       ) : null}
+
+      <section className={panel}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className={ad(theme, 'text-base font-bold text-stone-900', 'text-base font-bold text-white')}>
+              {tab === 'makeup' ? 'Makeup services' : 'Photoshoot packages'}
+            </h2>
+            <p className={muted + ' mt-1 text-[13px]'}>
+              {tab === 'makeup'
+                ? 'Studio, home, bridal, and any other appointment services.'
+                : 'Featured outfit + edited pictures packages.'}
+            </p>
+            <p className={muted + ' mt-2 text-[12px]'}>
+              ↑↓ arrows change the order customers see. Edit opens the form above — then Save changes.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={openNew}
+            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-[12px] font-bold uppercase tracking-wide text-white hover:bg-emerald-700"
+          >
+            Add new
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {list.length === 0 ? (
+            <p className={muted + ' py-8 text-center text-[14px]'}>No items in this category yet.</p>
+          ) : (
+            list.map((item, idx) => (
+              <div
+                key={item.id}
+                className={ad(
+                  theme,
+                  'flex flex-col gap-3 rounded-2xl border border-stone-200 p-4 sm:flex-row sm:items-center ' +
+                    (editing?.id === item.id ? 'border-emerald-400 ring-2 ring-emerald-500/20' : ''),
+                  'flex flex-col gap-3 rounded-2xl border border-neutral-700 p-4 sm:flex-row sm:items-center ' +
+                    (editing?.id === item.id ? 'border-emerald-500 ring-2 ring-emerald-500/30' : ''),
+                )}
+              >
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  <span className="material-symbols-outlined text-[22px]">{item.icon || 'spa'}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className={ad(theme, 'font-semibold text-stone-900', 'font-semibold text-white')}>{item.name}</p>
+                  <p className={muted + ' mt-0.5 text-[12px]'}>{item.duration}</p>
+                  <p className={muted + ' mt-1 line-clamp-2 text-[13px]'}>{item.desc || '—'}</p>
+                  <p className={'mt-2 font-bold tabular-nums ' + ad(theme, 'text-stone-900', 'text-white')}>{item.price}</p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    disabled={saving || idx === 0}
+                    onClick={() => void moveItem(item, -1)}
+                    title="Move higher on the customer menu"
+                    className={
+                      'inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-[11px] font-bold disabled:opacity-40 ' +
+                      ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-50', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800')
+                    }
+                  >
+                    <span className="material-symbols-outlined text-[16px]">arrow_upward</span>
+                    Up
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saving || idx >= list.length - 1}
+                    onClick={() => void moveItem(item, 1)}
+                    title="Move lower on the customer menu"
+                    className={
+                      'inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-[11px] font-bold disabled:opacity-40 ' +
+                      ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-50', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800')
+                    }
+                  >
+                    <span className="material-symbols-outlined text-[16px]">arrow_downward</span>
+                    Down
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openEdit(item)}
+                    className={
+                      'inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-[11px] font-bold ' +
+                      ad(theme, 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100', 'border-emerald-700 bg-emerald-950/40 text-emerald-200 hover:bg-emerald-950/60')
+                    }
+                  >
+                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onDelete(item)}
+                    className={
+                      'inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-[11px] font-bold text-rose-700 ' +
+                      ad(theme, 'border-rose-200 hover:bg-rose-50', 'border-rose-900/40 text-rose-300 hover:bg-rose-950/30')
+                    }
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
     </div>
   )
 }
