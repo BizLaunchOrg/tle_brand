@@ -20,6 +20,12 @@
     --tle-gold-rgb: 191 143 72;
     --tle-charcoal-rgb: 14 14 14;
     --tle-cream-rgb: 250 248 245;
+    --tle-product-card-bg: #000000;
+    --tle-product-price: #047857;
+    --tle-product-favorite: #ff7a20;
+    --tle-product-card-bg-rgb: 0 0 0;
+    --tle-product-price-rgb: 4 120 87;
+    --tle-product-favorite-rgb: 255 122 32;
   }
 
   body {

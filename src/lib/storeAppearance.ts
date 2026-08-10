@@ -1,7 +1,7 @@
 import { getSupabase } from './supabaseClient'
 import { isSupabaseConfigured } from './mapSupabaseAuthError'
 
-const CACHE_KEY = 'tle_store_appearance_v4'
+const CACHE_KEY = 'tle_store_appearance_v5'
 
 export type ExclusiveOfferAppearance = {
   enabled: boolean
@@ -30,6 +30,13 @@ export type BrandColorRoles = {
   dark: string
 }
 
+/** Product card colors on the storefront (card well, price, wishlist accents). */
+export type ProductUiColorRoles = {
+  cardBg: string
+  price: string
+  favorite: string
+}
+
 export type StoreAppearance = {
   /** Public image URLs, 1–4 slides. */
   heroBanners: string[]
@@ -40,6 +47,10 @@ export type StoreAppearance = {
    * Each entry is one full store look: icons/links, buttons/footer, labels.
    */
   colorHistory: BrandColorRoles[]
+  /** Current product card colors (card background, price, favorites). */
+  productUiColors: ProductUiColorRoles
+  /** Saved product card color sets (oldest → newest). */
+  productUiColorHistory: ProductUiColorRoles[]
   /** Admin panel accent (buttons, nav active, links). Storefront ignores this. */
   adminAccent: string
 }
@@ -60,6 +71,12 @@ export const DEFAULT_COLOR_ROLES: BrandColorRoles = {
   dark: DEFAULT_BRAND_COLORS.charcoal,
 }
 
+export const DEFAULT_PRODUCT_UI_ROLES: ProductUiColorRoles = {
+  cardBg: '#000000',
+  price: '#047857',
+  favorite: '#ff7a20',
+}
+
 export const DEFAULT_STORE_APPEARANCE: StoreAppearance = {
   heroBanners: ['/promo-hero.png'],
   exclusiveOffer: {
@@ -73,6 +90,8 @@ export const DEFAULT_STORE_APPEARANCE: StoreAppearance = {
   },
   colors: { ...DEFAULT_BRAND_COLORS },
   colorHistory: [{ ...DEFAULT_COLOR_ROLES }],
+  productUiColors: { ...DEFAULT_PRODUCT_UI_ROLES },
+  productUiColorHistory: [{ ...DEFAULT_PRODUCT_UI_ROLES }],
   /** Default matches previous admin emerald-600. */
   adminAccent: '#059669',
 }
@@ -240,6 +259,72 @@ export function removeColorSetting(
   return next.length ? next : [{ ...fallback }]
 }
 
+export function productUiRolesEqual(a: ProductUiColorRoles, b: ProductUiColorRoles): boolean {
+  return a.cardBg === b.cardBg && a.price === b.price && a.favorite === b.favorite
+}
+
+export function normalizeProductUiRoles(
+  raw: unknown,
+  fallback: ProductUiColorRoles = DEFAULT_PRODUCT_UI_ROLES,
+): ProductUiColorRoles {
+  if (!raw || typeof raw !== 'object') return { ...fallback }
+  const o = raw as Record<string, unknown>
+  return {
+    cardBg: normalizeHex(o.cardBg ?? o.card, fallback.cardBg),
+    price: normalizeHex(o.price, fallback.price),
+    favorite: normalizeHex(o.favorite ?? o.gold, fallback.favorite),
+  }
+}
+
+export function dedupeProductUiColorHistory(list: ProductUiColorRoles[]): ProductUiColorRoles[] {
+  const out: ProductUiColorRoles[] = []
+  for (const roles of list) {
+    const next = normalizeProductUiRoles(roles)
+    if (out.some((r) => productUiRolesEqual(r, next))) continue
+    out.push(next)
+  }
+  return out.slice(-MAX_COLOR_HISTORY)
+}
+
+export function normalizeProductUiColorHistory(
+  raw: unknown,
+  current: ProductUiColorRoles,
+): ProductUiColorRoles[] {
+  const list: ProductUiColorRoles[] = []
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue
+      list.push(normalizeProductUiRoles(item, current))
+    }
+  }
+  const cur = normalizeProductUiRoles(current)
+  if (!list.length) return [{ ...cur }]
+  const withoutCurrent = dedupeProductUiColorHistory(list).filter((r) => !productUiRolesEqual(r, cur))
+  return [...withoutCurrent, cur].slice(-MAX_COLOR_HISTORY)
+}
+
+export function rememberProductUiColorSetting(
+  history: ProductUiColorRoles[],
+  roles: ProductUiColorRoles,
+): ProductUiColorRoles[] {
+  const normalized = normalizeProductUiRoles(roles)
+  const without = (history.length ? history : []).filter(
+    (r) => !productUiRolesEqual(normalizeProductUiRoles(r), normalized),
+  )
+  return [...without, normalized].slice(-MAX_COLOR_HISTORY)
+}
+
+export function removeProductUiColorSetting(
+  history: ProductUiColorRoles[],
+  index: number,
+  fallback: ProductUiColorRoles = DEFAULT_PRODUCT_UI_ROLES,
+): ProductUiColorRoles[] {
+  if (history.length <= 1) return history.length ? [...history] : [{ ...fallback }]
+  if (index < 0 || index >= history.length) return [...history]
+  const next = history.filter((_, i) => i !== index)
+  return next.length ? next : [{ ...fallback }]
+}
+
 function normalizeColors(raw: unknown): BrandColors {
   const d = DEFAULT_BRAND_COLORS
   if (!raw || typeof raw !== 'object') return { ...d }
@@ -275,11 +360,14 @@ export function normalizeStoreAppearance(raw: unknown): StoreAppearance {
   const o = raw as Record<string, unknown>
   const colors = normalizeColors(o.colors)
   const roles = rolesFromBrandColors(colors)
+  const productUiColors = normalizeProductUiRoles(o.productUiColors ?? o.productUi)
   return {
     heroBanners: normalizeBanners(o.heroBanners),
     exclusiveOffer: normalizeOffer(o.exclusiveOffer),
     colors,
     colorHistory: normalizeColorHistory(o.colorHistory, roles),
+    productUiColors,
+    productUiColorHistory: normalizeProductUiColorHistory(o.productUiColorHistory, productUiColors),
     adminAccent: normalizeHex(o.adminAccent, DEFAULT_STORE_APPEARANCE.adminAccent),
   }
 }
@@ -322,6 +410,19 @@ export function applyBrandColors(colors: BrandColors): void {
   root.style.setProperty('--tle-light-rgb', hexToRgbTriplet(colors.light))
 }
 
+/** Product card accents — price, favorites, image well background. */
+export function applyProductUiColors(roles: ProductUiColorRoles): void {
+  if (typeof document === 'undefined') return
+  const normalized = normalizeProductUiRoles(roles)
+  const root = document.documentElement
+  root.style.setProperty('--tle-product-card-bg', normalized.cardBg)
+  root.style.setProperty('--tle-product-price', normalized.price)
+  root.style.setProperty('--tle-product-favorite', normalized.favorite)
+  root.style.setProperty('--tle-product-card-bg-rgb', hexToRgbTriplet(normalized.cardBg))
+  root.style.setProperty('--tle-product-price-rgb', hexToRgbTriplet(normalized.price))
+  root.style.setProperty('--tle-product-favorite-rgb', hexToRgbTriplet(normalized.favorite))
+}
+
 /** Admin panel accent only — remapped inside `.admin-shell` (see adminAccent.css). */
 export function applyAdminAccent(hex: string): void {
   if (typeof document === 'undefined') return
@@ -347,6 +448,7 @@ function hexToRgbTriplet(hex: string): string {
 export function bootstrapAppearanceFromCache(): StoreAppearance {
   const cached = readAppearanceCache()
   applyBrandColors(cached.colors)
+  applyProductUiColors(cached.productUiColors)
   applyAdminAccent(cached.adminAccent)
   return cached
 }
@@ -361,6 +463,7 @@ export function setMemoryAppearance(appearance: StoreAppearance): void {
   memoryCache = appearance
   writeAppearanceCache(appearance)
   applyBrandColors(appearance.colors)
+  applyProductUiColors(appearance.productUiColors)
   applyAdminAccent(appearance.adminAccent)
 }
 
@@ -391,10 +494,13 @@ export async function saveStoreAppearance(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) return { ok: false, message: 'Not configured.' }
   const roles = rolesFromBrandColors(appearance.colors)
+  const productUi = normalizeProductUiRoles(appearance.productUiColors)
   const withHistory = {
     ...appearance,
     colors: brandColorsFromRoles(roles),
     colorHistory: rememberColorSetting(appearance.colorHistory ?? [], roles),
+    productUiColors: productUi,
+    productUiColorHistory: rememberProductUiColorSetting(appearance.productUiColorHistory ?? [], productUi),
   }
   const normalized = normalizeStoreAppearance(withHistory)
   if (normalized.heroBanners.length < 1) {
@@ -418,6 +524,8 @@ export async function saveStoreAppearance(
           dark: savedRoles.dark,
         },
         colorHistory: normalized.colorHistory,
+        productUiColors: normalized.productUiColors,
+        productUiColorHistory: normalized.productUiColorHistory,
         adminAccent: normalized.adminAccent,
       },
       updated_at: new Date().toISOString(),

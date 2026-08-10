@@ -6,6 +6,7 @@ export type CatalogProductRow = {
   id: string
   slug: string
   payload: Product
+  sort_order: number
   created_at: string
   updated_at: string
 }
@@ -14,24 +15,43 @@ export async function fetchCatalogProducts(): Promise<CatalogProductRow[]> {
   if (!isSupabaseConfigured()) return []
   const { data, error } = await getSupabase()
     .from('catalog_products')
-    .select('id, slug, payload, created_at, updated_at')
+    .select('id, slug, payload, sort_order, created_at, updated_at')
+    .order('sort_order', { ascending: true })
     .order('updated_at', { ascending: false })
 
   if (error || !data) return []
-  return data as CatalogProductRow[]
+  return (data as Array<Omit<CatalogProductRow, 'sort_order'> & { sort_order?: number }>).map((row) => ({
+    ...row,
+    sort_order: typeof row.sort_order === 'number' ? row.sort_order : 0,
+  }))
+}
+
+async function nextSortOrderForNewProduct(): Promise<number> {
+  const { data } = await getSupabase()
+    .from('catalog_products')
+    .select('sort_order')
+    .order('sort_order', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  const min = typeof (data as { sort_order?: number } | null)?.sort_order === 'number'
+    ? (data as { sort_order: number }).sort_order
+    : 0
+  return min - 1
 }
 
 export async function insertCatalogProduct(
   product: Product,
 ): Promise<{ ok: true; row: CatalogProductRow } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) return { ok: false, message: 'Not configured.' }
+  const sortOrder = await nextSortOrderForNewProduct()
   const { data, error } = await getSupabase()
     .from('catalog_products')
     .insert({
       slug: product.slug,
       payload: product,
+      sort_order: sortOrder,
     })
-    .select('id, slug, payload, created_at, updated_at')
+    .select('id, slug, payload, sort_order, created_at, updated_at')
     .single()
   if (error) {
     if (error.code === '23505') return { ok: false, message: 'That slug already exists in staging.' }
@@ -66,6 +86,34 @@ export async function updateCatalogProduct(
     return { ok: false, message: 'Could not update product.' }
   }
   return { ok: true }
+}
+
+export async function swapCatalogProductSort(
+  idA: string,
+  sortA: number,
+  idB: string,
+  sortB: number,
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false
+  const sb = getSupabase()
+  const { error: e1 } = await sb.from('catalog_products').update({ sort_order: sortB }).eq('id', idA)
+  const { error: e2 } = await sb.from('catalog_products').update({ sort_order: sortA }).eq('id', idB)
+  return !e1 && !e2
+}
+
+export async function moveCatalogProductToTop(id: string): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false
+  const rows = await fetchCatalogProducts()
+  if (!rows.length) return false
+  const min = rows.reduce((m, r) => Math.min(m, r.sort_order), rows[0]!.sort_order)
+  const row = rows.find((r) => r.id === id)
+  if (!row) return false
+  if (row.sort_order <= min) return true
+  const { error } = await getSupabase()
+    .from('catalog_products')
+    .update({ sort_order: min - 1 })
+    .eq('id', id)
+  return !error
 }
 
 /** For enriching order line items when older rows lack snapshots. */
