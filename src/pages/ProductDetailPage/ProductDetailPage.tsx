@@ -331,7 +331,7 @@ export function ProductDetailPage() {
                       ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                       : 'text-white hover:opacity-95'
                 }`}
-                style={addDisabled || inCart ? undefined : { backgroundColor: 'var(--tle-product-card-bg, #000000)' }}
+                style={addDisabled || inCart ? undefined : { backgroundColor: 'var(--tle-product-add-to-cart, #000000)' }}
                 onClick={() => {
                   if (addDisabled) return
                   addToCart(product, addVariant)

@@ -85,14 +85,17 @@ export function ContactPage() {
                   href={whatsappHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group flex items-center gap-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/90 p-4 no-underline transition-colors hover:border-emerald-400/60 hover:bg-emerald-100"
+                  className="group flex items-center gap-4 rounded-2xl border border-black/10 bg-white p-4 no-underline transition-colors hover:border-black/20 hover:bg-zinc-50"
                 >
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition-transform group-hover:scale-[1.03]">
+                  <span
+                    className="flex size-12 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-transform group-hover:scale-[1.03]"
+                    style={{ backgroundColor: 'var(--tle-product-whatsapp, #25d366)' }}
+                  >
                     <WhatsAppIcon className="size-7" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold tracking-[0.14em] text-emerald-900/70 uppercase">WhatsApp</p>
-                    <p className="mt-0.5 font-sans text-lg font-semibold text-emerald-950">Message us</p>
+                    <p className="text-[10px] font-bold tracking-[0.14em] text-tle-muted uppercase">WhatsApp</p>
+                    <p className="mt-0.5 font-sans text-lg font-semibold text-tle-ink">Message us</p>
                   </div>
                 </a>
               </li>

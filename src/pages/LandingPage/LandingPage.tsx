@@ -37,16 +37,6 @@ import { useStoreAppearance } from "../../context/StoreAppearanceContext.tsx";
 import { useMakeupMenu } from "../../context/MakeupMenuContext.tsx";
 import { useCartDrawer } from "../../context/CartDrawerContext.tsx";
 
-const MARQUEE_ITEMS = [
-  "Soft Glam",
-  "Bridal Beauty",
-  "Statement Jewelry",
-  "Fashion Pieces",
-  "Luxury Accessories",
-  "Elevated Style",
-  "Makeup Studio",
-] as const;
-
 const HERO_FLOAT: { style: CSSProperties; icon: string }[] = [
   {
     style: {
@@ -150,6 +140,18 @@ export function LandingPage() {
   const { services, makeupItems, photoshootPackages, highlightTags } = useMakeupMenu();
   const offer = appearance.exclusiveOffer;
   const heroBanners = appearance.heroBanners;
+  const marqueeItems =
+    appearance.heroMarquee?.length > 0
+      ? appearance.heroMarquee
+      : [
+          "Soft Glam",
+          "Bridal Beauty",
+          "Statement Jewelry",
+          "Fashion Pieces",
+          "Luxury Accessories",
+          "Elevated Style",
+          "Makeup Studio",
+        ];
   const wrapRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -574,9 +576,9 @@ export function LandingPage() {
 
         <div className="flex overflow-hidden bg-tle-charcoal py-[22px] sm:py-6">
           <div className="flex animate-marquee whitespace-nowrap">
-            {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((text, i) => (
+            {[...marqueeItems, ...marqueeItems].map((text, i) => (
               <span
-                key={i}
+                key={`${text}-${i}`}
                 className="inline-flex shrink-0 items-center gap-6 px-6 text-[11.5px] font-semibold tracking-[0.12em] text-white/70 normal-case sm:text-xs sm:tracking-[0.14em]"
               >
                 {text}{" "}
