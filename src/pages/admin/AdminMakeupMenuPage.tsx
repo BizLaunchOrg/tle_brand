@@ -35,6 +35,8 @@ export function AdminMakeupMenuPage() {
   const [editing, setEditing] = useState<MakeupMenuItem | null>(null)
   const [isNew, setIsNew] = useState(false)
   const editorRef = useRef<HTMLElement | null>(null)
+  const orderPersistTimer = useRef<number | null>(null)
+  const orderPersistSeq = useRef(0)
 
   const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
   const heading = ad(theme, 'text-2xl font-bold tracking-tight text-stone-900', 'text-2xl font-bold tracking-tight text-white')
@@ -104,7 +106,7 @@ export function AdminMakeupMenuPage() {
     setEditing((prev) => (prev ? { ...prev, ...patch } : prev))
   }, [])
 
-  const persistItems = async (items: MakeupMenuItem[], successMsg: string) => {
+  const persistItems = async (items: MakeupMenuItem[], successMsg?: string) => {
     setSaving(true)
     const res = await saveMakeupMenu({ items })
     setSaving(false)
@@ -114,7 +116,7 @@ export function AdminMakeupMenuPage() {
     }
     const refreshed = await fetchMakeupMenu()
     setMenu(refreshed)
-    toast.success(successMsg)
+    if (successMsg) toast.success(successMsg)
     return true
   }
 
@@ -161,7 +163,7 @@ export function AdminMakeupMenuPage() {
     await persistItems(items, 'Deleted')
   }
 
-  const moveItem = async (item: MakeupMenuItem, dir: -1 | 1) => {
+  const moveItem = (item: MakeupMenuItem, dir: -1 | 1) => {
     if (!menu) return
     const inCat = menu.items.filter((i) => i.category === tab)
     const others = menu.items.filter((i) => i.category !== tab)
@@ -170,7 +172,23 @@ export function AdminMakeupMenuPage() {
     if (idx < 0 || j < 0 || j >= inCat.length) return
     const next = [...inCat]
     ;[next[idx], next[j]] = [next[j]!, next[idx]!]
-    await persistItems([...others, ...next], 'Order updated')
+    const ordered = [...others, ...next].map((it, i) => ({ ...it, sortOrder: i }))
+    setMenu({ items: ordered })
+    if (orderPersistTimer.current) window.clearTimeout(orderPersistTimer.current)
+    orderPersistTimer.current = window.setTimeout(() => {
+      const seq = ++orderPersistSeq.current
+      void (async () => {
+        const res = await saveMakeupMenu({ items: ordered })
+        if (seq !== orderPersistSeq.current) return
+        if (!res.ok) {
+          toast.error(res.message)
+          return
+        }
+        const refreshed = await fetchMakeupMenu()
+        if (seq !== orderPersistSeq.current) return
+        setMenu(refreshed)
+      })()
+    }, 250)
   }
 
   if (loading || !menu) {
@@ -341,7 +359,7 @@ export function AdminMakeupMenuPage() {
                 : 'Featured outfit + edited pictures packages.'}
             </p>
             <p className={muted + ' mt-2 text-[12px]'}>
-              ↑↓ arrows change the order customers see. Edit opens the form above — then Save changes.
+              ↑↓ arrows change order instantly (saves quietly in the background). Edit opens the form above — then Save changes.
             </p>
           </div>
           <button
@@ -380,8 +398,8 @@ export function AdminMakeupMenuPage() {
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     type="button"
-                    disabled={saving || idx === 0}
-                    onClick={() => void moveItem(item, -1)}
+                    disabled={idx === 0}
+                    onClick={() => moveItem(item, -1)}
                     title="Move higher on the customer menu"
                     className={
                       'inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-[11px] font-bold disabled:opacity-40 ' +
@@ -393,8 +411,8 @@ export function AdminMakeupMenuPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={saving || idx >= list.length - 1}
-                    onClick={() => void moveItem(item, 1)}
+                    disabled={idx >= list.length - 1}
+                    onClick={() => moveItem(item, 1)}
                     title="Move lower on the customer menu"
                     className={
                       'inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-[11px] font-bold disabled:opacity-40 ' +

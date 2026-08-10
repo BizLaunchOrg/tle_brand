@@ -116,6 +116,20 @@ export async function moveCatalogProductToTop(id: string): Promise<boolean> {
   return !error
 }
 
+/** Persist full shelf order (id → sort_order). Used after optimistic local reorders. */
+export async function saveCatalogSortOrders(
+  orders: Array<{ id: string; sort_order: number }>,
+): Promise<boolean> {
+  if (!isSupabaseConfigured() || !orders.length) return false
+  const sb = getSupabase()
+  const results = await Promise.all(
+    orders.map(({ id, sort_order }) =>
+      sb.from('catalog_products').update({ sort_order }).eq('id', id),
+    ),
+  )
+  return results.every((r) => !r.error)
+}
+
 /** For enriching order line items when older rows lack snapshots. */
 export async function fetchCatalogPayloadsBySlugs(slugs: string[]): Promise<Map<string, Product>> {
   const map = new Map<string, Product>()
