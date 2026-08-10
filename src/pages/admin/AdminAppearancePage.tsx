@@ -466,7 +466,7 @@ export function AdminAppearancePage() {
           <div>
             <h2 className={sectionTitle}>Trending marquee</h2>
             <p className={muted + ' mt-1 max-w-lg text-[13px] leading-relaxed'}>
-              Scrolling phrases under the hero (what&apos;s trending). Edit the list — they loop on the home page.
+              Scrolling phrases under the hero (what&apos;s trending). Edit the list.
             </p>
           </div>
           <button
