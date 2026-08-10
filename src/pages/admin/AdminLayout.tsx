@@ -338,6 +338,7 @@ function AdminLayoutInner() {
             <NavItem to="/admin" end label="Dashboard" theme={theme} icon="dashboard" />
             <NavItem to="/admin/customers" label="Customers" theme={theme} icon="group" />
             <NavItem to="/admin/makeup-bookings" label="Makeup requests" theme={theme} icon="face_retouching_natural" badge={makeupAlertCount} />
+            <NavItem to="/admin/makeup-menu" label="Makeup menu" theme={theme} icon="spa" />
             <NavItem to="/admin/makeup-hours" label="Makeup hours" theme={theme} icon="schedule" />
             <NavItem to="/admin/orders" label="Orders" theme={theme} icon="receipt_long" badge={orderAlertCount} />
             <NavItem to="/admin/products" label="Products" theme={theme} icon="inventory_2" />

@@ -17,9 +17,6 @@ import {
   productMatchesGender,
 } from "../../data/products.ts";
 import {
-  BOOKABLE_SERVICES,
-  MAKEUP_HIGHLIGHT_TAGS,
-  PHOTOSHOOT_PACKAGES,
   bookableServiceFromPhotoshootLine,
 } from "../../data/bookingServices.ts";
 import { BOOKING_TRANSFER_DEMO } from "../../data/bookingTransferDetails.ts";
@@ -37,6 +34,7 @@ import {
   useShopProducts,
 } from "../../context/ShopProductsContext.tsx";
 import { useStoreAppearance } from "../../context/StoreAppearanceContext.tsx";
+import { useMakeupMenu } from "../../context/MakeupMenuContext.tsx";
 import { useCartDrawer } from "../../context/CartDrawerContext.tsx";
 
 const MARQUEE_ITEMS = [
@@ -149,6 +147,7 @@ export function LandingPage() {
   const products = useShopProducts();
   const catalogLoading = useShopCatalogLoading();
   const appearance = useStoreAppearance();
+  const { services, makeupItems, photoshootPackages, highlightTags } = useMakeupMenu();
   const offer = appearance.exclusiveOffer;
   const heroBanners = appearance.heroBanners;
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -271,14 +270,14 @@ export function LandingPage() {
 
   const pickPhotoshootPackage = useCallback(
     (line: string) => {
-      const s = bookableServiceFromPhotoshootLine(line);
+      const s = bookableServiceFromPhotoshootLine(line, services);
       if (!s) return;
       setSelectedService({ name: s.name, price: s.price });
       setBookingError(null);
       setFormStep(2);
       scrollToBooking();
     },
-    [scrollToBooking],
+    [scrollToBooking, services],
   );
 
   const openHeroPhotoshootBooking = useCallback(() => {
@@ -805,15 +804,22 @@ export function LandingPage() {
                   Session.
                 </h2>
                 <p className="mb-7 max-w-[400px] text-[14.5px] font-light leading-[1.85] text-white/50">
-                  Studio session at{" "}
-                  <span className="text-white/75">₦35,000</span>. Home service
-                  from <span className="text-white/75">₦50,000</span> and bridal
-                  from <span className="text-white/75">₦100,000</span> — both
-                  depend on location. Use the hero offer for photoshoot bundles,
-                  or book any option below.
+                  {makeupItems.length
+                    ? makeupItems
+                        .slice(0, 3)
+                        .map((s, i) => (
+                          <span key={s.id}>
+                            {i > 0 ? ". " : ""}
+                            {s.name}{" "}
+                            <span className="text-white/75">{s.price}</span>
+                          </span>
+                        ))
+                    : null}
+                  . Use the hero offer for photoshoot bundles, or book any
+                  option below.
                 </p>
                 <div className="mb-8 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                  {MAKEUP_HIGHLIGHT_TAGS.map((name) => (
+                  {highlightTags.map((name) => (
                     <div
                       key={name}
                       className="flex items-center gap-2.5 rounded-[13px] border border-white/10 bg-white/5 px-4 py-3.5 transition-colors hover:border-tle-pink/30 hover:bg-tle-pink/10"
@@ -1030,8 +1036,8 @@ export function LandingPage() {
                       </button>
                     </div>
                     <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {PHOTOSHOOT_PACKAGES.map((p) => {
-                        const s = bookableServiceFromPhotoshootLine(p.line);
+                      {photoshootPackages.map((p) => {
+                        const s = bookableServiceFromPhotoshootLine(p.line, services);
                         if (!s) return null;
                         return (
                           <div
@@ -1086,9 +1092,7 @@ export function LandingPage() {
                       ? (Makeup session included.)
                     </p>
                     <div className="mb-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {BOOKABLE_SERVICES.filter(
-                        (s) => s.duration !== "Photoshoot",
-                      ).map((s) => {
+                      {makeupItems.map((s) => {
                         const sel = selectedService.name === s.name;
                         return (
                           <div
