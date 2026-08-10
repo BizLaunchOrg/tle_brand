@@ -17,8 +17,7 @@ import {
   deleteCatalogProduct,
   fetchCatalogProducts,
   insertCatalogProduct,
-  moveCatalogProductToTop,
-  swapCatalogProductSort,
+  saveCatalogSortOrders,
   updateCatalogProduct,
   type CatalogProductRow,
 } from '../../lib/adminCatalog.ts'
@@ -280,7 +279,10 @@ export function AdminProductsPage() {
   const [extraMergePaste, setExtraMergePaste] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploadBusy, setUploadBusy] = useState(false)
-  const [orderBusy, setOrderBusy] = useState<string | null>(null)
+  const [shelfSaving, setShelfSaving] = useState(false)
+  const shelfPersistTimer = useRef<number | null>(null)
+  const shelfPersistSeq = useRef(0)
+  const lastSavedSort = useRef<Map<string, number>>(new Map())
 
   const mainFileRef = useRef<HTMLInputElement>(null)
   const galleryFilesRef = useRef<HTMLInputElement>(null)
@@ -296,6 +298,7 @@ export function AdminProductsPage() {
     setRows(catalog)
     setOrders(ord)
     setCategoryPresetRows(catRows)
+    lastSavedSort.current = new Map(catalog.map((r) => [r.id, r.sort_order]))
     setLoading(false)
   }, [])
 
@@ -531,29 +534,55 @@ export function AdminProductsPage() {
 
   const shelfPosition = (id: string) => rows.findIndex((r) => r.id === id)
 
-  const moveShelf = async (row: CatalogProductRow, dir: 'up' | 'down' | 'top') => {
-    if (orderBusy) return
-    setOrderBusy(row.id)
-    try {
-      if (dir === 'top') {
-        const ok = await moveCatalogProductToTop(row.id)
-        if (!ok) toast.error('Could not move product. Apply migration 20260520170000_catalog_product_sort_order.sql if needed.')
-        else {
-          toast.success('Moved to top of shop')
-          await load()
-        }
-        return
-      }
-      const idx = shelfPosition(row.id)
-      if (idx < 0) return
-      const neighbor = dir === 'up' ? rows[idx - 1] : rows[idx + 1]
-      if (!neighbor) return
-      const ok = await swapCatalogProductSort(row.id, row.sort_order, neighbor.id, neighbor.sort_order)
-      if (!ok) toast.error('Could not reorder. Apply migration 20260520170000_catalog_product_sort_order.sql if needed.')
-      else await load()
-    } finally {
-      setOrderBusy(null)
+  const scheduleShelfPersist = useCallback((ordered: CatalogProductRow[]) => {
+    if (shelfPersistTimer.current) window.clearTimeout(shelfPersistTimer.current)
+    const dirty = ordered
+      .map((r, i) => ({ id: r.id, sort_order: i }))
+      .filter((r) => lastSavedSort.current.get(r.id) !== r.sort_order)
+    if (!dirty.length) {
+      setShelfSaving(false)
+      return
     }
+    setShelfSaving(true)
+    shelfPersistTimer.current = window.setTimeout(() => {
+      const seq = ++shelfPersistSeq.current
+      void saveCatalogSortOrders(dirty).then((ok) => {
+        if (seq !== shelfPersistSeq.current) return
+        setShelfSaving(false)
+        if (!ok) {
+          toast.error('Could not save shelf order. Apply migration 20260520170000_catalog_product_sort_order.sql if needed.')
+          return
+        }
+        for (const r of dirty) lastSavedSort.current.set(r.id, r.sort_order)
+      })
+    }, 250)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (shelfPersistTimer.current) window.clearTimeout(shelfPersistTimer.current)
+    }
+  }, [])
+
+  /** Instant local reorder — saves in the background (no success toast). */
+  const moveShelf = (row: CatalogProductRow, dir: 'up' | 'down' | 'top') => {
+    setRows((prev) => {
+      const next = [...prev]
+      const idx = next.findIndex((r) => r.id === row.id)
+      if (idx < 0) return prev
+      if (dir === 'top') {
+        if (idx === 0) return prev
+        const [item] = next.splice(idx, 1)
+        next.unshift(item!)
+      } else {
+        const j = dir === 'up' ? idx - 1 : idx + 1
+        if (j < 0 || j >= next.length) return prev
+        ;[next[idx], next[j]] = [next[j]!, next[idx]!]
+      }
+      const ordered = next.map((r, i) => ({ ...r, sort_order: i }))
+      scheduleShelfPersist(ordered)
+      return ordered
+    })
   }
 
   const toggleSelect = (id: string) => {
@@ -797,7 +826,8 @@ export function AdminProductsPage() {
                 </button>
                 {mainTab === 'inventory' && (
                   <p className={'w-full text-[12px] ' + muted}>
-                    New products appear first. Use shelf arrows to pick what shows at the top of the shop.
+                    Shelf arrows move products instantly on this list (and the shop).{' '}
+                    {shelfSaving ? <span className="font-semibold text-emerald-700">Saving order…</span> : null}
                   </p>
                 )}
                 {mainTab === 'inventory' && (
@@ -948,8 +978,8 @@ export function AdminProductsPage() {
                           <div className="flex gap-1">
                             <button
                               type="button"
-                              disabled={orderBusy === row.id || shelfPosition(row.id) <= 0}
-                              onClick={() => void moveShelf(row, 'top')}
+                              disabled={shelfPosition(row.id) <= 0}
+                              onClick={() => moveShelf(row, 'top')}
                               className={
                                 'inline-flex size-9 items-center justify-center rounded-lg border ' +
                                 ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-50 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
@@ -961,8 +991,8 @@ export function AdminProductsPage() {
                             </button>
                             <button
                               type="button"
-                              disabled={orderBusy === row.id || shelfPosition(row.id) <= 0}
-                              onClick={() => void moveShelf(row, 'up')}
+                              disabled={shelfPosition(row.id) <= 0}
+                              onClick={() => moveShelf(row, 'up')}
                               className={
                                 'inline-flex size-9 items-center justify-center rounded-lg border ' +
                                 ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-50 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
@@ -974,8 +1004,8 @@ export function AdminProductsPage() {
                             </button>
                             <button
                               type="button"
-                              disabled={orderBusy === row.id || shelfPosition(row.id) < 0 || shelfPosition(row.id) >= rows.length - 1}
-                              onClick={() => void moveShelf(row, 'down')}
+                              disabled={shelfPosition(row.id) < 0 || shelfPosition(row.id) >= rows.length - 1}
+                              onClick={() => moveShelf(row, 'down')}
                               className={
                                 'inline-flex size-9 items-center justify-center rounded-lg border ' +
                                 ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-50 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
@@ -1099,8 +1129,8 @@ export function AdminProductsPage() {
                             <div className="inline-flex flex-col gap-0.5">
                               <button
                                 type="button"
-                                disabled={orderBusy === row.id || shelfPosition(row.id) <= 0}
-                                onClick={() => void moveShelf(row, 'top')}
+                                disabled={shelfPosition(row.id) <= 0}
+                                onClick={() => moveShelf(row, 'top')}
                                 className={
                                   'inline-flex size-7 items-center justify-center rounded-md border ' +
                                   ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-100 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
@@ -1113,8 +1143,8 @@ export function AdminProductsPage() {
                               <div className="flex justify-center gap-0.5">
                                 <button
                                   type="button"
-                                  disabled={orderBusy === row.id || shelfPosition(row.id) <= 0}
-                                  onClick={() => void moveShelf(row, 'up')}
+                                  disabled={shelfPosition(row.id) <= 0}
+                                  onClick={() => moveShelf(row, 'up')}
                                   className={
                                     'inline-flex size-7 items-center justify-center rounded-md border ' +
                                     ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-100 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
@@ -1126,8 +1156,8 @@ export function AdminProductsPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={orderBusy === row.id || shelfPosition(row.id) < 0 || shelfPosition(row.id) >= rows.length - 1}
-                                  onClick={() => void moveShelf(row, 'down')}
+                                  disabled={shelfPosition(row.id) < 0 || shelfPosition(row.id) >= rows.length - 1}
+                                  onClick={() => moveShelf(row, 'down')}
                                   className={
                                     'inline-flex size-7 items-center justify-center rounded-md border ' +
                                     ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-100 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
