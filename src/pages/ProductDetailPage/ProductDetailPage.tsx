@@ -15,9 +15,6 @@ import {
 } from '../../data/products.ts'
 import { useShopProducts } from '../../context/ShopProductsContext.tsx'
 
-const NAVY = '#1A233A'
-const ORANGE = '#FF7A20'
-
 export function ProductDetailPage() {
   const products = useShopProducts()
   const { slug } = useParams<{ slug: string }>()
@@ -139,7 +136,7 @@ export function ProductDetailPage() {
           <div className="flex flex-col gap-4 lg:sticky lg:top-28 lg:self-start">
             <div
               className="relative flex aspect-[4/5] max-h-[560px] items-center justify-center overflow-hidden rounded-[28px] sm:aspect-square"
-              style={{ backgroundColor: NAVY }}
+              style={{ backgroundColor: 'var(--tle-product-card-bg, #000000)' }}
             >
               <img
                 src={activeSrc}
@@ -183,7 +180,7 @@ export function ProductDetailPage() {
               {saleLabel ? (
                 <span
                   className="pointer-events-none absolute top-4 left-4 rounded-lg px-3 py-1 text-[10px] font-bold tracking-wide text-white uppercase sm:top-5 sm:left-5 sm:text-[11px]"
-                  style={{ backgroundColor: ORANGE }}
+                  style={{ backgroundColor: 'var(--tle-product-favorite, #ff7a20)' }}
                 >
                   {saleLabel}
                 </span>
@@ -216,7 +213,7 @@ export function ProductDetailPage() {
                     className={`relative shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
                       i === activeImageIdx ? 'border-tle-pink ring-2 ring-tle-pink/25' : 'border-transparent opacity-80 hover:opacity-100'
                     }`}
-                    style={{ backgroundColor: NAVY }}
+                    style={{ backgroundColor: 'var(--tle-product-card-bg, #000000)' }}
                   >
                     <img src={url} alt="" className="size-[72px] object-contain object-center p-2 sm:size-20" />
                   </button>
@@ -243,7 +240,12 @@ export function ProductDetailPage() {
                   {formatProductPriceLabel(product.compareAt)}
                 </span>
               ) : null}
-              <span className="font-sans text-[clamp(1.5rem,3vw,2rem)] font-bold tabular-nums text-emerald-700">{displayPrice}</span>
+              <span
+                className="font-sans text-[clamp(1.5rem,3vw,2rem)] font-bold tabular-nums"
+                style={{ color: 'var(--tle-product-price, #047857)' }}
+              >
+                {displayPrice}
+              </span>
             </p>
 
             {product.tags && product.tags.length > 0 ? (
@@ -290,7 +292,12 @@ export function ProductDetailPage() {
                           {optOos ? <span className="ml-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400">Sold out</span> : null}
                         </span>
                         {opt.price && !optOos ? (
-                          <span className="shrink-0 font-bold tabular-nums text-emerald-700">{formatProductPriceLabel(opt.price)}</span>
+                          <span
+                            className="shrink-0 font-bold tabular-nums"
+                            style={{ color: 'var(--tle-product-price, #047857)' }}
+                          >
+                            {formatProductPriceLabel(opt.price)}
+                          </span>
                         ) : null}
                       </button>
                     )
@@ -324,7 +331,7 @@ export function ProductDetailPage() {
                       ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                       : 'text-white hover:opacity-95'
                 }`}
-                style={addDisabled || inCart ? undefined : { backgroundColor: NAVY }}
+                style={addDisabled || inCart ? undefined : { backgroundColor: 'var(--tle-product-card-bg, #000000)' }}
                 onClick={() => {
                   if (addDisabled) return
                   addToCart(product, addVariant)
@@ -347,7 +354,7 @@ export function ProductDetailPage() {
               >
                 <span
                   className={`material-symbols-outlined text-[22px] leading-none ${favorite ? 'material-symbols-filled' : ''}`}
-                  style={{ color: favorite ? '#DC2626' : ORANGE }}
+                  style={{ color: favorite ? '#DC2626' : 'var(--tle-product-favorite, #ff7a20)' }}
                 >
                   favorite
                 </span>
@@ -377,7 +384,7 @@ export function ProductDetailPage() {
                   to={`/product/${p.slug}`}
                   className="group overflow-hidden rounded-2xl border border-black/8 bg-white no-underline shadow-sm transition-all hover:-translate-y-0.5 hover:border-tle-pink/25 hover:shadow-md"
                 >
-                  <div className="aspect-square overflow-hidden" style={{ backgroundColor: NAVY }}>
+                  <div className="aspect-square overflow-hidden" style={{ backgroundColor: 'var(--tle-product-card-bg, #000000)' }}>
                     <img
                       src={p.img}
                       alt={p.alt}
@@ -389,7 +396,12 @@ export function ProductDetailPage() {
                     <p className="line-clamp-2 font-sans text-sm font-semibold text-tle-ink group-hover:text-tle-pink">
                       {p.name}
                     </p>
-                    <p className="mt-1 font-sans text-sm font-bold tabular-nums text-emerald-700">{formatProductPriceLabel(p.price)}</p>
+                    <p
+                      className="mt-1 font-sans text-sm font-bold tabular-nums"
+                      style={{ color: 'var(--tle-product-price, #047857)' }}
+                    >
+                      {formatProductPriceLabel(p.price)}
+                    </p>
                   </div>
                 </Link>
               ))}

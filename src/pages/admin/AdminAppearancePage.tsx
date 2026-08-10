@@ -4,20 +4,26 @@ import { uploadProductImageFile } from '../../lib/adminProductMedia.ts'
 import {
   brandColorsFromRoles,
   DEFAULT_COLOR_ROLES,
+  DEFAULT_PRODUCT_UI_ROLES,
   DEFAULT_STORE_APPEARANCE,
   fetchStoreAppearance,
+  normalizeProductUiRoles,
+  productUiRolesEqual,
   removeColorSetting,
+  removeProductUiColorSetting,
   rolesEqual,
   rolesFromBrandColors,
   saveStoreAppearance,
   type BrandColorRoles,
   type ExclusiveOfferAppearance,
+  type ProductUiColorRoles,
   type StoreAppearance,
 } from '../../lib/storeAppearance.ts'
 import { useAdminTheme } from './AdminThemeContext.tsx'
 import { ad, adminConfirmDelete, adminFont } from './adminUi.ts'
 
 type ColorRoleKey = keyof BrandColorRoles
+type ProductUiRoleKey = keyof ProductUiColorRoles
 
 const COLOR_SECTIONS: {
   key: ColorRoleKey
@@ -45,6 +51,32 @@ const COLOR_SECTIONS: {
   },
 ]
 
+const PRODUCT_UI_SECTIONS: {
+  key: ProductUiRoleKey
+  title: string
+  places: string[]
+  help: string
+}[] = [
+  {
+    key: 'cardBg',
+    title: 'Card background',
+    places: ['Product cards', 'Add to cart'],
+    help: 'Black area behind product photos and the add-to-cart button.',
+  },
+  {
+    key: 'price',
+    title: 'Price',
+    places: ['Price labels'],
+    help: 'Selling price on product cards and product pages.',
+  },
+  {
+    key: 'favorite',
+    title: 'Favorites & accents',
+    places: ['Wishlist', 'Sale tags', 'Thumbnails'],
+    help: 'Heart icon, sale badges, and photo thumbnail highlights.',
+  },
+]
+
 export function AdminAppearancePage() {
   const { theme } = useAdminTheme()
   const [draft, setDraft] = useState<StoreAppearance>(() => structuredClone(DEFAULT_STORE_APPEARANCE))
@@ -54,6 +86,8 @@ export function AdminAppearancePage() {
   /** Index into colorHistory (oldest → newest). */
   const [historyIndex, setHistoryIndex] = useState(0)
   const [isNewDraft, setIsNewDraft] = useState(false)
+  const [productHistoryIndex, setProductHistoryIndex] = useState(0)
+  const [productIsNewDraft, setProductIsNewDraft] = useState(false)
 
   const muted = ad(theme, 'text-stone-500', 'text-neutral-500')
   const heading = ad(theme, 'text-2xl font-bold tracking-tight text-stone-900', 'text-2xl font-bold tracking-tight text-white')
@@ -80,6 +114,8 @@ export function AdminAppearancePage() {
       setDraft(data)
       setHistoryIndex(Math.max(0, data.colorHistory.length - 1))
       setIsNewDraft(false)
+      setProductHistoryIndex(Math.max(0, data.productUiColorHistory.length - 1))
+      setProductIsNewDraft(false)
       setLoading(false)
     })()
     return () => {
@@ -90,9 +126,15 @@ export function AdminAppearancePage() {
   const roles = rolesFromBrandColors(draft.colors)
   const history = draft.colorHistory
   const historyLen = history.length
+  const productUi = normalizeProductUiRoles(draft.productUiColors)
+  const productHistory = draft.productUiColorHistory
+  const productHistoryLen = productHistory.length
   const canGoPrevious = isNewDraft ? historyLen > 0 : historyIndex > 0
   /** Disabled on the newest saved setting (and while drafting new colors). */
   const canGoNext = !isNewDraft && historyIndex < historyLen - 1
+
+  const productCanGoPrevious = productIsNewDraft ? productHistoryLen > 0 : productHistoryIndex > 0
+  const productCanGoNext = !productIsNewDraft && productHistoryIndex < productHistoryLen - 1
 
   const historyLabel = useMemo(() => {
     if (isNewDraft) return 'New colors (not saved yet)'
@@ -100,6 +142,15 @@ export function AdminAppearancePage() {
     if (historyIndex === historyLen - 1) return `Current · ${historyIndex + 1} of ${historyLen}`
     return `Saved setting · ${historyIndex + 1} of ${historyLen}`
   }, [historyIndex, historyLen, isNewDraft])
+
+  const productHistoryLabel = useMemo(() => {
+    if (productIsNewDraft) return 'New product colors (not saved yet)'
+    if (productHistoryLen <= 1) return 'Current product colors'
+    if (productHistoryIndex === productHistoryLen - 1) {
+      return `Current · ${productHistoryIndex + 1} of ${productHistoryLen}`
+    }
+    return `Saved setting · ${productHistoryIndex + 1} of ${productHistoryLen}`
+  }, [productHistoryIndex, productHistoryLen, productIsNewDraft])
 
   const applyRoles = useCallback((next: BrandColorRoles) => {
     setDraft((d) => ({ ...d, colors: brandColorsFromRoles(next) }))
@@ -114,6 +165,17 @@ export function AdminAppearancePage() {
       const next = { ...rolesFromBrandColors(d.colors), [key]: value }
       return { ...d, colors: brandColorsFromRoles(next) }
     })
+  }, [])
+
+  const applyProductUi = useCallback((next: ProductUiColorRoles) => {
+    setDraft((d) => ({ ...d, productUiColors: normalizeProductUiRoles(next) }))
+  }, [])
+
+  const patchProductUiRole = useCallback((key: ProductUiRoleKey, value: string) => {
+    setDraft((d) => ({
+      ...d,
+      productUiColors: normalizeProductUiRoles({ ...normalizeProductUiRoles(d.productUiColors), [key]: value }),
+    }))
   }, [])
 
   const goPrevious = () => {
@@ -177,6 +239,67 @@ export function AdminAppearancePage() {
     toast.success('Color set removed — save appearance to keep this change')
   }
 
+  const productGoPrevious = () => {
+    if (!productCanGoPrevious) return
+    if (productIsNewDraft) {
+      const last = productHistory[productHistoryLen - 1]
+      if (!last) return
+      setProductIsNewDraft(false)
+      setProductHistoryIndex(productHistoryLen - 1)
+      applyProductUi(last)
+      return
+    }
+    const nextIndex = productHistoryIndex - 1
+    const setting = productHistory[nextIndex]
+    if (!setting) return
+    setProductHistoryIndex(nextIndex)
+    applyProductUi(setting)
+  }
+
+  const productGoNext = () => {
+    if (!productCanGoNext) return
+    const nextIndex = productHistoryIndex + 1
+    const setting = productHistory[nextIndex]
+    if (!setting) return
+    setProductHistoryIndex(nextIndex)
+    applyProductUi(setting)
+  }
+
+  const formNewProductUiColors = () => {
+    setProductIsNewDraft(true)
+    applyProductUi({ ...DEFAULT_PRODUCT_UI_ROLES })
+    toast.success('New product color set — change the three colors below, then save')
+  }
+
+  const deleteCurrentProductUiSet = () => {
+    if (!productIsNewDraft && productHistoryLen <= 1) {
+      toast.error('Keep at least one product color set')
+      return
+    }
+    if (!adminConfirmDelete(productIsNewDraft ? 'these new product colors' : 'this product color set')) return
+    if (productIsNewDraft) {
+      const last = productHistory[productHistoryLen - 1]
+      if (!last) return
+      setProductIsNewDraft(false)
+      setProductHistoryIndex(productHistoryLen - 1)
+      applyProductUi(last)
+      toast.success('New draft discarded')
+      return
+    }
+    const removedIndex = productHistoryIndex
+    const nextHistory = removeProductUiColorSetting(productHistory, removedIndex, DEFAULT_PRODUCT_UI_ROLES)
+    const nextIndex = Math.min(removedIndex, nextHistory.length - 1)
+    const nextRoles = nextHistory[nextIndex] ?? DEFAULT_PRODUCT_UI_ROLES
+    setDraft((d) => ({
+      ...d,
+      productUiColorHistory: nextHistory,
+      productUiColors: normalizeProductUiRoles(nextRoles),
+    }))
+    setProductHistoryIndex(Math.max(0, nextIndex))
+    setProductIsNewDraft(false)
+    toast.success('Product color set removed — save appearance to keep this change')
+  }
+
   const onUploadBanner = async (file: File | null) => {
     if (!file) return
     if (draft.heroBanners.length >= 4) {
@@ -224,6 +347,8 @@ export function AdminAppearancePage() {
     setDraft(refreshed)
     setIsNewDraft(false)
     setHistoryIndex(Math.max(0, refreshed.colorHistory.length - 1))
+    setProductIsNewDraft(false)
+    setProductHistoryIndex(Math.max(0, refreshed.productUiColorHistory.length - 1))
     toast.success('Appearance saved — store and admin colors updated')
   }
 
@@ -511,6 +636,125 @@ export function AdminAppearancePage() {
             Link
           </span>
           {!isNewDraft && history[historyIndex] && !rolesEqual(roles, history[historyIndex]!) ? (
+            <span className={muted + ' ml-auto text-[11px]'}>Edited — save to keep</span>
+          ) : null}
+        </div>
+      </section>
+
+      {/* Product card colors */}
+      <section className={panel}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className={sectionTitle}>Product card colors</h2>
+            <p className={muted + ' mt-1 max-w-lg text-[13px] leading-relaxed'}>
+              Three colors for product cards — photo background, price, and wishlist accents.
+            </p>
+          </div>
+          <button type="button" onClick={formNewProductUiColors} className={linkBtn}>
+            Form new colors
+          </button>
+        </div>
+
+        <div
+          className={ad(
+            theme,
+            'mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-3',
+            'mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-700 bg-neutral-950/50 px-4 py-3',
+          )}
+        >
+          <button type="button" className={linkBtn} onClick={productGoPrevious} disabled={!productCanGoPrevious}>
+            <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+            Previous
+          </button>
+          <div className="min-w-0 text-center">
+            <p className={ad(theme, 'text-[13px] font-bold text-stone-900', 'text-[13px] font-bold text-white')}>
+              {productHistoryLabel}
+            </p>
+            <div className="mt-1.5 flex justify-center gap-1.5">
+              <span className="size-4 rounded-full border border-black/10" style={{ background: productUi.cardBg }} title="Card background" />
+              <span className="size-4 rounded-full border border-black/10" style={{ background: productUi.price }} title="Price" />
+              <span className="size-4 rounded-full border border-black/10" style={{ background: productUi.favorite }} title="Favorites" />
+            </div>
+          </div>
+          <button type="button" className={linkBtn} onClick={productGoNext} disabled={!productCanGoNext}>
+            Next
+            <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+          </button>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-0.5">
+          <p className={muted + ' text-[11px]'}>Same three colors are never saved twice.</p>
+          <button
+            type="button"
+            onClick={deleteCurrentProductUiSet}
+            disabled={!productIsNewDraft && productHistoryLen <= 1}
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-rose-600 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-stone-400 disabled:no-underline"
+          >
+            <span className="material-symbols-outlined text-[16px]">delete</span>
+            {productIsNewDraft ? 'Discard new colors' : 'Delete this set'}
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {PRODUCT_UI_SECTIONS.map((f) => (
+            <div
+              key={f.key}
+              className={ad(theme, 'rounded-2xl border border-stone-200 p-4', 'rounded-2xl border border-neutral-700 p-4')}
+            >
+              <h3 className={ad(theme, 'text-[15px] font-bold text-stone-900', 'text-[15px] font-bold text-white')}>
+                {f.title}
+              </h3>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {f.places.map((place) => (
+                  <span
+                    key={place}
+                    className={ad(
+                      theme,
+                      'rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-600',
+                      'rounded-md bg-neutral-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-300',
+                    )}
+                  >
+                    {place}
+                  </span>
+                ))}
+              </div>
+              <p className={muted + ' mt-2 text-[12px]'}>{f.help}</p>
+              <div className="mt-3 flex items-center gap-3">
+                <label className="relative shrink-0 cursor-pointer">
+                  <span className="block size-12 rounded-xl border border-black/10 shadow-inner" style={{ background: productUi[f.key] }} />
+                  <input
+                    type="color"
+                    value={productUi[f.key]}
+                    onChange={(e) => patchProductUiRole(f.key, e.target.value)}
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                    aria-label={f.title}
+                  />
+                </label>
+                <input
+                  className={inputCls + ' max-w-[10rem] font-mono'}
+                  value={productUi[f.key]}
+                  onChange={(e) => patchProductUiRole(f.key, e.target.value)}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-black/5 bg-black/[0.02] p-4">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-stone-500">Preview</span>
+          <div
+            className="flex size-14 items-center justify-center rounded-xl"
+            style={{ background: productUi.cardBg }}
+          >
+            <span className="material-symbols-outlined text-[24px] text-white/80">image</span>
+          </div>
+          <span className="font-bold tabular-nums" style={{ color: productUi.price }}>
+            ₦12,500
+          </span>
+          <span className="material-symbols-outlined text-[28px]" style={{ color: productUi.favorite }}>
+            favorite
+          </span>
+          {!productIsNewDraft && productHistory[productHistoryIndex] && !productUiRolesEqual(productUi, productHistory[productHistoryIndex]!) ? (
             <span className={muted + ' ml-auto text-[11px]'}>Edited — save to keep</span>
           ) : null}
         </div>

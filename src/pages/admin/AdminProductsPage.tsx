@@ -17,6 +17,8 @@ import {
   deleteCatalogProduct,
   fetchCatalogProducts,
   insertCatalogProduct,
+  moveCatalogProductToTop,
+  swapCatalogProductSort,
   updateCatalogProduct,
   type CatalogProductRow,
 } from '../../lib/adminCatalog.ts'
@@ -278,6 +280,7 @@ export function AdminProductsPage() {
   const [extraMergePaste, setExtraMergePaste] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploadBusy, setUploadBusy] = useState(false)
+  const [orderBusy, setOrderBusy] = useState<string | null>(null)
 
   const mainFileRef = useRef<HTMLInputElement>(null)
   const galleryFilesRef = useRef<HTMLInputElement>(null)
@@ -526,6 +529,33 @@ export function AdminProductsPage() {
     }
   }
 
+  const shelfPosition = (id: string) => rows.findIndex((r) => r.id === id)
+
+  const moveShelf = async (row: CatalogProductRow, dir: 'up' | 'down' | 'top') => {
+    if (orderBusy) return
+    setOrderBusy(row.id)
+    try {
+      if (dir === 'top') {
+        const ok = await moveCatalogProductToTop(row.id)
+        if (!ok) toast.error('Could not move product. Apply migration 20260520170000_catalog_product_sort_order.sql if needed.')
+        else {
+          toast.success('Moved to top of shop')
+          await load()
+        }
+        return
+      }
+      const idx = shelfPosition(row.id)
+      if (idx < 0) return
+      const neighbor = dir === 'up' ? rows[idx - 1] : rows[idx + 1]
+      if (!neighbor) return
+      const ok = await swapCatalogProductSort(row.id, row.sort_order, neighbor.id, neighbor.sort_order)
+      if (!ok) toast.error('Could not reorder. Apply migration 20260520170000_catalog_product_sort_order.sql if needed.')
+      else await load()
+    } finally {
+      setOrderBusy(null)
+    }
+  }
+
   const toggleSelect = (id: string) => {
     setSelected((s) => {
       const n = new Set(s)
@@ -766,6 +796,11 @@ export function AdminProductsPage() {
                   Clear filters
                 </button>
                 {mainTab === 'inventory' && (
+                  <p className={'w-full text-[12px] ' + muted}>
+                    New products appear first. Use shelf arrows to pick what shows at the top of the shop.
+                  </p>
+                )}
+                {mainTab === 'inventory' && (
                   <>
                     <button
                       type="button"
@@ -909,7 +944,48 @@ export function AdminProductsPage() {
                             {pub ? 'Live' : 'Draft'}
                           </span>
                         </div>
-                        <div className="mt-3 flex gap-2">
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              disabled={orderBusy === row.id || shelfPosition(row.id) <= 0}
+                              onClick={() => void moveShelf(row, 'top')}
+                              className={
+                                'inline-flex size-9 items-center justify-center rounded-lg border ' +
+                                ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-50 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
+                              }
+                              aria-label="Move to top of shop"
+                              title="Move to top"
+                            >
+                              <span className="material-symbols-outlined text-[18px] font-light">vertical_align_top</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={orderBusy === row.id || shelfPosition(row.id) <= 0}
+                              onClick={() => void moveShelf(row, 'up')}
+                              className={
+                                'inline-flex size-9 items-center justify-center rounded-lg border ' +
+                                ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-50 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
+                              }
+                              aria-label="Move up on shop shelf"
+                              title="Move up"
+                            >
+                              <span className="material-symbols-outlined text-[18px] font-light">arrow_upward</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={orderBusy === row.id || shelfPosition(row.id) < 0 || shelfPosition(row.id) >= rows.length - 1}
+                              onClick={() => void moveShelf(row, 'down')}
+                              className={
+                                'inline-flex size-9 items-center justify-center rounded-lg border ' +
+                                ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-50 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
+                              }
+                              aria-label="Move down on shop shelf"
+                              title="Move down"
+                            >
+                              <span className="material-symbols-outlined text-[18px] font-light">arrow_downward</span>
+                            </button>
+                          </div>
                           <button
                             type="button"
                             onClick={() => openEdit(row)}
@@ -961,13 +1037,14 @@ export function AdminProductsPage() {
                     <th className="hidden w-[72px] px-1 py-2.5 lg:table-cell lg:px-2 lg:py-3">CP</th>
                     <th className="min-w-0 px-1 py-2.5 sm:px-2 sm:py-3">SP</th>
                     <th className="hidden w-[92px] px-1 py-2.5 lg:table-cell lg:px-2 lg:py-3">Status</th>
+                    <th className="hidden w-[88px] px-1 py-2.5 text-center sm:table-cell sm:px-2 sm:py-3">Shelf</th>
                     <th className="w-[76px] px-1 py-2.5 text-right sm:w-24 sm:px-2 sm:py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRows.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className={'px-4 py-12 text-center text-[14px] ' + muted}>
+                      <td colSpan={11} className={'px-4 py-12 text-center text-[14px] ' + muted}>
                         No products match these filters. Try clearing filters or add a new product.
                       </td>
                     </tr>
@@ -1017,6 +1094,51 @@ export function AdminProductsPage() {
                             >
                               {pub ? 'Published' : 'Draft'}
                             </span>
+                          </td>
+                          <td className={'hidden px-1 py-2 text-center align-middle sm:table-cell sm:px-2 ' + tableCell}>
+                            <div className="inline-flex flex-col gap-0.5">
+                              <button
+                                type="button"
+                                disabled={orderBusy === row.id || shelfPosition(row.id) <= 0}
+                                onClick={() => void moveShelf(row, 'top')}
+                                className={
+                                  'inline-flex size-7 items-center justify-center rounded-md border ' +
+                                  ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-100 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
+                                }
+                                aria-label="Move to top of shop"
+                                title="Top"
+                              >
+                                <span className="material-symbols-outlined text-[16px] font-light">vertical_align_top</span>
+                              </button>
+                              <div className="flex justify-center gap-0.5">
+                                <button
+                                  type="button"
+                                  disabled={orderBusy === row.id || shelfPosition(row.id) <= 0}
+                                  onClick={() => void moveShelf(row, 'up')}
+                                  className={
+                                    'inline-flex size-7 items-center justify-center rounded-md border ' +
+                                    ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-100 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
+                                  }
+                                  aria-label="Move up"
+                                  title="Up"
+                                >
+                                  <span className="material-symbols-outlined text-[16px] font-light">arrow_upward</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={orderBusy === row.id || shelfPosition(row.id) < 0 || shelfPosition(row.id) >= rows.length - 1}
+                                  onClick={() => void moveShelf(row, 'down')}
+                                  className={
+                                    'inline-flex size-7 items-center justify-center rounded-md border ' +
+                                    ad(theme, 'border-stone-200 text-stone-700 hover:bg-stone-100 disabled:opacity-40', 'border-neutral-600 text-neutral-200 hover:bg-neutral-800 disabled:opacity-40')
+                                  }
+                                  aria-label="Move down"
+                                  title="Down"
+                                >
+                                  <span className="material-symbols-outlined text-[16px] font-light">arrow_downward</span>
+                                </button>
+                              </div>
+                            </div>
                           </td>
                           <td className={'px-1 py-2 text-right align-middle sm:px-2 ' + tableCell}>
                             <button

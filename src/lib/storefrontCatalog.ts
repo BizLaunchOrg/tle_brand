@@ -8,6 +8,7 @@ export async function fetchStorefrontCatalogProducts(): Promise<Product[]> {
   const { data, error } = await getSupabase()
     .from('catalog_products')
     .select('payload')
+    .order('sort_order', { ascending: true })
     .order('updated_at', { ascending: false })
 
   if (error || !data?.length) return []

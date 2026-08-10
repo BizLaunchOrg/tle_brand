@@ -9,10 +9,6 @@ import {
   type Product,
 } from '../data/products.ts'
 
-/** Screenshot-matched palette */
-const NAVY = '#1A233A'
-const ORANGE = '#FF7A20'
-
 export type ProductCardProps = {
   product: Product
   onAddToCart?: () => void
@@ -44,11 +40,10 @@ export function ProductCard({
     <article
       className={`flex h-full flex-col rounded-[16px] border border-zinc-200 bg-white p-3 shadow-sm sm:rounded-[20px] sm:p-5 ${className}`.trim()}
     >
-      {/* Navy image well */}
       <Link
         to={`/product/${slug}`}
         className="relative flex aspect-square items-center justify-center overflow-hidden rounded-xl sm:aspect-[1/1] sm:rounded-2xl"
-        style={{ backgroundColor: NAVY }}
+        style={{ backgroundColor: 'var(--tle-product-card-bg, #000000)' }}
       >
         {displayImg ? (
           <img
@@ -64,7 +59,7 @@ export function ProductCard({
         {saleLabel ? (
           <span
             className="absolute top-2.5 left-2.5 rounded-md px-2 py-0.5 text-[8px] font-bold tracking-wide text-white uppercase sm:top-3.5 sm:left-3.5 sm:px-2.5 sm:py-1 sm:text-[10px]"
-            style={{ backgroundColor: ORANGE }}
+            style={{ backgroundColor: 'var(--tle-product-favorite, #ff7a20)' }}
           >
             {saleLabel}
           </span>
@@ -85,7 +80,7 @@ export function ProductCard({
               onClick={() => setActiveThumb(i)}
               className="relative shrink-0 overflow-hidden rounded-lg border-2 bg-zinc-100 transition-colors"
               style={{
-                borderColor: activeThumb === i ? ORANGE : 'transparent',
+                borderColor: activeThumb === i ? 'var(--tle-product-favorite, #ff7a20)' : 'transparent',
               }}
               aria-label={`Preview ${i + 1}`}
             >
@@ -93,7 +88,10 @@ export function ProductCard({
             </button>
           ))}
           {moreCount > 0 ? (
-            <span className="shrink-0 pl-0.5 text-[11px] font-semibold sm:text-[13px]" style={{ color: ORANGE }}>
+            <span
+              className="shrink-0 pl-0.5 text-[11px] font-semibold sm:text-[13px]"
+              style={{ color: 'var(--tle-product-favorite, #ff7a20)' }}
+            >
               +{moreCount}
             </span>
           ) : null}
@@ -109,10 +107,14 @@ export function ProductCard({
           {name}
         </h3>
 
-        <p className="mt-1 font-sans text-base font-bold tabular-nums text-emerald-700 sm:text-xl">{formatProductPriceLabel(price)}</p>
+        <p
+          className="mt-1 font-sans text-base font-bold tabular-nums sm:text-xl"
+          style={{ color: 'var(--tle-product-price, #047857)' }}
+        >
+          {formatProductPriceLabel(price)}
+        </p>
       </Link>
 
-      {/* Keep CTA row pinned to the card bottom across uneven content (thumbs / titles). */}
       <div className="mt-auto flex items-stretch gap-2 pt-3.5 sm:pt-5">
         {outOfStock ? (
           <button
@@ -130,7 +132,7 @@ export function ProductCard({
             className={`flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-[10px] px-2 text-[9px] font-bold tracking-[0.1em] text-white uppercase transition-colors sm:min-h-[48px] sm:gap-2 sm:px-3 sm:text-[11px] ${
               inCart ? 'bg-emerald-600 hover:bg-emerald-700' : 'hover:opacity-95'
             }`}
-            style={inCart ? undefined : { backgroundColor: NAVY }}
+            style={inCart ? undefined : { backgroundColor: 'var(--tle-product-card-bg, #000000)' }}
             onClick={(e) => {
               e.preventDefault()
               onAddToCart?.()
@@ -156,7 +158,7 @@ export function ProductCard({
             className={`material-symbols-outlined text-[22px] leading-none sm:text-2xl ${
               isFavorite ? 'material-symbols-filled' : ''
             }`}
-            style={{ color: isFavorite ? '#DC2626' : ORANGE }}
+            style={{ color: isFavorite ? '#DC2626' : 'var(--tle-product-favorite, #ff7a20)' }}
           >
             favorite
           </span>
